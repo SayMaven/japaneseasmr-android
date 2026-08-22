@@ -40,6 +40,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val currentPos by viewModel.currentPosition.collectAsState()
     val duration by viewModel.duration.collectAsState()
     val repeatMode by viewModel.repeatMode.collectAsState()
+    val shuffleMode by viewModel.shuffleMode.collectAsState()
     val playlist by viewModel.playlist.collectAsState()
     val currentRjId by viewModel.currentRjId.collectAsState()
 
@@ -54,11 +55,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             // Large Artwork or Clean Empty Placeholder
             if (!coverUrl.isNullOrBlank()) {
@@ -67,7 +68,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     contentDescription = "Cover Art",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(260.dp)
+                        .size(250.dp)
                         .shadow(16.dp, RoundedCornerShape(20.dp))
                         .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
@@ -75,7 +76,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             } else {
                 Box(
                     modifier = Modifier
-                        .size(260.dp)
+                        .size(250.dp)
                         .shadow(8.dp, RoundedCornerShape(20.dp))
                         .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
@@ -89,9 +90,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             Icons.Default.Headphones,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                            modifier = Modifier.size(80.dp)
+                            modifier = Modifier.size(76.dp)
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = "JapaneseASMR",
                             style = MaterialTheme.typography.titleMedium,
@@ -102,10 +103,13 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Title & CV
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
@@ -115,17 +119,19 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     text = "CV: $artist",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Timeline Slider & Duration Info
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -146,7 +152,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     )
                 )
 
-                // Time Indicators (Left: Current Elapsed, Right: Clickable Total/Remaining Time)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -178,15 +183,15 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Playback Controls Row: [Repeat] [Prev] [-10s] [Play/Pause] [+10s] [Next]
+            // Upper Controls Utility Row: Repeat & Shuffle
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 3-Way Repeat Button (Off -> Repeat All -> Repeat One -> Off)
+                // 3-Way Repeat Button
                 IconButton(onClick = { viewModel.cycleRepeatMode() }) {
                     when (repeatMode) {
                         Player.REPEAT_MODE_ONE -> {
@@ -194,7 +199,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 Icons.Default.RepeatOne,
                                 contentDescription = "Ulangi Track Ini",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(26.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                         Player.REPEAT_MODE_ALL -> {
@@ -202,59 +207,73 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 Icons.Default.Repeat,
                                 contentDescription = "Ulangi Semua",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(26.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                         else -> {
                             Icon(
                                 Icons.Default.Repeat,
                                 contentDescription = "Ulangi Mati",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier.size(26.dp)
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
                 }
 
-                // Previous Track Button
+                // Shuffle Button (On the right of repeat)
+                IconButton(onClick = { viewModel.toggleShuffleMode() }) {
+                    Icon(
+                        Icons.Default.Shuffle,
+                        contentDescription = "Acak Lagu",
+                        tint = if (shuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            // Main Playback Controls: [Prev] [-10s] [Play/Pause] [+10s] [Next] (Centered & Clean)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(onClick = { viewModel.playPrevious() }) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = "Track Sebelumnya", modifier = Modifier.size(32.dp))
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "Track Sebelumnya", modifier = Modifier.size(34.dp))
                 }
 
-                // Rewind 10s Button
                 IconButton(onClick = { viewModel.seekTo((currentPos - 10000).coerceAtLeast(0L)) }) {
-                    Icon(Icons.Default.Replay10, contentDescription = "Mundur 10 Detik", modifier = Modifier.size(28.dp))
+                    Icon(Icons.Default.Replay10, contentDescription = "Mundur 10 Detik", modifier = Modifier.size(30.dp))
                 }
 
-                // Main Play/Pause Button
                 FilledIconButton(
                     onClick = { viewModel.togglePlayPause() },
-                    modifier = Modifier.size(60.dp),
+                    modifier = Modifier.size(64.dp),
                     shape = CircleShape,
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = "Play/Pause",
-                        modifier = Modifier.size(34.dp),
+                        modifier = Modifier.size(36.dp),
                         tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
 
-                // Fast Forward 10s Button
                 IconButton(onClick = { viewModel.seekTo(currentPos + 10000) }) {
-                    Icon(Icons.Default.Forward10, contentDescription = "Maju 10 Detik", modifier = Modifier.size(28.dp))
+                    Icon(Icons.Default.Forward10, contentDescription = "Maju 10 Detik", modifier = Modifier.size(30.dp))
                 }
 
-                // Next Track Button
                 IconButton(onClick = { viewModel.playNext() }) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "Track Selanjutnya", modifier = Modifier.size(32.dp))
+                    Icon(Icons.Default.SkipNext, contentDescription = "Track Selanjutnya", modifier = Modifier.size(34.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // YouTube Music Style "BERIKUTNYA • DAFTAR PUTAR" Bottom Bar
+            // YouTube Music Style Bottom Bar
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -427,7 +446,7 @@ fun PlaylistItemCard(
                     }
                 )
                 Text(
-                    text = if (fileExists) "CV: ${item.cv} • ${item.fileSize}" else "⚠️ File tidak ditemukan / Terhapus",
+                    text = if (fileExists) "CV: ${item.cv} • ${item.fileSize}" else "File belum diunduh / terhapus",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (fileExists) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                     maxLines = 1,
@@ -439,7 +458,7 @@ fun PlaylistItemCard(
                 Icon(
                     Icons.Default.FileDownloadOff,
                     contentDescription = "File Hilang",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
                     modifier = Modifier.size(22.dp)
                 )
             } else if (isCurrentTrack) {

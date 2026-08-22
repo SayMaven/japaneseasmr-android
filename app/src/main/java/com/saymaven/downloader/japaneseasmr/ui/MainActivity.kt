@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,7 +16,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
+import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.ui.components.BottomNavBar
 import com.saymaven.downloader.japaneseasmr.ui.components.NavTab
 import com.saymaven.downloader.japaneseasmr.ui.screens.history.HistoryScreen
@@ -74,6 +77,28 @@ class MainActivity : ComponentActivity() {
                                 onPlayTrack = { historyEntity ->
                                     playerViewModel.playLocalTrack(historyEntity)
                                     currentTab = NavTab.PLAYER
+                                },
+                                onRedownload = { historyEntity ->
+                                    // Tambahkan ke antrean unduh
+                                    val item = DownloadQueueItem(
+                                        rjid = historyEntity.rjid,
+                                        title = historyEntity.title,
+                                        cv = historyEntity.cv,
+                                        circle = historyEntity.circle,
+                                        genre = historyEntity.genre,
+                                        ageRating = historyEntity.ageRating,
+                                        coverUrl = historyEntity.coverUrl
+                                    )
+                                    DownloadService.enqueue(listOf(item))
+                                    queueViewModel.onInputChanged(historyEntity.rjid)
+
+                                    if (!DownloadService.isDownloading.value) {
+                                        DownloadService.startDownload(this@MainActivity)
+                                        Toast.makeText(this@MainActivity, "Memulai unduhan [${historyEntity.rjid}]...", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(this@MainActivity, "[${historyEntity.rjid}] ditambahkan ke antrean unduh.", Toast.LENGTH_SHORT).show()
+                                    }
+                                    currentTab = NavTab.QUEUE
                                 }
                             )
                             NavTab.PLAYER -> PlayerScreen(viewModel = playerViewModel)

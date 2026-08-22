@@ -25,13 +25,15 @@ import java.io.File
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel,
-    onPlayTrack: (HistoryEntity) -> Unit
+    onPlayTrack: (HistoryEntity) -> Unit,
+    onRedownload: (HistoryEntity) -> Unit
 ) {
     val context = LocalContext.current
     val historyList by viewModel.historyList.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
 
     var itemToDelete by remember { mutableStateOf<HistoryEntity?>(null) }
+    var showMenu by remember { mutableStateOf(false) }
     val hasMissingFiles = remember(historyList) { historyList.any { !File(it.localFilePath).exists() } }
 
     Column(
@@ -39,6 +41,7 @@ fun HistoryScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // Clean Header with Overflow Menu (Fixes all text wrapping/squishing bugs)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -50,24 +53,48 @@ fun HistoryScreen(
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
             )
-            Row {
-                if (hasMissingFiles) {
-                    TextButton(onClick = {
-                        viewModel.cleanMissingFiles()
-                        Toast.makeText(context, "Entri file yang hilang telah dibersihkan.", Toast.LENGTH_SHORT).show()
-                    }) {
-                        Text("Bersihkan File Hilang", color = MaterialTheme.colorScheme.tertiary)
-                    }
+
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Opsi Riwayat",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                if (historyList.isNotEmpty()) {
-                    TextButton(onClick = { viewModel.clearAllHistory() }) {
-                        Text("Hapus Semua", color = MaterialTheme.colorScheme.error)
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    if (hasMissingFiles) {
+                        DropdownMenuItem(
+                            text = { Text("Bersihkan File Hilang") },
+                            leadingIcon = { Icon(Icons.Default.CleaningServices, contentDescription = null) },
+                            onClick = {
+                                showMenu = false
+                                viewModel.cleanMissingFiles()
+                                Toast.makeText(context, "File hilang dibersihkan dari riwayat.", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+
+                    if (historyList.isNotEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("Hapus Semua Riwayat", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                showMenu = false
+                                viewModel.clearAllHistory()
+                                Toast.makeText(context, "Semua riwayat dihapus.", Toast.LENGTH_SHORT).show()
+                            }
+                        )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Search Bar
         OutlinedTextField(
@@ -109,9 +136,10 @@ fun HistoryScreen(
                             if (fileExists) {
                                 onPlayTrack(item)
                             } else {
-                                Toast.makeText(context, "File audio [${item.rjid}] tidak ditemukan di penyimpanan HP.", Toast.LENGTH_SHORT).show()
+                                onRedownload(item)
                             }
                         },
+                        onRedownload = { onRedownload(item) },
                         onDelete = { itemToDelete = item }
                     )
                 }
@@ -146,6 +174,7 @@ fun HistoryItemCard(
     item: HistoryEntity,
     fileExists: Boolean,
     onPlay: () -> Unit,
+    onRedownload: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
@@ -189,26 +218,29 @@ fun HistoryItemCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (fileExists) "${item.fileSize} • ${item.downloadDate}" else "⚠️ File telah dihapus dari HP",
+                    text = if (fileExists) "${item.fileSize} • ${item.downloadDate}" else "File belum diunduh / terhapus",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (fileExists) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
                 )
             }
 
-            IconButton(onClick = onPlay) {
-                if (fileExists) {
+            if (fileExists) {
+                IconButton(onClick = onPlay) {
                     Icon(
                         Icons.Default.PlayCircle,
                         contentDescription = "Play",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(32.dp)
                     )
-                } else {
+                }
+            } else {
+                // Download Again Button
+                IconButton(onClick = onRedownload) {
                     Icon(
-                        Icons.Default.FileDownloadOff,
-                        contentDescription = "File Hilang",
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
-                        modifier = Modifier.size(26.dp)
+                        Icons.Default.Download,
+                        contentDescription = "Unduh Lagi",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }

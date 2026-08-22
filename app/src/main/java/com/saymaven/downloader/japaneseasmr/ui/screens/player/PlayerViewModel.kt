@@ -58,6 +58,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
     val repeatMode = _repeatMode.asStateFlow()
 
+    private val _shuffleMode = MutableStateFlow(false)
+    val shuffleMode = _shuffleMode.asStateFlow()
+
     private var progressJob: Job? = null
 
     init {
@@ -101,19 +104,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             override fun onRepeatModeChanged(repeatMode: Int) {
                 _repeatMode.value = repeatMode
             }
+
+            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                _shuffleMode.value = shuffleModeEnabled
+            }
         })
     }
 
-    /**
-     * Memutar track lokal dan mendaftarkan seluruh daftar lagu koleksi ke antrean ExoPlayer.
-     * Sehingga saat lagu selesai, pemutar otomatis berlanjut ke lagu berikutnya (Repeat Off / Repeat All).
-     */
     fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = playlist.value) {
         val p = player ?: return
         val targetFile = File(history.localFilePath)
         if (!targetFile.exists()) return
 
-        // Hanya sertakan file yang benar-benar ada di penyimpanan lokal
         val validItems = fullList.filter { File(it.localFilePath).exists() }
         if (validItems.isEmpty()) return
 
@@ -215,6 +217,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         p.repeatMode = nextMode
         _repeatMode.value = nextMode
+    }
+
+    fun toggleShuffleMode() {
+        val p = player ?: return
+        val nextState = !p.shuffleModeEnabled
+        p.shuffleModeEnabled = nextState
+        _shuffleMode.value = nextState
     }
 
     private fun startProgressTracking() {
