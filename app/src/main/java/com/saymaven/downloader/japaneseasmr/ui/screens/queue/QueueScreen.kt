@@ -1,25 +1,23 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.queue
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadStatus
+import com.saymaven.downloader.japaneseasmr.service.DownloadService
 
 @Composable
 fun QueueScreen(viewModel: QueueViewModel) {
@@ -36,6 +35,16 @@ fun QueueScreen(viewModel: QueueViewModel) {
     val isLoadingPreview by viewModel.isLoadingPreview.collectAsState()
     val queueList by viewModel.queueState.collectAsState()
     val isDownloading by viewModel.isDownloading.collectAsState()
+    val logs by DownloadService.logsState.collectAsState()
+
+    var showLogs by remember { mutableStateOf(true) }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(logs.size) {
+        if (logs.isNotEmpty()) {
+            listState.animateScrollToItem(logs.size - 1)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -43,14 +52,27 @@ fun QueueScreen(viewModel: QueueViewModel) {
             .padding(16.dp)
     ) {
         // Header
-        Text(
-            text = "JapaneseASMR Downloader",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "JapaneseASMR Downloader",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            IconButton(onClick = { showLogs = !showLogs }) {
+                Icon(
+                    if (showLogs) Icons.Default.Terminal else Icons.Default.Code,
+                    contentDescription = "Toggle Logs",
+                    tint = if (showLogs) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Input Box
         OutlinedTextField(
@@ -86,7 +108,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Tambah Antrean")
+                Text("Tambah")
             }
 
             Button(
@@ -107,16 +129,16 @@ fun QueueScreen(viewModel: QueueViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 10.dp),
+                    .padding(vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                CircularProgressIndicator(modifier = Modifier.size(20.dp))
             }
         } else if (previewWork != null) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 6.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
@@ -126,7 +148,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         contentDescription = "Cover",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(70.dp, 50.dp)
+                            .size(64.dp, 46.dp)
                             .clip(RoundedCornerShape(8.dp))
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -149,7 +171,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Queue Header & Clear Button
         Row(
@@ -164,7 +186,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
             )
             if (queueList.isNotEmpty() && !isDownloading) {
                 TextButton(onClick = { viewModel.clearQueue() }) {
-                    Text("Bersihkan", color = MaterialTheme.colorScheme.error)
+                    Text("Bersihkan Antrean", color = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -173,7 +195,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
         if (queueList.isEmpty()) {
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(if (showLogs) 0.5f else 1f)
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
@@ -185,11 +207,85 @@ fun QueueScreen(viewModel: QueueViewModel) {
             }
         } else {
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(if (showLogs) 0.5f else 1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(queueList) { item ->
                     QueueItemCard(item)
+                }
+            }
+        }
+
+        // Log Console Section (Live Terminal)
+        if (showLogs) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.5f),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF14141E))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Terminal, contentDescription = null, tint = Color(0xFF50FA7B), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Log Unduhan Real-time",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF50FA7B),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (logs.isNotEmpty()) {
+                            Text(
+                                text = "Bersihkan Log",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF6272A4),
+                                modifier = Modifier.clickable { DownloadService.clearLogs() }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (logs.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "Log aktivitas akan muncul di sini saat proses unduhan dimulai.",
+                                color = Color(0xFF6272A4),
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(logs) { logLine ->
+                                val color = when {
+                                    logLine.contains("[ERROR]") || logLine.contains("[!]") -> Color(0xFFFF5555)
+                                    logLine.contains("[SUCCESS]") -> Color(0xFF50FA7B)
+                                    logLine.contains("[download]") -> Color(0xFF8BE9FD)
+                                    logLine.contains("Memproses:") -> Color(0xFFFF79C6)
+                                    else -> Color(0xFFF8F8F2)
+                                }
+                                Text(
+                                    text = logLine,
+                                    color = color,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    lineHeight = 15.sp
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -233,7 +329,7 @@ fun QueueItemCard(item: DownloadQueueItem) {
             if (item.status == DownloadStatus.DOWNLOADING || item.status == DownloadStatus.PROCESSING) {
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
-                    progress = item.progress,
+                    progress = { item.progress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)

@@ -1,20 +1,21 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.history
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,7 @@ fun HistoryScreen(
     viewModel: HistoryViewModel,
     onPlayTrack: (HistoryEntity) -> Unit
 ) {
+    val context = LocalContext.current
     val historyList by viewModel.historyList.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
 
@@ -102,7 +104,7 @@ fun HistoryScreen(
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
             title = { Text("Hapus dari Riwayat?") },
-            text = { Text("Apakah Anda ingin menghapus [${itemToDelete!!.rjid}] ${itemToDelete!!.title}?") },
+            text = { Text("Apakah Anda ingin menghapus [${itemToDelete!!.rjid}] ${itemToDelete!!.title} beserta filenya?") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteHistory(itemToDelete!!, deleteFile = true)

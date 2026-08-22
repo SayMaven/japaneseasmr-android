@@ -1,6 +1,11 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.settings
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,19 +15,35 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
+import com.saymaven.downloader.japaneseasmr.service.DownloadService
+import java.io.File
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
+    val context = LocalContext.current
     val themeMode by viewModel.themeMode.collectAsState()
     val dynamicColor by viewModel.dynamicColor.collectAsState()
+    val customDir by viewModel.downloadDir.collectAsState()
 
     var showThemeDialog by remember { mutableStateOf(false) }
     var showCacheClearedSnackbar by remember { mutableStateOf(false) }
+
+    val activeDownloadPath = remember(customDir) {
+        if (!customDir.isNullOrBlank()) customDir!! else DownloadService.getDownloadDirectory(context).absolutePath
+    }
+
+    val dirPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.setDownloadDir(uri.path ?: uri.toString())
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -89,9 +110,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Penyimpanan & Cache
+        // Penyimpanan & Unduhan
         Text(
-            text = "PENYIMPANAN & CACHE",
+            text = "PENYIMPANAN & UNDUHAN",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold
@@ -104,15 +125,57 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            ListItem(
-                headlineContent = { Text("Bersihkan Cache Gambar & Temp") },
-                supportingContent = { Text("Hapus file cover cache & partisi sementara") },
-                leadingContent = { Icon(Icons.Default.CleaningServices, contentDescription = null) },
-                modifier = Modifier.clickable {
-                    viewModel.clearCache()
-                    showCacheClearedSnackbar = true
-                }
-            )
+            Column {
+                ListItem(
+                    headlineContent = { Text("Folder Tujuan Unduhan") },
+                    supportingContent = {
+                        Text(
+                            text = activeDownloadPath,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
+                    trailingContent = {
+                        IconButton(onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(Uri.parse(activeDownloadPath), "resource/folder")
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                // Fallback
+                            }
+                        }) {
+                            Icon(Icons.Default.OpenInNew, contentDescription = "Buka Folder")
+                        }
+                    }
+                )
+
+                HorizontalDivider()
+
+                ListItem(
+                    headlineContent = { Text("Reset ke Folder Standar Musik") },
+                    supportingContent = { Text("Simpan di folder Music/JapaneseASMR perangkat") },
+                    leadingContent = { Icon(Icons.Default.FolderSpecial, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        viewModel.setDownloadDir("")
+                    }
+                )
+
+                HorizontalDivider()
+
+                ListItem(
+                    headlineContent = { Text("Bersihkan Cache Gambar & Temp") },
+                    supportingContent = { Text("Hapus file cover cache & partisi sementara") },
+                    leadingContent = { Icon(Icons.Default.CleaningServices, contentDescription = null) },
+                    modifier = Modifier.clickable {
+                        viewModel.clearCache()
+                        showCacheClearedSnackbar = true
+                    }
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -135,7 +198,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             Column {
                 ListItem(
                     headlineContent = { Text("JapaneseASMR Downloader") },
-                    supportingContent = { Text("Versi 1.0.0 (Native Android)") },
+                    supportingContent = { Text("Versi 1.0.1 (Native Android)") },
                     leadingContent = { Icon(Icons.Default.Info, contentDescription = null) }
                 )
                 HorizontalDivider()

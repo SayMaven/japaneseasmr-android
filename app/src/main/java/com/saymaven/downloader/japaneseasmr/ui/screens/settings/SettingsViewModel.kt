@@ -3,6 +3,7 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
@@ -17,6 +18,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     val themeMode = prefs.themeModeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeMode.SYSTEM)
     val dynamicColor = prefs.dynamicColorFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val downloadDir = prefs.downloadDirFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
@@ -30,6 +32,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setDownloadDir(path: String) {
+        viewModelScope.launch {
+            prefs.setDownloadDir(path)
+        }
+    }
+
+    @OptIn(ExperimentalCoilApi::class)
     fun clearCache() {
         viewModelScope.launch {
             val app = getApplication<Application>()
