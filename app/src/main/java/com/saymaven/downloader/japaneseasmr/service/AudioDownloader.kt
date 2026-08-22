@@ -180,8 +180,9 @@ object AudioDownloader {
             onLog("[i] Mengemas audio ke container ISO M4A (100% Seekable & Indeks Durasi Presisi)...")
             destFile.parentFile?.mkdirs()
 
-            val muxSuccess = muxAdtsFileToM4a(tempAdtsCombined, destFile)
+            val muxSuccess = muxAdtsFileToM4a(tempAdtsCombined, destFile, onLog)
             if (!muxSuccess) {
+                onLog("[!] Gagal mengemas ISO M4A, menyalin file stream...")
                 tempAdtsCombined.copyTo(destFile, overwrite = true)
             }
             tempAdtsCombined.delete()
@@ -204,7 +205,7 @@ object AudioDownloader {
     /**
      * Muxing cepat dan akurat ke container ISO M4A dengan offset buffer nol yang kompatibel 100% dengan MediaMuxer Android.
      */
-    private fun muxAdtsFileToM4a(adtsFile: File, outputFile: File): Boolean {
+    private fun muxAdtsFileToM4a(adtsFile: File, outputFile: File, onLog: (String) -> Unit): Boolean {
         if (!adtsFile.exists() || adtsFile.length() < 7) return false
         var muxer: MediaMuxer? = null
         var fis: FileInputStream? = null
@@ -226,7 +227,10 @@ object AudioDownloader {
                 firstOffset++
             }
 
-            if (firstOffset >= fileSize - 7) return false
+            if (firstOffset >= fileSize - 7) {
+                onLog("[!] Header ADTS pertama tidak ditemukan.")
+                return false
+            }
 
             val profile = ((mappedBuf.get(firstOffset + 2).toInt() ushr 6) and 0x03) + 1
             val sampleRateIdx = (mappedBuf.get(firstOffset + 2).toInt() ushr 2) and 0x0F
@@ -243,7 +247,7 @@ object AudioDownloader {
                 6 -> 24000
                 7 -> 22050
                 8 -> 16000
-                else -> 44100
+                else -> 48000
             }
 
             val csd0 = byteArrayOf(
@@ -260,11 +264,13 @@ object AudioDownloader {
             muxer.start()
 
             val directBuf = ByteBuffer.allocateDirect(64 * 1024)
+            val tempArray = ByteArray(64 * 1024)
             val bufferInfo = MediaCodec.BufferInfo()
             var frameIndex = 0L
             var pos = firstOffset
+            val totalSize = fileSize.toInt()
 
-            while (pos <= fileSize - 7) {
+            while (pos <= totalSize - 7) {
                 val b0 = mappedBuf.get(pos).toInt() and 0xFF
                 val b1 = mappedBuf.get(pos + 1).toInt() and 0xF0
 
@@ -276,12 +282,12 @@ object AudioDownloader {
                             ((mappedBuf.get(pos + 5).toInt() and 0xE0) ushr 5))
 
                     val rawPayloadLen = frameLen - headerLen
-                    if (rawPayloadLen in 1..65535 && pos + frameLen <= fileSize) {
+                    if (rawPayloadLen in 1..65535 && pos + frameLen <= totalSize) {
                         mappedBuf.position(pos + headerLen)
-                        mappedBuf.limit(pos + frameLen)
+                        mappedBuf.get(tempArray, 0, rawPayloadLen)
 
                         directBuf.clear()
-                        directBuf.put(mappedBuf)
+                        directBuf.put(tempArray, 0, rawPayloadLen)
                         directBuf.flip()
 
                         bufferInfo.offset = 0
@@ -303,6 +309,7 @@ object AudioDownloader {
             muxer.stop()
             true
         } catch (e: Exception) {
+            onLog("[!] Gagal muxing M4A: ${e.message}")
             e.printStackTrace()
             false
         } finally {
