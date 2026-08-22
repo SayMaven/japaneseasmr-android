@@ -2,6 +2,7 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import android.app.Application
 import android.content.ComponentName
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.media.MediaMetadataRetriever
@@ -41,6 +42,7 @@ import java.io.File
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val sp = application.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
     private val prefs = PreferencesManager(application)
     private val historyDao = AsmrDatabase.getDatabase(application).historyDao()
     val playlist = historyDao.getAllHistory().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -48,31 +50,32 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     val player: MediaController? get() = if (controllerFuture?.isDone == true) controllerFuture?.get() else null
 
-    private val _currentRjId = MutableStateFlow<String?>(null)
+    // Load instantly from fast cache so tab Pemutar renders immediately on start
+    private val _currentRjId = MutableStateFlow<String?>(sp.getString("cached_rjid", null))
     val currentRjId = _currentRjId.asStateFlow()
 
-    private val _currentTitle = MutableStateFlow("Belum ada lagu yang diputar")
+    private val _currentTitle = MutableStateFlow(sp.getString("cached_title", "Belum ada lagu yang diputar") ?: "Belum ada lagu yang diputar")
     val currentTitle = _currentTitle.asStateFlow()
 
-    private val _currentArtist = MutableStateFlow("-")
+    private val _currentArtist = MutableStateFlow(sp.getString("cached_artist", "-") ?: "-")
     val currentArtist = _currentArtist.asStateFlow()
 
-    private val _currentCoverUrl = MutableStateFlow<String?>(null)
+    private val _currentCoverUrl = MutableStateFlow<String?>(sp.getString("cached_cover", null))
     val currentCoverUrl = _currentCoverUrl.asStateFlow()
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying = _isPlaying.asStateFlow()
 
-    private val _currentPosition = MutableStateFlow(0L)
+    private val _currentPosition = MutableStateFlow(sp.getLong("cached_pos", 0L))
     val currentPosition = _currentPosition.asStateFlow()
 
-    private val _duration = MutableStateFlow(0L)
+    private val _duration = MutableStateFlow(sp.getLong("cached_duration", 0L))
     val duration = _duration.asStateFlow()
 
-    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
+    private val _repeatMode = MutableStateFlow(sp.getInt("cached_repeat", Player.REPEAT_MODE_OFF))
     val repeatMode = _repeatMode.asStateFlow()
 
-    private val _shuffleMode = MutableStateFlow(false)
+    private val _shuffleMode = MutableStateFlow(sp.getBoolean("cached_shuffle", false))
     val shuffleMode = _shuffleMode.asStateFlow()
 
     private var progressJob: Job? = null
@@ -95,14 +98,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun restorePlaybackState() {
         viewModelScope.launch {
-            val savedRjid = prefs.lastPlayedRjidFlow.first()
+            val savedRjid = prefs.lastPlayedRjidFlow.first() ?: sp.getString("cached_rjid", null)
             val savedPos = prefs.lastPositionMsFlow.first()
             val savedRepeat = prefs.repeatModeFlow.first()
             val savedShuffle = prefs.shuffleModeFlow.first()
 
             _repeatMode.value = savedRepeat
             _shuffleMode.value = savedShuffle
-            _currentPosition.value = savedPos
+            if (savedPos > 0L) _currentPosition.value = savedPos
 
             if (!savedRjid.isNullOrBlank()) {
                 val history = historyDao.getHistoryById(savedRjid)
@@ -111,6 +114,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _currentTitle.value = "[${history.rjid}] ${history.title}"
                     _currentArtist.value = history.cv
                     _currentCoverUrl.value = history.coverUrl
+                    saveCacheSynchronously()
                 }
             }
         }
@@ -127,6 +131,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
                     _duration.value = p.duration.coerceAtLeast(0L)
+                    saveCacheSynchronously()
                 }
             }
 
@@ -151,7 +156,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         })
 
-        // Terapkan saved repeat/shuffle ke player
         p.repeatMode = _repeatMode.value
         p.shuffleModeEnabled = _shuffleMode.value
     }
@@ -177,7 +181,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val targetPair = validItemsWithFiles.firstOrNull { it.first.rjid == history.rjid } ?: validItemsWithFiles.first()
             val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
 
-            // Siapkan Artwork Bytes untuk Lockscreen Notification
             val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, targetPair.first.coverUrl)
 
             val mediaItems = validItemsWithFiles.map { (item, file) ->
@@ -212,7 +215,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun loadArtworkBytes(localFilePath: String?, coverUrl: String?): ByteArray? = withContext(Dispatchers.IO) {
         try {
-            // 1. Coba baca embedded cover dari file audio lokal
             if (localFilePath != null) {
                 val f = File(localFilePath)
                 if (f.exists()) {
@@ -228,7 +230,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
 
-            // 2. Jika tidak ada di file lokal, muat via Coil
             if (!coverUrl.isNullOrBlank()) {
                 val req = ImageRequest.Builder(getApplication())
                     .data(coverUrl)
@@ -348,7 +349,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         saveCurrentState()
     }
 
+    private fun saveCacheSynchronously() {
+        sp.edit()
+            .putString("cached_rjid", _currentRjId.value)
+            .putString("cached_title", _currentTitle.value)
+            .putString("cached_artist", _currentArtist.value)
+            .putString("cached_cover", _currentCoverUrl.value)
+            .putLong("cached_pos", _currentPosition.value)
+            .putLong("cached_duration", _duration.value)
+            .putInt("cached_repeat", _repeatMode.value)
+            .putBoolean("cached_shuffle", _shuffleMode.value)
+            .apply()
+    }
+
     private fun saveCurrentState() {
+        saveCacheSynchronously()
         viewModelScope.launch {
             prefs.savePlaybackState(
                 rjid = _currentRjId.value,
