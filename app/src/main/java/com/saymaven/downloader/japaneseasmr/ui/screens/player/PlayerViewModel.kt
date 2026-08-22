@@ -12,6 +12,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
 import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
@@ -19,14 +20,22 @@ import com.saymaven.downloader.japaneseasmr.service.PlaybackService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val historyDao = AsmrDatabase.getDatabase(application).historyDao()
+    val playlist = historyDao.getAllHistory().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private var controllerFuture: ListenableFuture<MediaController>? = null
     val player: MediaController? get() = if (controllerFuture?.isDone == true) controllerFuture?.get() else null
+
+    private val _currentRjId = MutableStateFlow<String?>(null)
+    val currentRjId = _currentRjId.asStateFlow()
 
     private val _currentTitle = MutableStateFlow("Belum ada lagu yang diputar")
     val currentTitle = _currentTitle.asStateFlow()
@@ -46,7 +55,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _duration = MutableStateFlow(0L)
     val duration = _duration.asStateFlow()
 
-    // 0 = Off, 2 = Repeat All, 1 = Repeat One
     private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
     val repeatMode = _repeatMode.asStateFlow()
 
@@ -95,6 +103,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun playLocalTrack(history: HistoryEntity) {
         val p = player ?: return
+        _currentRjId.value = history.rjid
         val file = File(history.localFilePath)
         val uri = if (file.exists()) Uri.fromFile(file) else Uri.parse(history.coverUrl)
 
@@ -121,6 +130,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val tracks = TrackDiscoveryService.discoverAllTracks(rawRjId)
             val trackUrl = tracks.firstOrNull()?.url ?: return@launch
 
+            _currentRjId.value = meta.rjid
             val p = player ?: return@launch
             val metadata = MediaMetadata.Builder()
                 .setTitle("[${meta.rjid}] ${meta.title}")
@@ -150,7 +160,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun seekTo(positionMs: Long) {
-        player?.seekTo(positionMs)
+        val p = player ?: return
+        p.seekTo(positionMs.coerceIn(0L, _duration.value.coerceAtLeast(0L)))
         _currentPosition.value = positionMs
     }
 

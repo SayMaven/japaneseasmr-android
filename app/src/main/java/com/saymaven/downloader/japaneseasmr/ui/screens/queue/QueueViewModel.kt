@@ -33,6 +33,7 @@ class QueueViewModel : ViewModel() {
 
     private var previewJob: Job? = null
     private var lastProcessedClipboardText: String? = null
+    private var isFirstResume = true
 
     fun onInputChanged(text: String) {
         _inputText.value = text
@@ -91,6 +92,14 @@ class QueueViewModel : ViewModel() {
                 val clip = clipboard.primaryClip
                 if (clip != null && clip.itemCount > 0) {
                     val text = clip.getItemAt(0).text?.toString() ?: ""
+                    
+                    // Pada saat pertama kali aplikasi dibuka (cold start), simpan baseline agar tidak otomatis mengisi teks lama
+                    if (isFirstResume) {
+                        isFirstResume = false
+                        lastProcessedClipboardText = text
+                        return@launch
+                    }
+
                     if (text.isNotBlank() && text != lastProcessedClipboardText) {
                         val extracted = extractRjIds(text)
                         if (extracted.isNotEmpty()) {
