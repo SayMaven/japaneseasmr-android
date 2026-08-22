@@ -61,7 +61,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
         ) {
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Large Artwork or Clean Empty Placeholder
+            // Large Artwork or Clean Empty Placeholder (Only Headphones Icon)
             if (!coverUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = coverUrl,
@@ -82,24 +82,12 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Headphones,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                            modifier = Modifier.size(76.dp)
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "JapaneseASMR",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Icon(
+                        Icons.Default.Headphones,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                        modifier = Modifier.size(90.dp)
+                    )
                 }
             }
 
@@ -221,7 +209,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     }
                 }
 
-                // Shuffle Button (On the right of repeat)
+                // Shuffle Button
                 IconButton(onClick = { viewModel.toggleShuffleMode() }) {
                     Icon(
                         Icons.Default.Shuffle,

@@ -2,131 +2,208 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.settings
 
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
-import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.saymaven.downloader.japaneseasmr.BuildConfig
+import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
-import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import java.io.File
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val context = LocalContext.current
     val themeMode by viewModel.themeMode.collectAsState()
     val dynamicColor by viewModel.dynamicColor.collectAsState()
-    val customDir by viewModel.downloadDir.collectAsState()
+    val colorPalette by viewModel.colorPalette.collectAsState()
+    val downloadDir by viewModel.downloadDir.collectAsState()
     val parallelConn by viewModel.parallelConnections.collectAsState()
     val autoClipboard by viewModel.autoClipboard.collectAsState()
     val useDetailedFilename by viewModel.useDetailedFilename.collectAsState()
 
     var showThemeDialog by remember { mutableStateOf(false) }
-    var showFolderDialog by remember { mutableStateOf(false) }
-    var showConnectionDialog by remember { mutableStateOf(false) }
-    var customPathInput by remember { mutableStateOf("") }
-    var showCacheClearedSnackbar by remember { mutableStateOf(false) }
+    var showPaletteDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showConnDialog by remember { mutableStateOf(false) }
+    var showChangelogDialog by remember { mutableStateOf(false) }
+    var showReadmeDialog by remember { mutableStateOf(false) }
 
-    val activeDownloadPath = remember(customDir) {
-        if (!customDir.isNullOrBlank()) customDir!! else DownloadService.getDefaultDownloadDirectory().absolutePath
-    }
-
-    val dirPickerLauncher = rememberLauncherForActivityResult(
+    val openDocumentTreeLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                val docId = DocumentsContract.getTreeDocumentId(uri)
+        uri?.let {
+            val docId = it.path ?: ""
+            val rawPath = if (docId.contains(":")) {
                 val split = docId.split(":")
-                if (split.size >= 2) {
-                    val type = split[0]
+                if (split.size > 1) {
                     val relativePath = split[1]
-                    if (type.equals("primary", ignoreCase = true)) {
-                        val path = "/storage/emulated/0/$relativePath"
-                        viewModel.setDownloadDir(path)
-                        return@rememberLauncherForActivityResult
-                    }
-                }
-            } catch (e: Exception) {
-                // Fallback
-            }
-            viewModel.setDownloadDir(uri.path ?: uri.toString())
+                    "/storage/emulated/0/$relativePath"
+                } else docId
+            } else docId
+            viewModel.setDownloadDir(rawPath)
         }
     }
 
-    Column(
+    val defaultDownloadPath = remember {
+        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "JapaneseASMR").absolutePath
+    }
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "Pengaturan",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
+        item {
+            Text(
+                text = "Pengaturan",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // ================= KATEGORI 1: UMUM =================
+        item {
+            SettingsCategoryHeader(title = "Umum", icon = Icons.Default.Folder)
+        }
 
-        // 1. TAMPILAN & TEMA
-        Text(
-            text = "TAMPILAN & TEMA",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column {
-                ListItem(
-                    headlineContent = { Text("Tema Aplikasi") },
-                    supportingContent = {
-                        Text(
-                            when (themeMode) {
-                                ThemeMode.SYSTEM -> "Mengikuti Sistem (Auto)"
-                                ThemeMode.DARK -> "Tema Gelap (Dracula / Dark)"
-                                ThemeMode.LIGHT -> "Tema Terang (Light Mode)"
-                            }
-                        )
-                    },
-                    leadingContent = { Icon(Icons.Default.Palette, contentDescription = null) },
-                    modifier = Modifier.clickable { showThemeDialog = true }
-                )
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    HorizontalDivider()
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            ) {
+                Column {
                     ListItem(
-                        headlineContent = { Text("Material You (Warna Dinamis)") },
-                        supportingContent = { Text("Menyesuaikan palet warna wallpaper perangkat") },
-                        leadingContent = { Icon(Icons.Default.ColorLens, contentDescription = null) },
+                        headlineContent = { Text("Lokasi Unduhan") },
+                        supportingContent = {
+                            Text(
+                                text = downloadDir ?: defaultDownloadPath,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        leadingContent = { Icon(Icons.Default.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            FilledTonalButton(
+                                onClick = { openDocumentTreeLauncher.launch(null) },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("Ubah", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Gunakan Judul Karya") },
+                        supportingContent = {
+                            Text(
+                                if (useDetailedFilename) "Nama file: [RJxxxxxx] Judul.m4a" else "Nama file: RJxxxxxx.m4a",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = { Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Switch(
+                                checked = useDetailedFilename,
+                                onCheckedChange = { viewModel.setUseDetailedFilename(it) }
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Deteksi Otomatis Clipboard") },
+                        supportingContent = { Text("Otomatis isi kode RJ baru saat disalin", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Switch(
+                                checked = autoClipboard,
+                                onCheckedChange = { viewModel.setAutoClipboard(it) }
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        // ================= KATEGORI 2: JARINGAN =================
+        item {
+            SettingsCategoryHeader(title = "Jaringan & Unduhan", icon = Icons.Default.Speed)
+        }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            ) {
+                ListItem(
+                    modifier = Modifier.clickable { showConnDialog = true },
+                    headlineContent = { Text("Koneksi Paralel Multi-Thread") },
+                    supportingContent = { Text("$parallelConn thread simultan (HLS & Range MP3)", style = MaterialTheme.typography.bodySmall) },
+                    leadingContent = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = {
+                        Text(
+                            "$parallelConn Thread",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                )
+            }
+        }
+
+        // ================= KATEGORI 3: TAMPILAN & BAHASA =================
+        item {
+            SettingsCategoryHeader(title = "Tampilan & Bahasa", icon = Icons.Default.Palette)
+        }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            ) {
+                Column {
+                    ListItem(
+                        modifier = Modifier.clickable { showThemeDialog = true },
+                        headlineContent = { Text("Mode Tema") },
+                        supportingContent = {
+                            Text(
+                                when (themeMode) {
+                                    ThemeMode.DARK -> "Gelap (Dark Mode)"
+                                    ThemeMode.LIGHT -> "Terang (Light Mode)"
+                                    ThemeMode.SYSTEM -> "Mengikuti Sistem"
+                                },
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = { Icon(Icons.Default.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Warna Dinamis (Material You)") },
+                        supportingContent = { Text("Menyesuaikan warna aksen wallpaper HP (Android 12+)", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.ColorLens, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = {
                             Switch(
                                 checked = dynamicColor,
@@ -134,345 +211,300 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             )
                         }
                     )
-                }
-            }
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
+                    if (!dynamicColor) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-        // 2. PENYIMPANAN & UNDUHAN
-        Text(
-            text = "PENYIMPANAN & UNDUHAN",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column {
-                ListItem(
-                    headlineContent = { Text("Folder Tujuan Unduhan") },
-                    supportingContent = {
-                        Text(
-                            text = activeDownloadPath,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
-                    trailingContent = {
-                        Row {
-                            IconButton(onClick = {
-                                customPathInput = activeDownloadPath
-                                showFolderDialog = true
-                            }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Ubah Folder")
-                            }
-                            IconButton(onClick = {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(Uri.parse(activeDownloadPath), "resource/folder")
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    // Fallback
-                                }
-                            }) {
-                                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Buka Folder")
-                            }
-                        }
-                    },
-                    modifier = Modifier.clickable {
-                        customPathInput = activeDownloadPath
-                        showFolderDialog = true
-                    }
-                )
-
-                HorizontalDivider()
-
-                ListItem(
-                    headlineContent = { Text("Gunakan Judul Karya sebagai Nama File") },
-                    supportingContent = {
-                        Text(if (useDetailedFilename) "Format: [RJ01673437] Judul Karya.m4a/.mp3" else "Format: RJ01673437.m4a/.mp3")
-                    },
-                    leadingContent = { Icon(Icons.Default.TextFields, contentDescription = null) },
-                    trailingContent = {
-                        Switch(
-                            checked = useDetailedFilename,
-                            onCheckedChange = { viewModel.setUseDetailedFilename(it) }
+                        ListItem(
+                            modifier = Modifier.clickable { showPaletteDialog = true },
+                            headlineContent = { Text("Palet Warna Aksen") },
+                            supportingContent = { Text(colorPalette.title, style = MaterialTheme.typography.bodySmall) },
+                            leadingContent = { Icon(Icons.Default.FormatPaint, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                         )
                     }
-                )
 
-                HorizontalDivider()
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-                ListItem(
-                    headlineContent = { Text("Koneksi Paralel per Unduhan") },
-                    supportingContent = { Text("$parallelConn koneksi simultan (High-speed multi-thread)") },
-                    leadingContent = { Icon(Icons.Default.Speed, contentDescription = null) },
-                    modifier = Modifier.clickable { showConnectionDialog = true }
-                )
-
-                HorizontalDivider()
-
-                ListItem(
-                    headlineContent = { Text("Otomatis Deteksi Clipboard") },
-                    supportingContent = { Text("Otomatis mendeteksi kode RJ dari clipboard saat membuka tab Antrean") },
-                    leadingContent = { Icon(Icons.Default.ContentPaste, contentDescription = null) },
-                    trailingContent = {
-                        Switch(
-                            checked = autoClipboard,
-                            onCheckedChange = { viewModel.setAutoClipboard(it) }
-                        )
-                    }
-                )
-
-                HorizontalDivider()
-
-                ListItem(
-                    headlineContent = { Text("Bersihkan Cache Gambar & Temp") },
-                    supportingContent = { Text("Hapus file cover cache & partisi sementara") },
-                    leadingContent = { Icon(Icons.Default.CleaningServices, contentDescription = null) },
-                    modifier = Modifier.clickable {
-                        viewModel.clearCache()
-                        showCacheClearedSnackbar = true
-                    }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // 3. TENTANG APLIKASI
-        Text(
-            text = "TENTANG APLIKASI",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column {
-                ListItem(
-                    headlineContent = { Text("JapaneseASMR Downloader") },
-                    supportingContent = { Text("Versi ${BuildConfig.VERSION_NAME} (Native Android Engine)") },
-                    leadingContent = { Icon(Icons.Default.Info, contentDescription = null) }
-                )
-                HorizontalDivider()
-                ListItem(
-                    headlineContent = { Text("Engine Unduhan") },
-                    supportingContent = { Text("High-Speed Native Engine") },
-                    leadingContent = { Icon(Icons.Default.Memory, contentDescription = null) }
-                )
-                HorizontalDivider()
-                ListItem(
-                    headlineContent = { Text("Pengembang") },
-                    supportingContent = { Text("SayMaven") },
-                    leadingContent = { Icon(Icons.Default.Person, contentDescription = null) }
-                )
-            }
-        }
-    }
-
-    // Dialog Ubah Folder Unduhan
-    if (showFolderDialog) {
-        AlertDialog(
-            onDismissRequest = { showFolderDialog = false },
-            title = { Text("Pilih Lokasi Penyimpanan") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Pilih folder untuk menyimpan file audio:")
-
-                    Button(
-                        onClick = {
-                            showFolderDialog = false
-                            dirPickerLauncher.launch(null)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Pilih Folder dari File Manager")
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.setDownloadDir("/storage/emulated/0/Download/JapaneseASMR")
-                            showFolderDialog = false
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Download/JapaneseASMR (Standar)")
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.setDownloadDir("/storage/emulated/0/Music/JapaneseASMR")
-                            showFolderDialog = false
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Music/JapaneseASMR")
-                    }
-
-                    OutlinedTextField(
-                        value = customPathInput,
-                        onValueChange = { customPathInput = it },
-                        label = { Text("Atau edit path manual") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp)
+                    ListItem(
+                        modifier = Modifier.clickable { showLanguageDialog = true },
+                        headlineContent = { Text("Bahasa (Language)") },
+                        supportingContent = { Text("Bahasa Indonesia", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                     )
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (customPathInput.isNotBlank()) {
-                        viewModel.setDownloadDir(customPathInput.trim())
-                    }
-                    showFolderDialog = false
-                }) {
-                    Text("Simpan")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showFolderDialog = false }) {
-                    Text("Batal")
+            }
+        }
+
+        // ================= KATEGORI 4: TENTANG =================
+        item {
+            SettingsCategoryHeader(title = "Tentang Aplikasi", icon = Icons.Default.Info)
+        }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            ) {
+                Column {
+                    ListItem(
+                        modifier = Modifier.clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/SayMaven"))
+                            context.startActivity(intent)
+                        },
+                        headlineContent = { Text("Pengembang (Developer)") },
+                        supportingContent = { Text("SayMaven (Ketuk untuk buka profil GitHub)", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = { Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp)) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Engine Unduhan") },
+                        supportingContent = { Text("High-Speed Native Engine", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.Memory, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Versi Aplikasi") },
+                        supportingContent = { Text("v1.0.0 (Release Build)", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        modifier = Modifier.clickable { showChangelogDialog = true },
+                        headlineContent = { Text("Log Versi (Changelog)") },
+                        supportingContent = { Text("Lihat riwayat pembaruan & fitur baru", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.HistoryEdu, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        modifier = Modifier.clickable { showReadmeDialog = true },
+                        headlineContent = { Text("Baca Panduan & Fitur (README)") },
+                        supportingContent = { Text("Ringkasan fitur lengkap & panduan penggunaan", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        modifier = Modifier.clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/SayMaven/japaneseasmr-android/issues"))
+                            context.startActivity(intent)
+                        },
+                        headlineContent = { Text("Laporkan Isu / Bug") },
+                        supportingContent = { Text("Buka GitHub Issues untuk saran & pelaporan bug", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.BugReport, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = { Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp)) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        modifier = Modifier.clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/SayMaven/japaneseasmr-android"))
+                            context.startActivity(intent)
+                        },
+                        headlineContent = { Text("Repositori GitHub") },
+                        supportingContent = { Text("SayMaven/japaneseasmr-android", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.Code, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = { Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp)) }
+                    )
                 }
             }
-        )
+        }
     }
 
-    // Dialog Jumlah Koneksi Paralel
-    if (showConnectionDialog) {
-        val options = listOf(4, 8, 16, 24, 32)
-        AlertDialog(
-            onDismissRequest = { showConnectionDialog = false },
-            title = { Text("Pilih Jumlah Koneksi") },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectableGroup(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    options.forEach { count ->
-                        val isSelected = count == parallelConn
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                    else MaterialTheme.colorScheme.surface
-                                )
-                                .selectable(
-                                    selected = isSelected,
-                                    onClick = {
-                                        viewModel.setParallelConnections(count)
-                                        showConnectionDialog = false
-                                    },
-                                    role = Role.RadioButton
-                                )
-                                .padding(horizontal = 12.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = null
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = "$count Koneksi Simultan" + if (count == 16) " (Disarankan)" else "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showConnectionDialog = false }) {
-                    Text("Tutup")
-                }
-            }
-        )
-    }
+    // ================= DIALOGS =================
 
-    // Dialog Tema
+    // 1. Theme Dialog
     if (showThemeDialog) {
         AlertDialog(
             onDismissRequest = { showThemeDialog = false },
-            title = { Text("Pilih Tema") },
+            title = { Text("Pilih Mode Tema") },
             text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectableGroup(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    listOf(
-                        ThemeMode.SYSTEM to "Mengikuti Sistem",
-                        ThemeMode.DARK to "Gelap (Dracula / Dark)",
-                        ThemeMode.LIGHT to "Terang (Light)"
-                    ).forEach { (mode, label) ->
-                        val isSelected = mode == themeMode
+                Column {
+                    ThemeMode.values().forEach { mode ->
                         Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                    else MaterialTheme.colorScheme.surface
-                                )
-                                .selectable(
-                                    selected = isSelected,
-                                    onClick = {
-                                        viewModel.setThemeMode(mode)
-                                        showThemeDialog = false
-                                    },
-                                    role = Role.RadioButton
-                                )
-                                .padding(horizontal = 12.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .clickable {
+                                    viewModel.setThemeMode(mode)
+                                    showThemeDialog = false
+                                }
+                                .padding(vertical = 10.dp)
                         ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = null
-                            )
+                            RadioButton(selected = themeMode == mode, onClick = null)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                when (mode) {
+                                    ThemeMode.DARK -> "Gelap (Dark Mode)"
+                                    ThemeMode.LIGHT -> "Terang (Light Mode)"
+                                    ThemeMode.SYSTEM -> "Mengikuti Sistem"
+                                }
                             )
                         }
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showThemeDialog = false }) {
-                    Text("Tutup")
+            confirmButton = { TextButton(onClick = { showThemeDialog = false }) { Text("Tutup") } }
+        )
+    }
+
+    // 2. Color Palette Dialog
+    if (showPaletteDialog) {
+        AlertDialog(
+            onDismissRequest = { showPaletteDialog = false },
+            title = { Text("Pilih Palet Warna Aksen") },
+            text = {
+                Column {
+                    ColorPalette.values().forEach { pal ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setColorPalette(pal)
+                                    showPaletteDialog = false
+                                }
+                                .padding(vertical = 10.dp)
+                        ) {
+                            RadioButton(selected = colorPalette == pal, onClick = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(pal.title, fontWeight = FontWeight.Bold)
+                                Text(pal.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                 }
-            }
+            },
+            confirmButton = { TextButton(onClick = { showPaletteDialog = false }) { Text("Tutup") } }
+        )
+    }
+
+    // 3. Language Dialog (Placeholder)
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text("Pilih Bahasa (Language)") },
+            text = {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        RadioButton(selected = true, onClick = null)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Bahasa Indonesia (Aktif)")
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        RadioButton(selected = false, onClick = null, enabled = false)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("English (Segera Hadir)", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        RadioButton(selected = false, onClick = null, enabled = false)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("日本語 (Segera Hadir)", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text("Tutup") } }
+        )
+    }
+
+    // 4. Parallel Connections Dialog
+    if (showConnDialog) {
+        val options = listOf(4, 8, 16, 24, 32)
+        AlertDialog(
+            onDismissRequest = { showConnDialog = false },
+            title = { Text("Jumlah Koneksi Paralel") },
+            text = {
+                Column {
+                    options.forEach { count ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setParallelConnections(count)
+                                    showConnDialog = false
+                                }
+                                .padding(vertical = 10.dp)
+                        ) {
+                            RadioButton(selected = parallelConn == count, onClick = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("$count Koneksi ${if (count == 16) "(Rekomendasi Default)" else ""}")
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showConnDialog = false }) { Text("Tutup") } }
+        )
+    }
+
+    // 5. Changelog Dialog
+    if (showChangelogDialog) {
+        AlertDialog(
+            onDismissRequest = { showChangelogDialog = false },
+            title = { Text("Log Versi v1.0.0") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("• High-Speed Native Engine (16 koneksi paralel HTTP Range & HLS).", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("• Container standar ISO M4A & MP3 (100% playable & seekable di HiBy Music, VLC, Poweramp).", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("• Notifikasi Status Bar & Lockscreen dengan cover art resolusi tinggi.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("• Pemutar Musik Bawaan lengkap dengan Laci Antrean YouTube Music, Repeat 3-Mode, Shuffle, & Clickable Duration.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("• Persistensi resume playback audio terakhir saat aplikasi dibuka kembali.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("• Deteksi file cerdas & pencegahan unduhan duplikat.", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = { TextButton(onClick = { showChangelogDialog = false }) { Text("Tutup") } }
+        )
+    }
+
+    // 6. Readme Dialog
+    if (showReadmeDialog) {
+        AlertDialog(
+            onDismissRequest = { showReadmeDialog = false },
+            title = { Text("Tentang JapaneseASMR Downloader") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Aplikasi Android Native modern, cepat, dan elegan untuk mengunduh, mengelola koleksi, dan memutar karya audio ASMR Jepang (Kode RJ) langsung dari smartphone Anda.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("Dibuat dengan ❤️ oleh SayMaven menggunakan Kotlin & Jetpack Compose.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            confirmButton = { TextButton(onClick = { showReadmeDialog = false }) { Text("Tutup") } }
+        )
+    }
+}
+
+@Composable
+fun SettingsCategoryHeader(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -15,10 +16,17 @@ class PreferencesManager(private val context: Context) {
     companion object {
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        val KEY_COLOR_PALETTE = stringPreferencesKey("color_palette")
         val KEY_DOWNLOAD_DIR = stringPreferencesKey("download_dir")
         val KEY_PARALLEL_CONNECTIONS = intPreferencesKey("parallel_connections")
         val KEY_AUTO_CLIPBOARD = booleanPreferencesKey("auto_clipboard")
         val KEY_USE_DETAILED_FILENAME = booleanPreferencesKey("use_detailed_filename")
+
+        // Playback State Persistence
+        val KEY_LAST_PLAYED_RJID = stringPreferencesKey("last_played_rjid")
+        val KEY_LAST_POSITION_MS = longPreferencesKey("last_position_ms")
+        val KEY_REPEAT_MODE = intPreferencesKey("repeat_mode")
+        val KEY_SHUFFLE_MODE = booleanPreferencesKey("shuffle_mode")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
@@ -32,6 +40,15 @@ class PreferencesManager(private val context: Context) {
 
     val dynamicColorFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_DYNAMIC_COLOR] ?: true
+    }
+
+    val colorPaletteFlow: Flow<ColorPalette> = context.dataStore.data.map { preferences ->
+        val palStr = preferences[KEY_COLOR_PALETTE] ?: ColorPalette.DEFAULT.name
+        try {
+            ColorPalette.valueOf(palStr)
+        } catch (e: Exception) {
+            ColorPalette.DEFAULT
+        }
     }
 
     val downloadDirFlow: Flow<String?> = context.dataStore.data.map { preferences ->
@@ -50,6 +67,22 @@ class PreferencesManager(private val context: Context) {
         preferences[KEY_USE_DETAILED_FILENAME] ?: false
     }
 
+    val lastPlayedRjidFlow: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[KEY_LAST_PLAYED_RJID]
+    }
+
+    val lastPositionMsFlow: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[KEY_LAST_POSITION_MS] ?: 0L
+    }
+
+    val repeatModeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[KEY_REPEAT_MODE] ?: 0
+    }
+
+    val shuffleModeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_SHUFFLE_MODE] ?: false
+    }
+
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { preferences ->
             preferences[KEY_THEME_MODE] = mode.name
@@ -59,6 +92,12 @@ class PreferencesManager(private val context: Context) {
     suspend fun setDynamicColor(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_DYNAMIC_COLOR] = enabled
+        }
+    }
+
+    suspend fun setColorPalette(palette: ColorPalette) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_COLOR_PALETTE] = palette.name
         }
     }
 
@@ -83,6 +122,15 @@ class PreferencesManager(private val context: Context) {
     suspend fun setUseDetailedFilename(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_USE_DETAILED_FILENAME] = enabled
+        }
+    }
+
+    suspend fun savePlaybackState(rjid: String?, positionMs: Long, repeatMode: Int, shuffleMode: Boolean) {
+        context.dataStore.edit { preferences ->
+            if (rjid != null) preferences[KEY_LAST_PLAYED_RJID] = rjid
+            preferences[KEY_LAST_POSITION_MS] = positionMs
+            preferences[KEY_REPEAT_MODE] = repeatMode
+            preferences[KEY_SHUFFLE_MODE] = shuffleMode
         }
     }
 }

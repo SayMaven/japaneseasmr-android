@@ -16,8 +16,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
-import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.ui.components.BottomNavBar
 import com.saymaven.downloader.japaneseasmr.ui.components.NavTab
@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
     ) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
 
         checkAndRequestPermissions()
@@ -50,12 +51,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by settingsViewModel.themeMode.collectAsState()
             val dynamicColor by settingsViewModel.dynamicColor.collectAsState()
+            val colorPalette by settingsViewModel.colorPalette.collectAsState()
 
             var currentTab by remember { mutableStateOf(NavTab.QUEUE) }
 
             JapaneseASMRTheme(
                 themeMode = themeMode,
-                dynamicColor = dynamicColor
+                dynamicColor = dynamicColor,
+                colorPalette = colorPalette
             ) {
                 Scaffold(
                     bottomBar = {
@@ -79,7 +82,6 @@ class MainActivity : ComponentActivity() {
                                     currentTab = NavTab.PLAYER
                                 },
                                 onRedownload = { historyEntity ->
-                                    // Tambahkan ke antrean unduh
                                     val item = DownloadQueueItem(
                                         rjid = historyEntity.rjid,
                                         title = historyEntity.title,
