@@ -57,7 +57,6 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     ) { uri: Uri? ->
         if (uri != null) {
             try {
-                // Resolusi doc path dari Uri jika memungkinkan
                 val docId = DocumentsContract.getTreeDocumentId(uri)
                 val split = docId.split(":")
                 if (split.size >= 2) {
@@ -201,7 +200,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 ListItem(
                     headlineContent = { Text("Gunakan Judul Karya sebagai Nama File") },
                     supportingContent = {
-                        Text(if (useDetailedFilename) "Format: [RJ01673437] Judul Karya.mp3" else "Format: RJ01673437.mp3")
+                        Text(if (useDetailedFilename) "Format: [RJ01673437] Judul Karya.m4a/.mp3" else "Format: RJ01673437.m4a/.mp3")
                     },
                     leadingContent = { Icon(Icons.Default.TextFields, contentDescription = null) },
                     trailingContent = {
@@ -216,7 +215,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                 ListItem(
                     headlineContent = { Text("Koneksi Paralel per Unduhan") },
-                    supportingContent = { Text("$parallelConn koneksi simultan (HLS multi-thread)") },
+                    supportingContent = { Text("$parallelConn koneksi simultan (High-speed multi-thread)") },
                     leadingContent = { Icon(Icons.Default.Speed, contentDescription = null) },
                     modifier = Modifier.clickable { showConnectionDialog = true }
                 )
@@ -275,7 +274,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider()
                 ListItem(
                     headlineContent = { Text("Engine Unduhan") },
-                    supportingContent = { Text("Native Kotlin HLS Demuxer ($parallelConn Threads) - Tanpa perlu yt-dlp.exe") },
+                    supportingContent = { Text("High-Speed Native Engine ($parallelConn Koneksi Paralel)") },
                     leadingContent = { Icon(Icons.Default.Memory, contentDescription = null) }
                 )
                 HorizontalDivider()
@@ -288,7 +287,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         }
     }
 
-    // Dialog Ubah Folder Unduhan (Dengan Tombol Buka File Manager Native)
+    // Dialog Ubah Folder Unduhan
     if (showFolderDialog) {
         AlertDialog(
             onDismissRequest = { showFolderDialog = false },
@@ -360,7 +359,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         )
     }
 
-    // Dialog Jumlah Koneksi Paralel (Material 3 RadioButton Design)
+    // Dialog Jumlah Koneksi Paralel
     if (showConnectionDialog) {
         val options = listOf(4, 8, 16, 24, 32)
         AlertDialog(

@@ -1,6 +1,7 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.Player
 import coil.compose.AsyncImage
 
 @Composable
@@ -27,9 +29,10 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val isPlaying by viewModel.isPlaying.collectAsState()
     val currentPos by viewModel.currentPosition.collectAsState()
     val duration by viewModel.duration.collectAsState()
-    val isLooping by viewModel.isLooping.collectAsState()
+    val repeatMode by viewModel.repeatMode.collectAsState()
 
     var sliderPos by remember { mutableStateOf<Float?>(null) }
+    var showRemainingTime by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -121,6 +124,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             )
         )
 
+        // Time Indicators (Left: Current Elapsed, Right: Clickable Total/Remaining Time)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -130,10 +134,24 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            val activePos = if (sliderPos != null) (sliderPos!! * duration).toLong() else currentPos
+            val rightTimeText = if (showRemainingTime) {
+                val remainingMs = (duration - activePos).coerceAtLeast(0L)
+                "-${formatDuration(remainingMs)}"
+            } else {
+                formatDuration(duration)
+            }
+
             Text(
-                text = formatDuration(duration),
+                text = rightTimeText,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (showRemainingTime) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (showRemainingTime) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { showRemainingTime = !showRemainingTime }
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
             )
         }
 
@@ -145,12 +163,34 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { viewModel.toggleLoop() }) {
-                Icon(
-                    Icons.Default.Repeat,
-                    contentDescription = "Loop",
-                    tint = if (isLooping) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            // 3-Way Repeat Button (Off -> Repeat All -> Repeat One -> Off)
+            IconButton(onClick = { viewModel.cycleRepeatMode() }) {
+                when (repeatMode) {
+                    Player.REPEAT_MODE_ONE -> {
+                        Icon(
+                            Icons.Default.RepeatOne,
+                            contentDescription = "Ulangi Track Ini",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Player.REPEAT_MODE_ALL -> {
+                        Icon(
+                            Icons.Default.Repeat,
+                            contentDescription = "Ulangi Semua",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    else -> {
+                        Icon(
+                            Icons.Default.Repeat,
+                            contentDescription = "Ulangi Mati",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
             }
 
             IconButton(onClick = { viewModel.seekTo(0) }) {

@@ -136,7 +136,7 @@ class DownloadService : Service() {
             getDefaultDownloadDirectory()
         }
 
-        log("📁 Folder tujuan penyimpanan: ${downloadDir.absolutePath}")
+        log("📁 Folder penyimpanan: ${downloadDir.absolutePath}")
         log("⚡ Koneksi paralel: $parallelConn")
 
         val tempDir = File(cacheDir, "temp_downloads")
@@ -187,10 +187,13 @@ class DownloadService : Service() {
             // 3. Download Tracks
             val downloadedTracks = mutableListOf<File>()
             var isFailed = false
+            val isHls = tracks.any { it.url.endsWith(".m3u8", ignoreCase = true) }
+            val fileExtension = if (isHls) "m4a" else "mp3"
 
             for (tIdx in tracks.indices) {
                 val track = tracks[tIdx]
-                val trackFile = File(tempDir, "${item.rjid}_t${tIdx + 1}.mp3")
+                val trackExt = if (track.url.endsWith(".m3u8", ignoreCase = true)) "m4a" else "mp3"
+                val trackFile = File(tempDir, "${item.rjid}_t${tIdx + 1}.$trackExt")
 
                 updateItem(i) {
                     it.copy(
@@ -250,19 +253,19 @@ class DownloadService : Service() {
                 continue
             }
 
-            // 4. Finalizing & Filename
-            log("  [3/3] Menyematkan tag ID3 & cover art...")
+            // 4. Finalizing & Metadata Tagging
+            log("  [3/3] Menyematkan tag metadata & cover art...")
             updateItem(i) {
                 it.copy(
                     status = DownloadStatus.PROCESSING,
-                    statusText = "Menyematkan ID3 tag & cover art..."
+                    statusText = "Menyematkan metadata & cover art..."
                 )
             }
 
             val filename = if (useDetailedFilename) {
-                "[${item.rjid}] ${sanitizeFilename(meta.title)}.mp3"
+                "[${item.rjid}] ${sanitizeFilename(meta.title)}.$fileExtension"
             } else {
-                "${item.rjid}.mp3"
+                "${item.rjid}.$fileExtension"
             }
 
             val finalOutputFile = File(downloadDir, filename)

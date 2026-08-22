@@ -46,8 +46,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _duration = MutableStateFlow(0L)
     val duration = _duration.asStateFlow()
 
-    private val _isLooping = MutableStateFlow(false)
-    val isLooping = _isLooping.asStateFlow()
+    // 0 = Off, 2 = Repeat All, 1 = Repeat One
+    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
+    val repeatMode = _repeatMode.asStateFlow()
 
     private var progressJob: Job? = null
 
@@ -84,6 +85,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _currentTitle.value = mediaMetadata.title?.toString() ?: "JapaneseASMR"
                 _currentArtist.value = mediaMetadata.artist?.toString() ?: "-"
                 _currentCoverUrl.value = mediaMetadata.artworkUri?.toString()
+            }
+
+            override fun onRepeatModeChanged(repeatMode: Int) {
+                _repeatMode.value = repeatMode
             }
         })
     }
@@ -149,11 +154,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _currentPosition.value = positionMs
     }
 
-    fun toggleLoop() {
+    fun cycleRepeatMode() {
         val p = player ?: return
-        val newMode = if (p.repeatMode == Player.REPEAT_MODE_ONE) Player.REPEAT_MODE_OFF else Player.REPEAT_MODE_ONE
-        p.repeatMode = newMode
-        _isLooping.value = newMode == Player.REPEAT_MODE_ONE
+        val nextMode = when (p.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+        p.repeatMode = nextMode
+        _repeatMode.value = nextMode
     }
 
     private fun startProgressTracking() {
