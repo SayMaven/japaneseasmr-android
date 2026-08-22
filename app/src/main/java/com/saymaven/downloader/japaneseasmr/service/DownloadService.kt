@@ -52,7 +52,7 @@ class DownloadService : Service() {
             val entry = "[$time] $msg"
             val current = _logsState.value.toMutableList()
             current.add(entry)
-            if (current.size > 200) current.removeAt(0)
+            if (current.size > 250) current.removeAt(0)
             _logsState.value = current
         }
 
@@ -81,21 +81,20 @@ class DownloadService : Service() {
             context.startForegroundService(intent)
         }
 
-        fun getDownloadDirectory(context: Context): File {
-            val publicMusic = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+        fun getDefaultDownloadDirectory(): File {
+            val publicDownload = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
                 "JapaneseASMR"
             )
-            if (!publicMusic.exists()) {
-                publicMusic.mkdirs()
+            if (!publicDownload.exists()) {
+                publicDownload.mkdirs()
             }
-            if (publicMusic.canWrite()) {
-                return publicMusic
-            }
-            val appMusic = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-                ?: File(context.filesDir, "Music")
-            appMusic.mkdirs()
-            return appMusic
+            return publicDownload
+        }
+
+        fun sanitizeFilename(name: String): String {
+            val clean = name.replace(Regex("[\\\\/*?:\"<>|]"), "").trim().trimEnd('.')
+            return if (clean.isBlank()) "audio" else clean
         }
     }
 
@@ -126,15 +125,19 @@ class DownloadService : Service() {
         val prefs = PreferencesManager(this)
 
         val customDirStr = prefs.downloadDirFlow.first()
+        val parallelConn = prefs.parallelConnectionsFlow.first()
+        val useDetailedFilename = prefs.useDetailedFilenameFlow.first()
+
         val downloadDir = if (!customDirStr.isNullOrBlank()) {
             val f = File(customDirStr)
             f.mkdirs()
-            if (f.canWrite()) f else getDownloadDirectory(this)
+            if (f.canWrite()) f else getDefaultDownloadDirectory()
         } else {
-            getDownloadDirectory(this)
+            getDefaultDownloadDirectory()
         }
 
         log("📁 Folder tujuan penyimpanan: ${downloadDir.absolutePath}")
+        log("⚡ Koneksi paralel: $parallelConn")
 
         val tempDir = File(cacheDir, "temp_downloads")
         tempDir.mkdirs()
@@ -196,12 +199,13 @@ class DownloadService : Service() {
                     )
                 }
 
-                log("  [2/3] Mengunduh ${track.name} [${tIdx + 1}/${tracks.size}] (${track.url})...")
+                log("  [2/3] Mengunduh ${track.name} [${tIdx + 1}/${tracks.size}]...")
 
                 val success = AudioDownloader.downloadTrack(
                     url = track.url,
                     destFile = trackFile,
                     tempDir = tempDir,
+                    parallelConnections = parallelConn,
                     onProgress = { pct, speed, eta, downStr, totStr ->
                         val overallPct = (tIdx.toFloat() + pct) / tracks.size.toFloat()
                         updateItem(i) {
@@ -246,8 +250,8 @@ class DownloadService : Service() {
                 continue
             }
 
-            // 4. Finalizing & ID3 Tagging
-            log("  [3/3] Menyematkan tag ID3 & cover art ke file MP3...")
+            // 4. Finalizing & Filename
+            log("  [3/3] Menyematkan tag ID3 & cover art...")
             updateItem(i) {
                 it.copy(
                     status = DownloadStatus.PROCESSING,
@@ -255,7 +259,13 @@ class DownloadService : Service() {
                 )
             }
 
-            val finalOutputFile = File(downloadDir, "${item.rjid}.mp3")
+            val filename = if (useDetailedFilename) {
+                "[${item.rjid}] ${sanitizeFilename(meta.title)}.mp3"
+            } else {
+                "${item.rjid}.mp3"
+            }
+
+            val finalOutputFile = File(downloadDir, filename)
             if (downloadedTracks.size == 1) {
                 downloadedTracks[0].copyTo(finalOutputFile, overwrite = true)
             } else {
@@ -268,7 +278,7 @@ class DownloadService : Service() {
                 }
             }
 
-            AudioTagger.tagMp3File(
+            AudioTagger.tagAudioFile(
                 audioFile = finalOutputFile,
                 coverFile = coverFile,
                 title = meta.title,

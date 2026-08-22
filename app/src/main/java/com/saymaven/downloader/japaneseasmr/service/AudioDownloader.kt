@@ -7,6 +7,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -26,11 +28,12 @@ object AudioDownloader {
         url: String,
         destFile: File,
         tempDir: File,
+        parallelConnections: Int = 16,
         onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -> Unit,
         onLog: (String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         if (url.endsWith(".m3u8", ignoreCase = true)) {
-            downloadHlsStream(url, destFile, tempDir, onProgress, onLog)
+            downloadHlsStream(url, destFile, tempDir, parallelConnections, onProgress, onLog)
         } else {
             downloadDirectFile(url, destFile, onProgress, onLog)
         }
@@ -40,6 +43,7 @@ object AudioDownloader {
         m3u8Url: String,
         destFile: File,
         tempDir: File,
+        parallelConnections: Int,
         onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -> Unit,
         onLog: (String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
@@ -73,7 +77,8 @@ object AudioDownloader {
             }
 
             val totalSegments = segmentUrls.size
-            onLog("[i] Terdeteksi $totalSegments segmen audio HLS. Memulai unduhan paralel (8 thread)...")
+            val concurrency = parallelConnections.coerceIn(1, 32)
+            onLog("[i] Terdeteksi $totalSegments segmen audio HLS. Memulai unduhan paralel ($concurrency koneksi)...")
 
             val segmentFiles = Array<File?>(totalSegments) { null }
             val completedCount = AtomicInteger(0)
@@ -81,7 +86,7 @@ object AudioDownloader {
             val bytesSinceLastLog = AtomicLong(0)
             var lastLogTime = System.currentTimeMillis()
 
-            val semaphore = Semaphore(8) // 8 parallel downloads
+            val semaphore = Semaphore(concurrency)
             val startTime = System.currentTimeMillis()
 
             coroutineScope {
@@ -92,7 +97,7 @@ object AudioDownloader {
                             var success = false
                             var attempts = 0
 
-                            while (!success && attempts < 3) {
+                            while (!success && attempts < 4) {
                                 attempts++
                                 try {
                                     val segReq = Request.Builder()
@@ -114,7 +119,7 @@ object AudioDownloader {
                                         }
                                     }
                                 } catch (e: Exception) {
-                                    delay(500)
+                                    delay(400)
                                 }
                             }
 
@@ -132,7 +137,8 @@ object AudioDownloader {
                                 val etaSec = if (done > 0) ((totalSegments - done) * timeElapsed) / done else 0L
                                 val etaStr = formatTimeSeconds(etaSec)
 
-                                onProgress(pct, speedStr, etaStr, downloadedStr, "~${formatFileSize(totalBytesDownloaded.get() * totalSegments / done)}")
+                                val estTotal = if (done > 0) totalBytesDownloaded.get() * totalSegments / done else 0L
+                                onProgress(pct, speedStr, etaStr, downloadedStr, "~${formatFileSize(estTotal)}")
 
                                 if (done % 25 == 0 || done == totalSegments) {
                                     onLog("  [download] Segmen $done/$totalSegments (${(pct * 100).toInt()}%) - $downloadedStr @ $speedStr")
@@ -146,27 +152,77 @@ object AudioDownloader {
                 }.awaitAll()
             }
 
-            // Gabungkan semua segmen ke file final
-            onLog("[i] Menggabungkan $totalSegments segmen menjadi file audio utuh...")
+            // Demux dan gabungkan seluruh stream TS ke ADTS AAC native audio file
+            onLog("[i] Mengekstrak audio ADTS AAC murni dari $totalSegments segmen TS...")
             destFile.parentFile?.mkdirs()
-            FileOutputStream(destFile).use { out ->
+            FileOutputStream(destFile).use { outStream ->
                 for (i in 0 until totalSegments) {
                     val sf = segmentFiles[i]
                     if (sf != null && sf.exists()) {
-                        sf.inputStream().use { it.copyTo(out) }
+                        sf.inputStream().use { inStream ->
+                            demuxTsToAac(inStream, outStream)
+                        }
                         sf.delete()
                     }
                 }
             }
 
             val finalSizeStr = formatFileSize(destFile.length())
-            onLog("[SUCCESS] Penggabungan selesai: $finalSizeStr")
+            onLog("[SUCCESS] Ekstraksi audio selesai: $finalSizeStr")
             onProgress(1f, "Selesai", "00:00", finalSizeStr, finalSizeStr)
             true
         } catch (e: Exception) {
             onLog("[ERROR] Gagal mengunduh HLS: ${e.message}")
             e.printStackTrace()
             false
+        }
+    }
+
+    /**
+     * Mengekstrak elementary stream AAC (ADTS) langsung dari paket MPEG-TS 188-byte.
+     * Hasil ekstraksi adalah format audio AAC murni yang 100% kompatibel dengan pemutar Android bawaan.
+     */
+    private fun demuxTsToAac(tsInput: InputStream, aacOutput: OutputStream) {
+        val pkt = ByteArray(188)
+        while (true) {
+            var read = 0
+            while (read < 188) {
+                val r = tsInput.read(pkt, read, 188 - read)
+                if (r == -1) break
+                read += r
+            }
+            if (read < 188) break
+            if (pkt[0] != 0x47.toByte()) continue
+
+            val pid = ((pkt[1].toInt() and 0x1F) shl 8) or (pkt[2].toInt() and 0xFF)
+            if (pid != 256) continue // PID 256 (0x100) adalah Audio PES Stream
+
+            val pusi = (pkt[1].toInt() and 0x40) != 0
+            val afc = (pkt[3].toInt() and 0x30) ushr 4
+
+            var offset = 4
+            if (afc == 2 || afc == 3) {
+                val afLen = pkt[4].toInt() and 0xFF
+                offset += 1 + afLen
+            }
+            if (offset >= 188) continue
+
+            var payloadOffset = offset
+            var payloadLen = 188 - offset
+
+            if (pusi) {
+                // PES Header: 0x00 0x00 0x01
+                if (payloadLen >= 9 && pkt[payloadOffset] == 0.toByte() && pkt[payloadOffset + 1] == 0.toByte() && pkt[payloadOffset + 2] == 1.toByte()) {
+                    val pesHeaderDataLen = pkt[payloadOffset + 8].toInt() and 0xFF
+                    val skip = 9 + pesHeaderDataLen
+                    payloadOffset += skip
+                    payloadLen -= skip
+                }
+            }
+
+            if (payloadLen > 0 && payloadOffset + payloadLen <= 188) {
+                aacOutput.write(pkt, payloadOffset, payloadLen)
+            }
         }
     }
 

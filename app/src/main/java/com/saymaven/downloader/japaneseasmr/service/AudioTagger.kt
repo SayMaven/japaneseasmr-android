@@ -8,7 +8,7 @@ import java.io.File
 
 object AudioTagger {
 
-    fun tagMp3File(
+    fun tagAudioFile(
         audioFile: File,
         coverFile: File?,
         title: String,
@@ -44,7 +44,7 @@ object AudioTagger {
             f.commit()
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            // Jika container AAC raw tidak mendukung ID3v23 wrapper, lewati tanpa merusak file audio
             false
         }
     }

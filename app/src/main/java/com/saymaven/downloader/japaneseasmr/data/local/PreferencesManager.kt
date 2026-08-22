@@ -2,11 +2,7 @@ package com.saymaven.downloader.japaneseasmr.data.local
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +18,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_DOWNLOAD_DIR = stringPreferencesKey("download_dir")
         val KEY_PARALLEL_CONNECTIONS = intPreferencesKey("parallel_connections")
         val KEY_AUTO_CLIPBOARD = booleanPreferencesKey("auto_clipboard")
+        val KEY_USE_DETAILED_FILENAME = booleanPreferencesKey("use_detailed_filename")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
@@ -42,11 +39,15 @@ class PreferencesManager(private val context: Context) {
     }
 
     val parallelConnectionsFlow: Flow<Int> = context.dataStore.data.map { preferences ->
-        preferences[KEY_PARALLEL_CONNECTIONS] ?: 8
+        preferences[KEY_PARALLEL_CONNECTIONS] ?: 16
     }
 
     val autoClipboardFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[KEY_AUTO_CLIPBOARD] ?: false
+        preferences[KEY_AUTO_CLIPBOARD] ?: true
+    }
+
+    val useDetailedFilenameFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_USE_DETAILED_FILENAME] ?: false
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
@@ -76,6 +77,12 @@ class PreferencesManager(private val context: Context) {
     suspend fun setAutoClipboard(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_AUTO_CLIPBOARD] = enabled
+        }
+    }
+
+    suspend fun setUseDetailedFilename(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_USE_DETAILED_FILENAME] = enabled
         }
     }
 }

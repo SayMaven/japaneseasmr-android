@@ -1,6 +1,5 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.queue
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import coil.compose.AsyncImage
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadStatus
@@ -39,6 +40,10 @@ fun QueueScreen(viewModel: QueueViewModel) {
 
     var showLogs by remember { mutableStateOf(true) }
     val listState = rememberLazyListState()
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.checkAutoClipboard(context)
+    }
 
     LaunchedEffect(logs.size) {
         if (logs.isNotEmpty()) {
@@ -74,7 +79,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Input Box
+        // Input Box with Clear and Paste Buttons
         OutlinedTextField(
             value = inputText,
             onValueChange = { viewModel.onInputChanged(it) },
@@ -85,9 +90,14 @@ fun QueueScreen(viewModel: QueueViewModel) {
             singleLine = false,
             maxLines = 2,
             trailingIcon = {
-                if (inputText.isNotBlank()) {
-                    IconButton(onClick = { viewModel.onInputChanged("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (inputText.isNotBlank()) {
+                        IconButton(onClick = { viewModel.onInputChanged("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        }
+                    }
+                    IconButton(onClick = { viewModel.pasteFromClipboard(context) }) {
+                        Icon(Icons.Default.ContentPaste, contentDescription = "Tempel Clipboard", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             }

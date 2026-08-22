@@ -1,8 +1,10 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.queue
 
+import android.content.ClipboardManager
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.model.AsmrWork
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
@@ -11,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.regex.Pattern
 
@@ -29,6 +32,7 @@ class QueueViewModel : ViewModel() {
     val isLoadingPreview = _isLoadingPreview.asStateFlow()
 
     private var previewJob: Job? = null
+    private var lastProcessedClipboardText: String? = null
 
     fun onInputChanged(text: String) {
         _inputText.value = text
@@ -54,6 +58,49 @@ class QueueViewModel : ViewModel() {
                 _previewWork.value = null
             } finally {
                 _isLoadingPreview.value = false
+            }
+        }
+    }
+
+    fun pasteFromClipboard(context: Context) {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = clipboard.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                val text = clip.getItemAt(0).text?.toString() ?: ""
+                val extracted = extractRjIds(text)
+                if (extracted.isNotEmpty()) {
+                    onInputChanged(extracted.joinToString(", "))
+                } else if (text.isNotBlank()) {
+                    onInputChanged(text.trim())
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun checkAutoClipboard(context: Context) {
+        viewModelScope.launch {
+            val prefs = PreferencesManager(context)
+            val isAutoClipboard = prefs.autoClipboardFlow.first()
+            if (!isAutoClipboard) return@launch
+
+            try {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = clipboard.primaryClip
+                if (clip != null && clip.itemCount > 0) {
+                    val text = clip.getItemAt(0).text?.toString() ?: ""
+                    if (text.isNotBlank() && text != lastProcessedClipboardText) {
+                        val extracted = extractRjIds(text)
+                        if (extracted.isNotEmpty()) {
+                            lastProcessedClipboardText = text
+                            onInputChanged(extracted.joinToString(", "))
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore clipboard access restrictions
             }
         }
     }

@@ -19,6 +19,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val themeMode = prefs.themeModeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeMode.SYSTEM)
     val dynamicColor = prefs.dynamicColorFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val downloadDir = prefs.downloadDirFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val parallelConnections = prefs.parallelConnectionsFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16)
+    val autoClipboard = prefs.autoClipboardFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val useDetailedFilename = prefs.useDetailedFilenameFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
@@ -35,6 +38,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setDownloadDir(path: String) {
         viewModelScope.launch {
             prefs.setDownloadDir(path)
+        }
+    }
+
+    fun setParallelConnections(connections: Int) {
+        viewModelScope.launch {
+            prefs.setParallelConnections(connections)
+        }
+    }
+
+    fun setAutoClipboard(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setAutoClipboard(enabled)
+        }
+    }
+
+    fun setUseDetailedFilename(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setUseDetailedFilename(enabled)
         }
     }
 

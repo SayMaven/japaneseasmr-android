@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,19 +30,26 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val themeMode by viewModel.themeMode.collectAsState()
     val dynamicColor by viewModel.dynamicColor.collectAsState()
     val customDir by viewModel.downloadDir.collectAsState()
+    val parallelConn by viewModel.parallelConnections.collectAsState()
+    val autoClipboard by viewModel.autoClipboard.collectAsState()
+    val useDetailedFilename by viewModel.useDetailedFilename.collectAsState()
 
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showFolderDialog by remember { mutableStateOf(false) }
+    var showConnectionDialog by remember { mutableStateOf(false) }
+    var customPathInput by remember { mutableStateOf("") }
     var showCacheClearedSnackbar by remember { mutableStateOf(false) }
 
     val activeDownloadPath = remember(customDir) {
-        if (!customDir.isNullOrBlank()) customDir!! else DownloadService.getDownloadDirectory(context).absolutePath
+        if (!customDir.isNullOrBlank()) customDir!! else DownloadService.getDefaultDownloadDirectory().absolutePath
     }
 
     val dirPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri != null) {
-            viewModel.setDownloadDir(uri.path ?: uri.toString())
+            val path = uri.path ?: uri.toString()
+            viewModel.setDownloadDir(path)
         }
     }
 
@@ -60,7 +68,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Tampilan & Tema Card
+        // 1. TAMPILAN & TEMA
         Text(
             text = "TAMPILAN & TEMA",
             style = MaterialTheme.typography.labelSmall,
@@ -110,7 +118,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Penyimpanan & Unduhan
+        // 2. PENYIMPANAN & UNDUHAN
         Text(
             text = "PENYIMPANAN & UNDUHAN",
             style = MaterialTheme.typography.labelSmall,
@@ -137,30 +145,70 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     },
                     leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
                     trailingContent = {
-                        IconButton(onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(Uri.parse(activeDownloadPath), "resource/folder")
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                }
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                // Fallback
+                        Row {
+                            IconButton(onClick = {
+                                customPathInput = activeDownloadPath
+                                showFolderDialog = true
+                            }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Ubah Folder")
                             }
-                        }) {
-                            Icon(Icons.Default.OpenInNew, contentDescription = "Buka Folder")
+                            IconButton(onClick = {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(Uri.parse(activeDownloadPath), "resource/folder")
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    // Fallback
+                                }
+                            }) {
+                                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Buka Folder")
+                            }
                         }
+                    },
+                    modifier = Modifier.clickable {
+                        customPathInput = activeDownloadPath
+                        showFolderDialog = true
                     }
                 )
 
                 HorizontalDivider()
 
                 ListItem(
-                    headlineContent = { Text("Reset ke Folder Standar Musik") },
-                    supportingContent = { Text("Simpan di folder Music/JapaneseASMR perangkat") },
-                    leadingContent = { Icon(Icons.Default.FolderSpecial, contentDescription = null) },
-                    modifier = Modifier.clickable {
-                        viewModel.setDownloadDir("")
+                    headlineContent = { Text("Gunakan Judul Karya sebagai Nama File") },
+                    supportingContent = {
+                        Text(if (useDetailedFilename) "Format: [RJ01673437] Judul Karya.mp3" else "Format: RJ01673437.mp3")
+                    },
+                    leadingContent = { Icon(Icons.Default.TextFields, contentDescription = null) },
+                    trailingContent = {
+                        Switch(
+                            checked = useDetailedFilename,
+                            onCheckedChange = { viewModel.setUseDetailedFilename(it) }
+                        )
+                    }
+                )
+
+                HorizontalDivider()
+
+                ListItem(
+                    headlineContent = { Text("Koneksi Paralel per Unduhan") },
+                    supportingContent = { Text("$parallelConn koneksi simultan (HLS multi-thread)") },
+                    leadingContent = { Icon(Icons.Default.Speed, contentDescription = null) },
+                    modifier = Modifier.clickable { showConnectionDialog = true }
+                )
+
+                HorizontalDivider()
+
+                ListItem(
+                    headlineContent = { Text("Otomatis Deteksi Clipboard") },
+                    supportingContent = { Text("Otomatis mendeteksi kode RJ dari clipboard saat membuka tab Antrean") },
+                    leadingContent = { Icon(Icons.Default.ContentPaste, contentDescription = null) },
+                    trailingContent = {
+                        Switch(
+                            checked = autoClipboard,
+                            onCheckedChange = { viewModel.setAutoClipboard(it) }
+                        )
                     }
                 )
 
@@ -180,7 +228,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Tentang Aplikasi
+        // 3. TENTANG APLIKASI
         Text(
             text = "TENTANG APLIKASI",
             style = MaterialTheme.typography.labelSmall,
@@ -198,8 +246,14 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             Column {
                 ListItem(
                     headlineContent = { Text("JapaneseASMR Downloader") },
-                    supportingContent = { Text("Versi 1.0.1 (Native Android)") },
+                    supportingContent = { Text("Versi 1.0.1 (Native Android Engine)") },
                     leadingContent = { Icon(Icons.Default.Info, contentDescription = null) }
+                )
+                HorizontalDivider()
+                ListItem(
+                    headlineContent = { Text("Engine Unduhan") },
+                    supportingContent = { Text("Native Kotlin HLS Demuxer ($parallelConn Threads) - Tanpa perlu yt-dlp.exe") },
+                    leadingContent = { Icon(Icons.Default.Memory, contentDescription = null) }
                 )
                 HorizontalDivider()
                 ListItem(
@@ -211,6 +265,90 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         }
     }
 
+    // Dialog Ubah Folder Unduhan
+    if (showFolderDialog) {
+        AlertDialog(
+            onDismissRequest = { showFolderDialog = false },
+            title = { Text("Ubah Folder Unduhan") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Pilih lokasi penyimpanan audio:")
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.setDownloadDir("/storage/emulated/0/Download/JapaneseASMR")
+                            showFolderDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Download/JapaneseASMR (Default)")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.setDownloadDir("/storage/emulated/0/Music/JapaneseASMR")
+                            showFolderDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Music/JapaneseASMR")
+                    }
+
+                    OutlinedTextField(
+                        value = customPathInput,
+                        onValueChange = { customPathInput = it },
+                        label = { Text("Atau masukkan path kustom") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (customPathInput.isNotBlank()) {
+                        viewModel.setDownloadDir(customPathInput.trim())
+                    }
+                    showFolderDialog = false
+                }) {
+                    Text("Simpan Path")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFolderDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Dialog Jumlah Koneksi Paralel
+    if (showConnectionDialog) {
+        val options = listOf(4, 8, 16, 24, 32)
+        AlertDialog(
+            onDismissRequest = { showConnectionDialog = false },
+            title = { Text("Pilih Jumlah Koneksi Paralel") },
+            text = {
+                Column {
+                    options.forEach { count ->
+                        ListItem(
+                            headlineContent = { Text("$count Koneksi Simultan" + if (count == 16) " (Disarankan)" else "") },
+                            modifier = Modifier.clickable {
+                                viewModel.setParallelConnections(count)
+                                showConnectionDialog = false
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showConnectionDialog = false }) {
+                    Text("Tutup")
+                }
+            }
+        )
+    }
+
+    // Dialog Tema
     if (showThemeDialog) {
         AlertDialog(
             onDismissRequest = { showThemeDialog = false },
