@@ -1,6 +1,6 @@
 # JapaneseASMR Android 🎧
 
-Aplikasi mobile modern dan ringan untuk mengunduh audio JapaneseASMR, menyematkan *cover art* HD & metadata resmi DLsite ke dalam file MP3 secara native, serta dilengkapi pemutar audio bawaan dengan dukungan background playback dan lock screen controls.
+Aplikasi mobile Android modern dan ringan untuk mengunduh audio JapaneseASMR, menggabungkan *multi-track* & bonus/omake secara otomatis, menyematkan *cover art* HD & metadata resmi DLsite ke dalam tag ID3 MP3 secara native, serta dilengkapi pemutar audio bawaan.
 
 ---
 
@@ -13,6 +13,14 @@ Aplikasi mobile modern dan ringan untuk mengunduh audio JapaneseASMR, menyematka
 - 🎵 **Integrated Background Audio Player**: Pemutar musik bawaan berbasis Jetpack Media3 (ExoPlayer) yang mendukung pemutaran latar belakang, kontrol notifikasi, dan lockscreen.
 - 🌐 **Instant Streaming Preview**: Mendengarkan karya secara instan dari internet tanpa harus mengunduh seluruh file terlebih dahulu.
 - 💾 **Manajemen Riwayat & Offline Storage**: Riwayat unduhan tersimpan rapi di database lokal (Room SQLite).
+
+---
+
+## 📲 Cara Instalasi & Penggunaan
+
+1. Unduh file **pp-debug.apk** atau **JapaneseASMR-Release.apk** dari menu **[Releases](https://github.com/SayMaven/japaneseasmr-android/releases)** atau tab **[Actions](https://github.com/SayMaven/japaneseasmr-android/actions)**.
+2. Pasang (install) file .apk tersebut di perangkat Android Anda.
+3. Buka aplikasi, masukkan satu atau beberapa Kode RJ (contoh: RJ01673437, RJ278932), lalu tekan tombol **Mulai Unduh**.
 
 ---
 
@@ -29,31 +37,5 @@ Aplikasi mobile modern dan ringan untuk mengunduh audio JapaneseASMR, menyematka
 
 ---
 
-## 🚀 Cara Kompilasi (CLI / Tanpa Android Studio)
-
-Pastikan **Java 21** dan **Android SDK** telah terpasang di sistem Anda.
-
-1. **Clone repository**:
-   ```bash
-   git clone https://github.com/SayMaven/japaneseasmr-android.git
-   cd japaneseasmr-android
-   ```
-
-2. **Kompilasi APK**:
-   * **Windows**:
-     ```powershell
-     .\gradlew assembleDebug
-     ```
-   * **Linux / macOS**:
-     ```bash
-     chmod +x gradlew
-     ./gradlew assembleDebug
-     ```
-
-3. File APK hasil kompilasi akan berada di:
-   `app/build/outputs/apk/debug/app-debug.apk`
-
----
-
 ## 📄 Lisensi
-Proyek ini dilisensikan di bawah **GNU General Public License v3.0 (GPL-3.0)**.
+Proyek ini dilisensikan di bawah **[GNU General Public License v3.0 (GPL-3.0)](LICENSE)**. Hak cipta © 2026 **SayMaven**.
