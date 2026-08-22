@@ -1,7 +1,7 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.queue
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -39,7 +40,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
     val isDownloading by viewModel.isDownloading.collectAsState()
     val logs by DownloadService.logsState.collectAsState()
 
-    val isDark = isSystemInDarkTheme()
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     var showLogs by remember { mutableStateOf(true) }
     val listState = rememberLazyListState()
 
@@ -228,7 +229,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
             }
         }
 
-        // Log Console Section (Theme-Aware Live Terminal)
+        // Log Console Section (Dynamic Theme-Aware Live Terminal)
         if (showLogs) {
             Spacer(modifier = Modifier.height(10.dp))
             Card(
@@ -236,8 +237,12 @@ fun QueueScreen(viewModel: QueueViewModel) {
                     .fillMaxWidth()
                     .weight(0.5f),
                 shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(
+                    1.dp,
+                    if (isDark) Color(0xFF282A36) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                ),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isDark) Color(0xFF14141E) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                    containerColor = if (isDark) Color(0xFF14141E) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                 )
             ) {
                 Column(modifier = Modifier.padding(10.dp)) {
@@ -250,14 +255,14 @@ fun QueueScreen(viewModel: QueueViewModel) {
                             Icon(
                                 Icons.Default.Terminal,
                                 contentDescription = null,
-                                tint = if (isDark) Color(0xFF50FA7B) else Color(0xFF2E7D32),
+                                tint = if (isDark) Color(0xFF50FA7B) else Color(0xFF1B5E20),
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Log Unduhan Real-time",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isDark) Color(0xFF50FA7B) else Color(0xFF2E7D32),
+                                color = if (isDark) Color(0xFF50FA7B) else Color(0xFF1B5E20),
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -277,7 +282,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
                                 text = "Log aktivitas akan muncul di sini saat proses unduhan dimulai.",
-                                color = if (isDark) Color(0xFF6272A4) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                color = if (isDark) Color(0xFF6272A4) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace
                             )
@@ -298,11 +303,11 @@ fun QueueScreen(viewModel: QueueViewModel) {
                                     }
                                 } else {
                                     when {
-                                        logLine.contains("[ERROR]") || logLine.contains("[!]") -> Color(0xFFD32F2F)
-                                        logLine.contains("[SUCCESS]") -> Color(0xFF2E7D32)
-                                        logLine.contains("[download]") -> Color(0xFF0288D1)
-                                        logLine.contains("Memproses:") -> Color(0xFF7B1FA2)
-                                        else -> Color(0xFF212121)
+                                        logLine.contains("[ERROR]") || logLine.contains("[!]") -> Color(0xFFB71C1C)
+                                        logLine.contains("[SUCCESS]") -> Color(0xFF1B5E20)
+                                        logLine.contains("[download]") -> Color(0xFF01579B)
+                                        logLine.contains("Memproses:") -> Color(0xFF4A148C)
+                                        else -> Color(0xFF263238)
                                     }
                                 }
                                 Text(
