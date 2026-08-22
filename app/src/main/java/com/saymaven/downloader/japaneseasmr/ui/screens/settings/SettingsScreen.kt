@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import java.io.File
+import com.saymaven.downloader.japaneseasmr.BuildConfig
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
@@ -246,7 +247,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             Column {
                 ListItem(
                     headlineContent = { Text("JapaneseASMR Downloader") },
-                    supportingContent = { Text("Versi 1.0.1 (Native Android Engine)") },
+                    supportingContent = { Text("Versi ${BuildConfig.VERSION_NAME} (Native Android Engine)") },
                     leadingContent = { Icon(Icons.Default.Info, contentDescription = null) }
                 )
                 HorizontalDivider()
