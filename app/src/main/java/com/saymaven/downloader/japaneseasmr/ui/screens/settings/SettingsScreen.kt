@@ -274,7 +274,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider()
                 ListItem(
                     headlineContent = { Text("Engine Unduhan") },
-                    supportingContent = { Text("High-Speed Native Engine ($parallelConn Koneksi Paralel)") },
+                    supportingContent = { Text("High-Speed Native Engine") },
                     leadingContent = { Icon(Icons.Default.Memory, contentDescription = null) }
                 )
                 HorizontalDivider()
