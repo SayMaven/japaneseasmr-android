@@ -8,10 +8,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.FileOutputStream
-import java.io.RandomAccessFile
+import java.io.*
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -51,6 +48,9 @@ object AudioDownloader {
         onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -> Unit,
         onLog: (String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
+        val segDir = File(tempDir, "hls_segs_${System.currentTimeMillis()}")
+        segDir.mkdirs()
+
         try {
             onLog("[i] Mengambil playlist HLS (.m3u8)...")
             val request = Request.Builder()
@@ -84,7 +84,6 @@ object AudioDownloader {
             val concurrency = parallelConnections.coerceIn(1, 32)
             onLog("[i] Terdeteksi $totalSegments segmen audio HLS. Memulai unduhan paralel ($concurrency koneksi)...")
 
-            val segmentAdtsData = Array<ByteArray?>(totalSegments) { null }
             val completedCount = AtomicInteger(0)
             val totalBytesDownloaded = AtomicLong(0)
             val bytesSinceLastLog = AtomicLong(0)
@@ -99,6 +98,7 @@ object AudioDownloader {
                         semaphore.withPermit {
                             var success = false
                             var attempts = 0
+                            val segFile = File(segDir, "seg_$index.adts")
 
                             while (!success && attempts < 4) {
                                 attempts++
@@ -114,9 +114,10 @@ object AudioDownloader {
                                     if (segResp.isSuccessful) {
                                         val rawBytes = segResp.body?.bytes()
                                         if (rawBytes != null && rawBytes.isNotEmpty()) {
+                                            // Demux paket TS langsung ke disk tanpa menahan memori RAM
                                             val adtsBytes = extractAdtsFromTs(rawBytes)
                                             if (adtsBytes.isNotEmpty()) {
-                                                segmentAdtsData[index] = adtsBytes
+                                                segFile.writeBytes(adtsBytes)
                                                 totalBytesDownloaded.addAndGet(adtsBytes.size.toLong())
                                                 bytesSinceLastLog.addAndGet(adtsBytes.size.toLong())
                                                 success = true
@@ -145,7 +146,7 @@ object AudioDownloader {
                                 val estTotal = if (done > 0) totalBytesDownloaded.get() * totalSegments / done else 0L
                                 onProgress(pct, speedStr, etaStr, downloadedStr, "~${formatFileSize(estTotal)}")
 
-                                if (done % 25 == 0 || done == totalSegments) {
+                                if (done % 50 == 0 || done == totalSegments) {
                                     onLog("  [download] Segmen $done/$totalSegments (${(pct * 100).toInt()}%) - $downloadedStr @ $speedStr")
                                 }
 
@@ -157,62 +158,81 @@ object AudioDownloader {
                 }.awaitAll()
             }
 
-            // Gabungkan seluruh segmen ADTS menjadi satu stream utuh
-            val totalRawSize = segmentAdtsData.filterNotNull().sumOf { it.size }
-            val combinedAdts = ByteArrayOutputStream(totalRawSize)
-            for (i in 0 until totalSegments) {
-                val data = segmentAdtsData[i]
-                if (data != null) combinedAdts.write(data)
+            // Gabungkan segmen-segmen ke single temporary ADTS file secara streaming (Hemat RAM < 5MB)
+            onLog("[i] Menggabungkan $totalSegments segmen audio secara streaming...")
+            val tempAdtsCombined = File(tempDir, "temp_combined_${System.currentTimeMillis()}.adts")
+            tempAdtsCombined.outputStream().buffered(128 * 1024).use { outStream ->
+                val buffer = ByteArray(64 * 1024)
+                for (i in 0 until totalSegments) {
+                    val sFile = File(segDir, "seg_$i.adts")
+                    if (sFile.exists()) {
+                        sFile.inputStream().use { input ->
+                            var read: Int
+                            while (input.read(buffer).also { read = it } != -1) {
+                                outStream.write(buffer, 0, read)
+                            }
+                        }
+                        sFile.delete() // Langsung bersihkan file segmen dari disk
+                    }
+                }
             }
-            val allAdtsBytes = combinedAdts.toByteArray()
 
-            onLog("[i] Mengemas audio ke container ISO M4A (Seek-table & Duration Index)...")
+            onLog("[i] Mengemas audio ke container ISO M4A (Seek-table & Index Durasi)...")
             destFile.parentFile?.mkdirs()
 
-            val muxSuccess = muxAdtsToM4a(allAdtsBytes, destFile)
+            val muxSuccess = muxAdtsFileToM4a(tempAdtsCombined, destFile)
             if (!muxSuccess) {
-                // Fallback: simpan raw ADTS jika muxer gagal
-                FileOutputStream(destFile).use { it.write(allAdtsBytes) }
+                // Fallback jika muxing gagal
+                tempAdtsCombined.copyTo(destFile, overwrite = true)
             }
+            tempAdtsCombined.delete()
 
             val finalSizeStr = formatFileSize(destFile.length())
-            onLog("[SUCCESS] File M4A berhasil dibuat: $finalSizeStr (100% Seekable & Jernih)")
+            onLog("[SUCCESS] File audio berhasil dibuat: $finalSizeStr (Jernih & 100% Seekable)")
             onProgress(1f, "Selesai", "00:00", finalSizeStr, finalSizeStr)
             true
         } catch (e: Exception) {
             onLog("[ERROR] Gagal mengunduh HLS: ${e.message}")
             e.printStackTrace()
             false
+        } finally {
+            try {
+                segDir.deleteRecursively()
+            } catch (e: Exception) {}
         }
     }
 
     /**
-     * Memaketkan raw ADTS AAC elementary stream ke container standar ISO M4A menggunakan Android MediaMuxer.
-     * Menghasilkan file M4A yang 100% valid dengan indeks durasi presisi, thumbnail support, dan seekable di semua player.
+     * Muxing streaming dari file ADTS di disk ke file M4A tanpa memuat seluruh file ke RAM (Zero OOM).
      */
-    private fun muxAdtsToM4a(adtsBytes: ByteArray, outputFile: File): Boolean {
-        if (adtsBytes.size < 7) return false
+    private fun muxAdtsFileToM4a(adtsFile: File, outputFile: File): Boolean {
+        if (!adtsFile.exists() || adtsFile.length() < 7) return false
         var muxer: MediaMuxer? = null
 
         return try {
-            // 1. Parse header ADTS pertama untuk mengekstrak parameter audio (sample rate, channels, profile)
-            var firstHeaderOffset = 0
-            while (firstHeaderOffset < adtsBytes.size - 7) {
-                if ((adtsBytes[firstHeaderOffset].toInt() and 0xFF) == 0xFF &&
-                    (adtsBytes[firstHeaderOffset + 1].toInt() and 0xF0) == 0xF0
+            val fileLength = adtsFile.length()
+            val raf = RandomAccessFile(adtsFile, "r")
+
+            // 1. Cari header ADTS pertama untuk mengekstrak parameter audio (sample rate, channels, profile)
+            val headerBuf = ByteArray(16)
+            raf.read(headerBuf)
+            raf.seek(0)
+
+            var firstOffset = 0
+            while (firstOffset < headerBuf.size - 7) {
+                if ((headerBuf[firstOffset].toInt() and 0xFF) == 0xFF &&
+                    (headerBuf[firstOffset + 1].toInt() and 0xF0) == 0xF0
                 ) {
                     break
                 }
-                firstHeaderOffset++
+                firstOffset++
             }
 
-            if (firstHeaderOffset >= adtsBytes.size - 7) return false
-
-            val hdr = adtsBytes
-            val profile = ((hdr[firstHeaderOffset + 2].toInt() ushr 6) and 0x03) + 1 // AAC-LC = 2
-            val sampleRateIdx = (hdr[firstHeaderOffset + 2].toInt() ushr 2) and 0x0F
-            val channels = (((hdr[firstHeaderOffset + 2].toInt() and 0x01) shl 2) or
-                    ((hdr[firstHeaderOffset + 3].toInt() ushr 6) and 0x03)).coerceAtLeast(1)
+            val hdr = headerBuf
+            val profile = ((hdr[firstOffset + 2].toInt() ushr 6) and 0x03) + 1
+            val sampleRateIdx = (hdr[firstOffset + 2].toInt() ushr 2) and 0x0F
+            val channels = (((hdr[firstOffset + 2].toInt() and 0x01) shl 2) or
+                    ((hdr[firstOffset + 3].toInt() ushr 6) and 0x03)).coerceAtLeast(1)
 
             val sampleRate = when (sampleRateIdx) {
                 0 -> 96000
@@ -227,7 +247,6 @@ object AudioDownloader {
                 else -> 44100
             }
 
-            // AudioSpecificConfig (CSD-0): 2 bytes
             val csd0 = byteArrayOf(
                 ((profile shl 3) or (sampleRateIdx ushr 1)).toByte(),
                 (((sampleRateIdx and 0x01) shl 7) or (channels shl 3)).toByte()
@@ -241,41 +260,63 @@ object AudioDownloader {
             val trackIndex = muxer.addTrack(mediaFormat)
             muxer.start()
 
-            var frameIndex = 0L
-            var offset = 0
-            val buffer = ByteBuffer.allocateDirect(64 * 1024)
+            // 2. Stream pembacaan frame demi frame dari disk menggunakan Direct ByteBuffer (RAM < 2MB)
+            val inputStream = BufferedInputStream(FileInputStream(adtsFile), 256 * 1024)
+            val readBuffer = ByteArray(64 * 1024)
+            val directBuf = ByteBuffer.allocateDirect(64 * 1024)
             val bufferInfo = MediaCodec.BufferInfo()
 
-            while (offset < adtsBytes.size - 7) {
-                if ((adtsBytes[offset].toInt() and 0xFF) == 0xFF && (adtsBytes[offset + 1].toInt() and 0xF0) == 0xF0) {
-                    val hasCrc = (adtsBytes[offset + 1].toInt() and 0x01) == 0
+            var frameIndex = 0L
+            val frameHeader = ByteArray(7)
+
+            while (true) {
+                inputStream.mark(7)
+                val headerRead = inputStream.read(frameHeader)
+                if (headerRead < 7) break
+
+                if ((frameHeader[0].toInt() and 0xFF) == 0xFF && (frameHeader[1].toInt() and 0xF0) == 0xF0) {
+                    val hasCrc = (frameHeader[1].toInt() and 0x01) == 0
                     val headerLen = if (hasCrc) 9 else 7
-                    val frameLen = (((adtsBytes[offset + 3].toInt() and 0x03) shl 11) or
-                            ((adtsBytes[offset + 4].toInt() and 0xFF) shl 3) or
-                            ((adtsBytes[offset + 5].toInt() and 0xE0) ushr 5))
+                    val frameLen = (((frameHeader[3].toInt() and 0x03) shl 11) or
+                            ((frameHeader[4].toInt() and 0xFF) shl 3) or
+                            ((frameHeader[5].toInt() and 0xE0) ushr 5))
 
                     val rawPayloadLen = frameLen - headerLen
-                    if (rawPayloadLen > 0 && offset + frameLen <= adtsBytes.size) {
-                        buffer.clear()
-                        buffer.put(adtsBytes, offset + headerLen, rawPayloadLen)
-                        buffer.flip()
+                    if (rawPayloadLen in 1..65536) {
+                        if (hasCrc) {
+                            inputStream.skip(2) // Skip 2 bytes CRC
+                        }
+                        var totalRead = 0
+                        while (totalRead < rawPayloadLen) {
+                            val r = inputStream.read(readBuffer, totalRead, rawPayloadLen - totalRead)
+                            if (r == -1) break
+                            totalRead += r
+                        }
 
-                        bufferInfo.offset = 0
-                        bufferInfo.size = rawPayloadLen
-                        bufferInfo.presentationTimeUs = (frameIndex * 1024L * 1000000L) / sampleRate
-                        bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME
+                        if (totalRead == rawPayloadLen) {
+                            directBuf.clear()
+                            directBuf.put(readBuffer, 0, rawPayloadLen)
+                            directBuf.flip()
 
-                        muxer.writeSampleData(trackIndex, buffer, bufferInfo)
-                        frameIndex++
-                        offset += frameLen
+                            bufferInfo.offset = 0
+                            bufferInfo.size = rawPayloadLen
+                            bufferInfo.presentationTimeUs = (frameIndex * 1024L * 1000000L) / sampleRate
+                            bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME
+
+                            muxer.writeSampleData(trackIndex, directBuf, bufferInfo)
+                            frameIndex++
+                        }
                     } else {
-                        offset++
+                        inputStream.skip(1)
                     }
                 } else {
-                    offset++
+                    inputStream.reset()
+                    inputStream.skip(1)
                 }
             }
 
+            inputStream.close()
+            raf.close()
             muxer.stop()
             true
         } catch (e: Exception) {
