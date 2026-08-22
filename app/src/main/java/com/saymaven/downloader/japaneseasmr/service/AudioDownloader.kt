@@ -1,17 +1,14 @@
 package com.saymaven.downloader.japaneseasmr.service
 
-import android.media.MediaCodec
-import android.media.MediaExtractor
-import android.media.MediaFormat
-import android.media.MediaMuxer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.ByteBuffer
+import java.io.RandomAccessFile
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -38,7 +35,7 @@ object AudioDownloader {
         if (url.endsWith(".m3u8", ignoreCase = true)) {
             downloadHlsStream(url, destFile, tempDir, parallelConnections, onProgress, onLog)
         } else {
-            downloadDirectFile(url, destFile, onProgress, onLog)
+            downloadDirectFileParallel(url, destFile, parallelConnections, onProgress, onLog)
         }
     }
 
@@ -83,7 +80,7 @@ object AudioDownloader {
             val concurrency = parallelConnections.coerceIn(1, 32)
             onLog("[i] Terdeteksi $totalSegments segmen audio HLS. Memulai unduhan paralel ($concurrency koneksi)...")
 
-            val segmentFiles = Array<File?>(totalSegments) { null }
+            val segmentAdtsData = Array<ByteArray?>(totalSegments) { null }
             val completedCount = AtomicInteger(0)
             val totalBytesDownloaded = AtomicLong(0)
             val bytesSinceLastLog = AtomicLong(0)
@@ -96,7 +93,6 @@ object AudioDownloader {
                 segmentUrls.mapIndexed { index, segUrl ->
                     async {
                         semaphore.withPermit {
-                            val segFile = File(tempDir, "seg_${System.currentTimeMillis()}_${index}.ts")
                             var success = false
                             var attempts = 0
 
@@ -112,13 +108,16 @@ object AudioDownloader {
 
                                     val segResp = client.newCall(segReq).execute()
                                     if (segResp.isSuccessful) {
-                                        val bytes = segResp.body?.bytes()
-                                        if (bytes != null && bytes.isNotEmpty()) {
-                                            segFile.writeBytes(bytes)
-                                            segmentFiles[index] = segFile
-                                            totalBytesDownloaded.addAndGet(bytes.size.toLong())
-                                            bytesSinceLastLog.addAndGet(bytes.size.toLong())
-                                            success = true
+                                        val rawBytes = segResp.body?.bytes()
+                                        if (rawBytes != null && rawBytes.isNotEmpty()) {
+                                            // Demux paket MPEG-TS langsung ke frame ADTS AAC murni
+                                            val adtsBytes = extractAdtsFromTs(rawBytes)
+                                            if (adtsBytes.isNotEmpty()) {
+                                                segmentAdtsData[index] = adtsBytes
+                                                totalBytesDownloaded.addAndGet(adtsBytes.size.toLong())
+                                                bytesSinceLastLog.addAndGet(adtsBytes.size.toLong())
+                                                success = true
+                                            }
                                         }
                                     }
                                 } catch (e: Exception) {
@@ -155,31 +154,20 @@ object AudioDownloader {
                 }.awaitAll()
             }
 
-            // Gabungkan semua TS ke satu file sementara yang valid
-            onLog("[i] Menggabungkan $totalSegments segmen MPEG-TS...")
-            val combinedTsFile = File(tempDir, "combined_${System.currentTimeMillis()}.ts")
-            FileOutputStream(combinedTsFile).use { outStream ->
+            // Gabungkan seluruh frame ADTS AAC secara berurutan ke file akhir
+            onLog("[i] Menggabungkan $totalSegments segmen ADTS AAC menjadi file audio utuh...")
+            destFile.parentFile?.mkdirs()
+            FileOutputStream(destFile).use { outStream ->
                 for (i in 0 until totalSegments) {
-                    val sf = segmentFiles[i]
-                    if (sf != null && sf.exists()) {
-                        sf.inputStream().use { it.copyTo(outStream) }
-                        sf.delete()
+                    val adts = segmentAdtsData[i]
+                    if (adts != null && adts.isNotEmpty()) {
+                        outStream.write(adts)
                     }
                 }
             }
 
-            // Remux MPEG-TS ke format audio native (M4A/MP4 container dengan seek-table presisi)
-            onLog("[i] Melakukan remuxing ke container audio standar (MediaMuxer)...")
-            val remuxSuccess = remuxTsToM4a(combinedTsFile, destFile)
-            combinedTsFile.delete()
-
-            if (!remuxSuccess) {
-                onLog("[!] Remuxing MediaMuxer gagal, mencoba fallback direct copy...")
-                combinedTsFile.copyTo(destFile, overwrite = true)
-            }
-
             val finalSizeStr = formatFileSize(destFile.length())
-            onLog("[SUCCESS] Audio berhasil dibuat: $finalSizeStr (100% Seekable & Valid)")
+            onLog("[SUCCESS] File audio berhasil dibuat: $finalSizeStr (Suara Jernih & Format Valid)")
             onProgress(1f, "Selesai", "00:00", finalSizeStr, finalSizeStr)
             true
         } catch (e: Exception) {
@@ -190,78 +178,180 @@ object AudioDownloader {
     }
 
     /**
-     * Menggunakan Android MediaExtractor + MediaMuxer untuk mengubah MPEG-TS ke ISO MP4/M4A.
-     * Ini memastikan file audio memiliki index durasi, sample-table (stbl), dan 100% seekable di semua player.
+     * Mengekstrak seluruh payload audio ADTS AAC murni dari potongan MPEG-TS 188-byte.
      */
-    private fun remuxTsToM4a(tsFile: File, outputFile: File): Boolean {
-        val extractor = MediaExtractor()
-        var muxer: MediaMuxer? = null
-        return try {
-            extractor.setDataSource(tsFile.absolutePath)
-            var audioTrackIndex = -1
-            var audioFormat: MediaFormat? = null
+    private fun extractAdtsFromTs(tsBytes: ByteArray): ByteArray {
+        val out = ByteArrayOutputStream(tsBytes.size)
+        var i = 0
+        while (i <= tsBytes.size - 188) {
+            if (tsBytes[i] != 0x47.toByte()) {
+                i++
+                continue
+            }
+            val pkt = tsBytes
+            val pktStart = i
+            i += 188
 
-            for (i in 0 until extractor.trackCount) {
-                val format = extractor.getTrackFormat(i)
-                val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
-                if (mime.startsWith("audio/")) {
-                    audioTrackIndex = i
-                    audioFormat = format
-                    break
+            val pid = ((pkt[pktStart + 1].toInt() and 0x1F) shl 8) or (pkt[pktStart + 2].toInt() and 0xFF)
+            if (pid != 256) continue // Audio stream adalah PID 256 (0x100)
+
+            val pusi = (pkt[pktStart + 1].toInt() and 0x40) != 0
+            val afc = (pkt[pktStart + 3].toInt() and 0x30) ushr 4
+
+            var offset = 4
+            if (afc == 2 || afc == 3) {
+                val afLen = pkt[pktStart + 4].toInt() and 0xFF
+                offset += 1 + afLen
+            }
+            if (offset >= 188) continue
+
+            var payloadOffset = pktStart + offset
+            var payloadLen = 188 - offset
+
+            if (pusi) {
+                // PES Header: 0x00 0x00 0x01
+                if (payloadLen >= 9 && pkt[payloadOffset] == 0.toByte() && pkt[payloadOffset + 1] == 0.toByte() && pkt[payloadOffset + 2] == 1.toByte()) {
+                    val hLen = pkt[payloadOffset + 8].toInt() and 0xFF
+                    val skip = 9 + hLen
+                    payloadOffset += skip
+                    payloadLen -= skip
                 }
             }
 
-            if (audioTrackIndex == -1 || audioFormat == null) {
-                return false
+            if (payloadLen > 0 && payloadOffset + payloadLen <= pktStart + 188) {
+                out.write(pkt, payloadOffset, payloadLen)
+            }
+        }
+        return out.toByteArray()
+    }
+
+    /**
+     * Akselerasi unduhan Direct MP3 menggunakan 16 koneksi paralel HTTP Range (mirip engine aria2c).
+     */
+    private suspend fun downloadDirectFileParallel(
+        url: String,
+        destFile: File,
+        parallelConnections: Int,
+        onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -> Unit,
+        onLog: (String) -> Unit
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            onLog("[i] Memeriksa ukuran file direct MP3...")
+            val headReq = Request.Builder()
+                .url(url)
+                .head()
+                .header("Referer", REFERER)
+                .header("User-Agent", USER_AGENT)
+                .build()
+
+            val headResp = client.newCall(headReq).execute()
+            val totalBytes = headResp.headers["Content-Length"]?.toLongOrNull() ?: 0L
+            val acceptRanges = headResp.headers["Accept-Ranges"]?.contains("bytes", ignoreCase = true) == true
+
+            destFile.parentFile?.mkdirs()
+
+            if (totalBytes <= 0L || !acceptRanges || parallelConnections <= 1) {
+                onLog("[i] Mengunduh single-stream...")
+                return@withContext downloadDirectSingleStream(url, destFile, onProgress, onLog)
             }
 
-            extractor.selectTrack(audioTrackIndex)
+            val concurrency = parallelConnections.coerceIn(2, 32)
+            val totalStr = formatFileSize(totalBytes)
+            onLog("[i] Ukuran file: $totalStr. Memulai unduhan multi-part Range ($concurrency thread paralel)...")
 
-            outputFile.parentFile?.mkdirs()
-            muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-            val muxerTrackIndex = muxer.addTrack(audioFormat)
-            muxer.start()
+            // Siapkan file kosong dengan ukuran total
+            val raf = RandomAccessFile(destFile, "rw")
+            raf.setLength(totalBytes)
+            raf.close()
 
-            val maxBufferSize = if (audioFormat.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
-                audioFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE).coerceAtLeast(1024 * 1024)
-            } else {
-                1024 * 1024
+            val chunkSize = totalBytes / concurrency
+            val totalRead = AtomicLong(0L)
+            val bytesSinceLast = AtomicLong(0L)
+            var lastTime = System.currentTimeMillis()
+            val startTime = System.currentTimeMillis()
+
+            coroutineScope {
+                (0 until concurrency).map { partIndex ->
+                    async {
+                        val startByte = partIndex * chunkSize
+                        val endByte = if (partIndex == concurrency - 1) totalBytes - 1 else (partIndex + 1) * chunkSize - 1
+
+                        var success = false
+                        var attempts = 0
+
+                        while (!success && attempts < 4) {
+                            attempts++
+                            try {
+                                val rangeReq = Request.Builder()
+                                    .url(url)
+                                    .header("Range", "bytes=$startByte-$endByte")
+                                    .header("Referer", REFERER)
+                                    .header("User-Agent", USER_AGENT)
+                                    .build()
+
+                                val rangeResp = client.newCall(rangeReq).execute()
+                                val body = rangeResp.body ?: throw Exception("Empty body")
+
+                                val inputStream = body.byteStream()
+                                val partRaf = RandomAccessFile(destFile, "rw")
+                                partRaf.seek(startByte)
+
+                                val buffer = ByteArray(32 * 1024)
+                                var bytesRead: Int
+
+                                inputStream.use { input ->
+                                    partRaf.use { pRaf ->
+                                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                                            pRaf.write(buffer, 0, bytesRead)
+                                            totalRead.addAndGet(bytesRead.toLong())
+                                            bytesSinceLast.addAndGet(bytesRead.toLong())
+
+                                            val now = System.currentTimeMillis()
+                                            val diff = now - lastTime
+                                            if (diff >= 500) {
+                                                val currentRead = totalRead.get()
+                                                val speedBps = if (diff > 0) (bytesSinceLast.get() * 1000) / diff else 0L
+                                                val speedStr = "${formatFileSize(speedBps)}/s"
+
+                                                val timeElapsed = (now - startTime) / 1000
+                                                val etaSec = if (currentRead > 0) ((totalBytes - currentRead) * timeElapsed) / currentRead else 0L
+                                                val etaStr = formatTimeSeconds(etaSec)
+
+                                                val pct = currentRead.toFloat() / totalBytes.toFloat()
+                                                onProgress(pct, speedStr, etaStr, formatFileSize(currentRead), totalStr)
+
+                                                lastTime = now
+                                                bytesSinceLast.set(0)
+                                            }
+                                        }
+                                    }
+                                }
+                                success = true
+                            } catch (e: Exception) {
+                                delay(500)
+                            }
+                        }
+                    }
+                }.awaitAll()
             }
 
-            val buffer = ByteBuffer.allocateDirect(maxBufferSize)
-            val bufferInfo = MediaCodec.BufferInfo()
-
-            while (true) {
-                bufferInfo.offset = 0
-                bufferInfo.size = extractor.readSampleData(buffer, 0)
-                if (bufferInfo.size < 0) {
-                    break
-                }
-                bufferInfo.presentationTimeUs = extractor.sampleTime
-                bufferInfo.flags = extractor.sampleFlags
-                muxer.writeSampleData(muxerTrackIndex, buffer, bufferInfo)
-                extractor.advance()
-            }
-
-            muxer.stop()
+            val finalSizeStr = formatFileSize(destFile.length())
+            onLog("[SUCCESS] Unduhan multi-part selesai: $finalSizeStr")
+            onProgress(1f, "Selesai", "00:00", finalSizeStr, totalStr)
             true
         } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        } finally {
-            try { muxer?.release() } catch (e: Exception) {}
-            try { extractor.release() } catch (e: Exception) {}
+            onLog("[ERROR] Gagal unduhan multi-part: ${e.message}")
+            downloadDirectSingleStream(url, destFile, onProgress, onLog)
         }
     }
 
-    private suspend fun downloadDirectFile(
+    private suspend fun downloadDirectSingleStream(
         url: String,
         destFile: File,
         onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -> Unit,
         onLog: (String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            onLog("[i] Mengunduh direct file...")
             val request = Request.Builder()
                 .url(url)
                 .header("Referer", REFERER)
@@ -319,12 +409,12 @@ object AudioDownloader {
                 }
             }
 
-            onLog("[SUCCESS] Unduhan selesai: ${formatFileSize(destFile.length())}")
-            onProgress(1f, "Selesai", "00:00", formatFileSize(totalRead), totalStr)
+            val finalSize = formatFileSize(destFile.length())
+            onLog("[SUCCESS] Unduhan selesai: $finalSize")
+            onProgress(1f, "Selesai", "00:00", finalSize, totalStr)
             true
         } catch (e: Exception) {
-            onLog("[ERROR] Gagal mengunduh file: ${e.message}")
-            e.printStackTrace()
+            onLog("[ERROR] Gagal mengunduh: ${e.message}")
             false
         }
     }

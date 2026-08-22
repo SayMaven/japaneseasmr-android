@@ -188,11 +188,11 @@ class DownloadService : Service() {
             val downloadedTracks = mutableListOf<File>()
             var isFailed = false
             val isHls = tracks.any { it.url.endsWith(".m3u8", ignoreCase = true) }
-            val fileExtension = if (isHls) "m4a" else "mp3"
+            val fileExtension = if (isHls) "aac" else "mp3"
 
             for (tIdx in tracks.indices) {
                 val track = tracks[tIdx]
-                val trackExt = if (track.url.endsWith(".m3u8", ignoreCase = true)) "m4a" else "mp3"
+                val trackExt = if (track.url.endsWith(".m3u8", ignoreCase = true)) "aac" else "mp3"
                 val trackFile = File(tempDir, "${item.rjid}_t${tIdx + 1}.$trackExt")
 
                 updateItem(i) {
