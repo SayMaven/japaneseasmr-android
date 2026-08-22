@@ -2,7 +2,6 @@ package com.saymaven.downloader.japaneseasmr.service
 
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
-import org.jaudiotagger.tag.id3.ID3v23Tag
 import org.jaudiotagger.tag.images.ArtworkFactory
 import java.io.File
 
@@ -19,11 +18,7 @@ object AudioTagger {
     ): Boolean {
         return try {
             val f = AudioFileIO.read(audioFile)
-            var tag = f.tagOrCreateAndSetDefault
-            if (tag !is ID3v23Tag) {
-                tag = ID3v23Tag()
-                f.tag = tag
-            }
+            val tag = f.tagOrCreateAndSetDefault
 
             tag.setField(FieldKey.TITLE, title)
             tag.setField(FieldKey.ARTIST, if (artist.isBlank() || artist == "-") "JapaneseASMR" else artist)
@@ -37,14 +32,14 @@ object AudioTagger {
                     tag.deleteArtworkField()
                     tag.setField(artwork)
                 } catch (e: Exception) {
-                    // Ignore artwork error
+                    // Skip cover artwork if format not supported
                 }
             }
 
             f.commit()
             true
         } catch (e: Exception) {
-            // Jika container AAC raw tidak mendukung ID3v23 wrapper, lewati tanpa merusak file audio
+            // Safe fallback: keep audio file intact
             false
         }
     }

@@ -4,11 +4,15 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,14 +20,17 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.saymaven.downloader.japaneseasmr.BuildConfig
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import java.io.File
-import com.saymaven.downloader.japaneseasmr.BuildConfig
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
@@ -49,8 +56,23 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri != null) {
-            val path = uri.path ?: uri.toString()
-            viewModel.setDownloadDir(path)
+            try {
+                // Resolusi doc path dari Uri jika memungkinkan
+                val docId = DocumentsContract.getTreeDocumentId(uri)
+                val split = docId.split(":")
+                if (split.size >= 2) {
+                    val type = split[0]
+                    val relativePath = split[1]
+                    if (type.equals("primary", ignoreCase = true)) {
+                        val path = "/storage/emulated/0/$relativePath"
+                        viewModel.setDownloadDir(path)
+                        return@rememberLauncherForActivityResult
+                    }
+                }
+            } catch (e: Exception) {
+                // Fallback
+            }
+            viewModel.setDownloadDir(uri.path ?: uri.toString())
         }
     }
 
@@ -266,23 +288,37 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         }
     }
 
-    // Dialog Ubah Folder Unduhan
+    // Dialog Ubah Folder Unduhan (Dengan Tombol Buka File Manager Native)
     if (showFolderDialog) {
         AlertDialog(
             onDismissRequest = { showFolderDialog = false },
-            title = { Text("Ubah Folder Unduhan") },
+            title = { Text("Pilih Lokasi Penyimpanan") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Pilih lokasi penyimpanan audio:")
+                    Text("Pilih folder untuk menyimpan file audio:")
+
+                    Button(
+                        onClick = {
+                            showFolderDialog = false
+                            dirPickerLauncher.launch(null)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Pilih Folder dari File Manager")
+                    }
 
                     OutlinedButton(
                         onClick = {
                             viewModel.setDownloadDir("/storage/emulated/0/Download/JapaneseASMR")
                             showFolderDialog = false
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Download/JapaneseASMR (Default)")
+                        Text("Download/JapaneseASMR (Standar)")
                     }
 
                     OutlinedButton(
@@ -290,7 +326,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             viewModel.setDownloadDir("/storage/emulated/0/Music/JapaneseASMR")
                             showFolderDialog = false
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
                         Text("Music/JapaneseASMR")
                     }
@@ -298,9 +335,10 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     OutlinedTextField(
                         value = customPathInput,
                         onValueChange = { customPathInput = it },
-                        label = { Text("Atau masukkan path kustom") },
+                        label = { Text("Atau edit path manual") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp)
                     )
                 }
             },
@@ -311,7 +349,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     }
                     showFolderDialog = false
                 }) {
-                    Text("Simpan Path")
+                    Text("Simpan")
                 }
             },
             dismissButton = {
@@ -322,22 +360,52 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         )
     }
 
-    // Dialog Jumlah Koneksi Paralel
+    // Dialog Jumlah Koneksi Paralel (Material 3 RadioButton Design)
     if (showConnectionDialog) {
         val options = listOf(4, 8, 16, 24, 32)
         AlertDialog(
             onDismissRequest = { showConnectionDialog = false },
-            title = { Text("Pilih Jumlah Koneksi Paralel") },
+            title = { Text("Pilih Jumlah Koneksi") },
             text = {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectableGroup(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     options.forEach { count ->
-                        ListItem(
-                            headlineContent = { Text("$count Koneksi Simultan" + if (count == 16) " (Disarankan)" else "") },
-                            modifier = Modifier.clickable {
-                                viewModel.setParallelConnections(count)
-                                showConnectionDialog = false
-                            }
-                        )
+                        val isSelected = count == parallelConn
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    else MaterialTheme.colorScheme.surface
+                                )
+                                .selectable(
+                                    selected = isSelected,
+                                    onClick = {
+                                        viewModel.setParallelConnections(count)
+                                        showConnectionDialog = false
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = null
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "$count Koneksi Simultan" + if (count == 16) " (Disarankan)" else "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             },
@@ -355,28 +423,50 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             onDismissRequest = { showThemeDialog = false },
             title = { Text("Pilih Tema") },
             text = {
-                Column {
-                    ListItem(
-                        headlineContent = { Text("Mengikuti Sistem") },
-                        modifier = Modifier.clickable {
-                            viewModel.setThemeMode(ThemeMode.SYSTEM)
-                            showThemeDialog = false
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectableGroup(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(
+                        ThemeMode.SYSTEM to "Mengikuti Sistem",
+                        ThemeMode.DARK to "Gelap (Dracula / Dark)",
+                        ThemeMode.LIGHT to "Terang (Light)"
+                    ).forEach { (mode, label) ->
+                        val isSelected = mode == themeMode
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    else MaterialTheme.colorScheme.surface
+                                )
+                                .selectable(
+                                    selected = isSelected,
+                                    onClick = {
+                                        viewModel.setThemeMode(mode)
+                                        showThemeDialog = false
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = null
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
                         }
-                    )
-                    ListItem(
-                        headlineContent = { Text("Gelap (Dracula / Dark)") },
-                        modifier = Modifier.clickable {
-                            viewModel.setThemeMode(ThemeMode.DARK)
-                            showThemeDialog = false
-                        }
-                    )
-                    ListItem(
-                        headlineContent = { Text("Terang (Light)") },
-                        modifier = Modifier.clickable {
-                            viewModel.setThemeMode(ThemeMode.LIGHT)
-                            showThemeDialog = false
-                        }
-                    )
+                    }
                 }
             },
             confirmButton = {

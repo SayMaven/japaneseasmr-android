@@ -1,6 +1,7 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.queue
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,6 +39,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
     val isDownloading by viewModel.isDownloading.collectAsState()
     val logs by DownloadService.logsState.collectAsState()
 
+    val isDark = isSystemInDarkTheme()
     var showLogs by remember { mutableStateOf(true) }
     val listState = rememberLazyListState()
 
@@ -226,7 +228,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
             }
         }
 
-        // Log Console Section (Live Terminal)
+        // Log Console Section (Theme-Aware Live Terminal)
         if (showLogs) {
             Spacer(modifier = Modifier.height(10.dp))
             Card(
@@ -234,7 +236,9 @@ fun QueueScreen(viewModel: QueueViewModel) {
                     .fillMaxWidth()
                     .weight(0.5f),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF14141E))
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isDark) Color(0xFF14141E) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                )
             ) {
                 Column(modifier = Modifier.padding(10.dp)) {
                     Row(
@@ -243,12 +247,17 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Terminal, contentDescription = null, tint = Color(0xFF50FA7B), modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Default.Terminal,
+                                contentDescription = null,
+                                tint = if (isDark) Color(0xFF50FA7B) else Color(0xFF2E7D32),
+                                modifier = Modifier.size(16.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Log Unduhan Real-time",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF50FA7B),
+                                color = if (isDark) Color(0xFF50FA7B) else Color(0xFF2E7D32),
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -256,7 +265,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                             Text(
                                 text = "Bersihkan Log",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF6272A4),
+                                color = if (isDark) Color(0xFF6272A4) else MaterialTheme.colorScheme.outline,
                                 modifier = Modifier.clickable { DownloadService.clearLogs() }
                             )
                         }
@@ -268,7 +277,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
                                 text = "Log aktivitas akan muncul di sini saat proses unduhan dimulai.",
-                                color = Color(0xFF6272A4),
+                                color = if (isDark) Color(0xFF6272A4) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace
                             )
@@ -279,16 +288,26 @@ fun QueueScreen(viewModel: QueueViewModel) {
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(logs) { logLine ->
-                                val color = when {
-                                    logLine.contains("[ERROR]") || logLine.contains("[!]") -> Color(0xFFFF5555)
-                                    logLine.contains("[SUCCESS]") -> Color(0xFF50FA7B)
-                                    logLine.contains("[download]") -> Color(0xFF8BE9FD)
-                                    logLine.contains("Memproses:") -> Color(0xFFFF79C6)
-                                    else -> Color(0xFFF8F8F2)
+                                val textColor = if (isDark) {
+                                    when {
+                                        logLine.contains("[ERROR]") || logLine.contains("[!]") -> Color(0xFFFF5555)
+                                        logLine.contains("[SUCCESS]") -> Color(0xFF50FA7B)
+                                        logLine.contains("[download]") -> Color(0xFF8BE9FD)
+                                        logLine.contains("Memproses:") -> Color(0xFFFF79C6)
+                                        else -> Color(0xFFF8F8F2)
+                                    }
+                                } else {
+                                    when {
+                                        logLine.contains("[ERROR]") || logLine.contains("[!]") -> Color(0xFFD32F2F)
+                                        logLine.contains("[SUCCESS]") -> Color(0xFF2E7D32)
+                                        logLine.contains("[download]") -> Color(0xFF0288D1)
+                                        logLine.contains("Memproses:") -> Color(0xFF7B1FA2)
+                                        else -> Color(0xFF212121)
+                                    }
                                 }
                                 Text(
                                     text = logLine,
-                                    color = color,
+                                    color = textColor,
                                     fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace,
                                     lineHeight = 15.sp
