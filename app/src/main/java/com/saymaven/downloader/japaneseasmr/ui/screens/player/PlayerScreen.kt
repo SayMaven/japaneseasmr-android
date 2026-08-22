@@ -1,5 +1,6 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,19 +18,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import kotlinx.coroutines.launch
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(viewModel: PlayerViewModel) {
+    val context = LocalContext.current
     val title by viewModel.currentTitle.collectAsState()
     val artist by viewModel.currentArtist.collectAsState()
     val coverUrl by viewModel.currentCoverUrl.collectAsState()
@@ -54,7 +58,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Large Artwork or Clean Empty Placeholder
             if (!coverUrl.isNullOrBlank()) {
@@ -63,7 +67,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     contentDescription = "Cover Art",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(270.dp)
+                        .size(260.dp)
                         .shadow(16.dp, RoundedCornerShape(20.dp))
                         .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
@@ -71,9 +75,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             } else {
                 Box(
                     modifier = Modifier
-                        .size(270.dp)
+                        .size(260.dp)
                         .shadow(8.dp, RoundedCornerShape(20.dp))
-                    .clip(RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(20.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
@@ -98,7 +102,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Title & CV
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -121,9 +125,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Timeline Slider
+            // Timeline Slider & Duration Info
             Column(modifier = Modifier.fillMaxWidth()) {
                 val displayPos = sliderPos ?: if (duration > 0) (currentPos.toFloat() / duration.toFloat()) else 0f
                 Slider(
@@ -174,9 +178,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Playback Controls
+            // Playback Controls Row: [Repeat] [Prev] [-10s] [Play/Pause] [+10s] [Next]
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -190,7 +194,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 Icons.Default.RepeatOne,
                                 contentDescription = "Ulangi Track Ini",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                         Player.REPEAT_MODE_ALL -> {
@@ -198,7 +202,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 Icons.Default.Repeat,
                                 contentDescription = "Ulangi Semua",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                         else -> {
@@ -206,42 +210,51 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 Icons.Default.Repeat,
                                 contentDescription = "Ulangi Mati",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                     }
                 }
 
-                IconButton(onClick = { viewModel.seekTo(0) }) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = "Prev", modifier = Modifier.size(36.dp))
+                // Previous Track Button
+                IconButton(onClick = { viewModel.playPrevious() }) {
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "Track Sebelumnya", modifier = Modifier.size(32.dp))
                 }
 
+                // Rewind 10s Button
+                IconButton(onClick = { viewModel.seekTo((currentPos - 10000).coerceAtLeast(0L)) }) {
+                    Icon(Icons.Default.Replay10, contentDescription = "Mundur 10 Detik", modifier = Modifier.size(28.dp))
+                }
+
+                // Main Play/Pause Button
                 FilledIconButton(
                     onClick = { viewModel.togglePlayPause() },
-                    modifier = Modifier.size(64.dp),
+                    modifier = Modifier.size(60.dp),
                     shape = CircleShape,
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = "Play/Pause",
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(34.dp),
                         tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
 
+                // Fast Forward 10s Button
                 IconButton(onClick = { viewModel.seekTo(currentPos + 10000) }) {
-                    Icon(Icons.Default.Forward10, contentDescription = "Fast Forward (+10s)", modifier = Modifier.size(36.dp))
+                    Icon(Icons.Default.Forward10, contentDescription = "Maju 10 Detik", modifier = Modifier.size(28.dp))
                 }
 
-                IconButton(onClick = { viewModel.seekTo((currentPos - 10000).coerceAtLeast(0L)) }) {
-                    Icon(Icons.Default.Replay10, contentDescription = "Rewind (-10s)", modifier = Modifier.size(36.dp))
+                // Next Track Button
+                IconButton(onClick = { viewModel.playNext() }) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "Track Selanjutnya", modifier = Modifier.size(32.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // YouTube Music Style "BERIKUTNYA / DAFTAR PUTAR" Bottom Bar
+            // YouTube Music Style "BERIKUTNYA • DAFTAR PUTAR" Bottom Bar
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -259,7 +272,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            Icons.Default.QueueMusic,
+                            Icons.AutoMirrored.Filled.QueueMusic,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
@@ -339,14 +352,20 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             contentPadding = PaddingValues(vertical = 10.dp)
                         ) {
                             items(playlist) { item ->
+                                val fileExists = remember(item.localFilePath) { File(item.localFilePath).exists() }
                                 val isCurrentTrack = item.rjid == currentRjId
                                 PlaylistItemCard(
                                     item = item,
                                     isCurrentTrack = isCurrentTrack,
+                                    fileExists = fileExists,
                                     onClick = {
-                                        viewModel.playLocalTrack(item)
-                                        scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                            showBottomSheet = false
+                                        if (fileExists) {
+                                            viewModel.playLocalTrack(item, playlist)
+                                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                                showBottomSheet = false
+                                            }
+                                        } else {
+                                            Toast.makeText(context, "File [${item.rjid}] tidak ditemukan di memori HP.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 )
@@ -363,6 +382,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 fun PlaylistItemCard(
     item: HistoryEntity,
     isCurrentTrack: Boolean,
+    fileExists: Boolean,
     onClick: () -> Unit
 ) {
     Card(
@@ -371,8 +391,11 @@ fun PlaylistItemCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isCurrentTrack) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            containerColor = when {
+                !fileExists -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            }
         )
     ) {
         Row(
@@ -397,18 +420,29 @@ fun PlaylistItemCard(
                     fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                    color = when {
+                        !fileExists -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        isCurrentTrack -> MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
                 )
                 Text(
-                    text = "CV: ${item.cv} • ${item.fileSize}",
+                    text = if (fileExists) "CV: ${item.cv} • ${item.fileSize}" else "⚠️ File tidak ditemukan / Terhapus",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (fileExists) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            if (isCurrentTrack) {
+            if (!fileExists) {
+                Icon(
+                    Icons.Default.FileDownloadOff,
+                    contentDescription = "File Hilang",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                    modifier = Modifier.size(22.dp)
+                )
+            } else if (isCurrentTrack) {
                 Icon(
                     Icons.Default.GraphicEq,
                     contentDescription = "Playing",

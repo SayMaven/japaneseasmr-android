@@ -1,7 +1,6 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.history
 
-import android.content.Intent
-import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
+import java.io.File
 
 @Composable
 fun HistoryScreen(
@@ -32,6 +32,7 @@ fun HistoryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
 
     var itemToDelete by remember { mutableStateOf<HistoryEntity?>(null) }
+    val hasMissingFiles = remember(historyList) { historyList.any { !File(it.localFilePath).exists() } }
 
     Column(
         modifier = Modifier
@@ -49,9 +50,19 @@ fun HistoryScreen(
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
             )
-            if (historyList.isNotEmpty()) {
-                TextButton(onClick = { viewModel.clearAllHistory() }) {
-                    Text("Hapus Semua", color = MaterialTheme.colorScheme.error)
+            Row {
+                if (hasMissingFiles) {
+                    TextButton(onClick = {
+                        viewModel.cleanMissingFiles()
+                        Toast.makeText(context, "Entri file yang hilang telah dibersihkan.", Toast.LENGTH_SHORT).show()
+                    }) {
+                        Text("Bersihkan File Hilang", color = MaterialTheme.colorScheme.tertiary)
+                    }
+                }
+                if (historyList.isNotEmpty()) {
+                    TextButton(onClick = { viewModel.clearAllHistory() }) {
+                        Text("Hapus Semua", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }
@@ -90,9 +101,17 @@ fun HistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(historyList) { item ->
+                    val fileExists = remember(item.localFilePath) { File(item.localFilePath).exists() }
                     HistoryItemCard(
                         item = item,
-                        onPlay = { onPlayTrack(item) },
+                        fileExists = fileExists,
+                        onPlay = {
+                            if (fileExists) {
+                                onPlayTrack(item)
+                            } else {
+                                Toast.makeText(context, "File audio [${item.rjid}] tidak ditemukan di penyimpanan HP.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         onDelete = { itemToDelete = item }
                     )
                 }
@@ -104,13 +123,13 @@ fun HistoryScreen(
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
             title = { Text("Hapus dari Riwayat?") },
-            text = { Text("Apakah Anda ingin menghapus [${itemToDelete!!.rjid}] ${itemToDelete!!.title} beserta filenya?") },
+            text = { Text("Apakah Anda ingin menghapus [${itemToDelete!!.rjid}] ${itemToDelete!!.title} dari riwayat?") },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteHistory(itemToDelete!!, deleteFile = true)
                     itemToDelete = null
                 }) {
-                    Text("Hapus File & Riwayat", color = MaterialTheme.colorScheme.error)
+                    Text("Hapus", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -125,6 +144,7 @@ fun HistoryScreen(
 @Composable
 fun HistoryItemCard(
     item: HistoryEntity,
+    fileExists: Boolean,
     onPlay: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -133,7 +153,10 @@ fun HistoryItemCard(
             .fillMaxWidth()
             .clickable { onPlay() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(
+            containerColor = if (fileExists) MaterialTheme.colorScheme.surface
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        )
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -155,7 +178,8 @@ fun HistoryItemCard(
                     text = "[${item.rjid}] ${item.title}",
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (fileExists) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
                 Text(
                     text = "CV: ${item.cv} • ${item.circle}",
@@ -165,19 +189,28 @@ fun HistoryItemCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${item.fileSize} • ${item.downloadDate}",
+                    text = if (fileExists) "${item.fileSize} • ${item.downloadDate}" else "⚠️ File telah dihapus dari HP",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (fileExists) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
                 )
             }
 
             IconButton(onClick = onPlay) {
-                Icon(
-                    Icons.Default.PlayCircle,
-                    contentDescription = "Play",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
+                if (fileExists) {
+                    Icon(
+                        Icons.Default.PlayCircle,
+                        contentDescription = "Play",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.FileDownloadOff,
+                        contentDescription = "File Hilang",
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
             }
 
             IconButton(onClick = onDelete) {

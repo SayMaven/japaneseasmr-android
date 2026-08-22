@@ -89,10 +89,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
 
-            override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
-                _currentTitle.value = mediaMetadata.title?.toString() ?: "JapaneseASMR"
-                _currentArtist.value = mediaMetadata.artist?.toString() ?: "-"
-                _currentCoverUrl.value = mediaMetadata.artworkUri?.toString()
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                if (mediaItem != null) {
+                    _currentRjId.value = mediaItem.mediaId
+                    _currentTitle.value = mediaItem.mediaMetadata.title?.toString() ?: "JapaneseASMR"
+                    _currentArtist.value = mediaItem.mediaMetadata.artist?.toString() ?: "-"
+                    _currentCoverUrl.value = mediaItem.mediaMetadata.artworkUri?.toString()
+                }
             }
 
             override fun onRepeatModeChanged(repeatMode: Int) {
@@ -101,25 +104,42 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         })
     }
 
-    fun playLocalTrack(history: HistoryEntity) {
+    /**
+     * Memutar track lokal dan mendaftarkan seluruh daftar lagu koleksi ke antrean ExoPlayer.
+     * Sehingga saat lagu selesai, pemutar otomatis berlanjut ke lagu berikutnya (Repeat Off / Repeat All).
+     */
+    fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = playlist.value) {
         val p = player ?: return
+        val targetFile = File(history.localFilePath)
+        if (!targetFile.exists()) return
+
+        // Hanya sertakan file yang benar-benar ada di penyimpanan lokal
+        val validItems = fullList.filter { File(it.localFilePath).exists() }
+        if (validItems.isEmpty()) return
+
+        val mediaItems = validItems.map { item ->
+            val f = File(item.localFilePath)
+            val metadata = MediaMetadata.Builder()
+                .setTitle("[${item.rjid}] ${item.title}")
+                .setArtist(item.cv)
+                .setAlbumTitle(item.circle)
+                .setArtworkUri(Uri.parse(item.coverUrl))
+                .build()
+
+            MediaItem.Builder()
+                .setUri(Uri.fromFile(f))
+                .setMediaId(item.rjid)
+                .setMediaMetadata(metadata)
+                .build()
+        }
+
+        val targetIndex = validItems.indexOfFirst { it.rjid == history.rjid }.coerceAtLeast(0)
         _currentRjId.value = history.rjid
-        val file = File(history.localFilePath)
-        val uri = if (file.exists()) Uri.fromFile(file) else Uri.parse(history.coverUrl)
+        _currentTitle.value = "[${history.rjid}] ${history.title}"
+        _currentArtist.value = history.cv
+        _currentCoverUrl.value = history.coverUrl
 
-        val metadata = MediaMetadata.Builder()
-            .setTitle("[${history.rjid}] ${history.title}")
-            .setArtist(history.cv)
-            .setAlbumTitle(history.circle)
-            .setArtworkUri(Uri.parse(history.coverUrl))
-            .build()
-
-        val mediaItem = MediaItem.Builder()
-            .setUri(uri)
-            .setMediaMetadata(metadata)
-            .build()
-
-        p.setMediaItem(mediaItem)
+        p.setMediaItems(mediaItems, targetIndex, 0L)
         p.prepare()
         p.play()
     }
@@ -141,6 +161,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             val mediaItem = MediaItem.Builder()
                 .setUri(Uri.parse(trackUrl))
+                .setMediaId(meta.rjid)
                 .setMediaMetadata(metadata)
                 .build()
 
@@ -156,6 +177,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             p.pause()
         } else {
             p.play()
+        }
+    }
+
+    fun playNext() {
+        val p = player ?: return
+        if (p.hasNextMediaItem()) {
+            p.seekToNextMediaItem()
+        } else if (p.repeatMode == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
+            p.seekToDefaultPosition(0)
+        }
+    }
+
+    fun playPrevious() {
+        val p = player ?: return
+        if (p.currentPosition > 3000) {
+            p.seekTo(0)
+        } else if (p.hasPreviousMediaItem()) {
+            p.seekToPreviousMediaItem()
+        } else if (p.repeatMode == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
+            p.seekToDefaultPosition(p.mediaItemCount - 1)
         }
     }
 

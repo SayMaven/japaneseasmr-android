@@ -52,6 +52,17 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun cleanMissingFiles() {
+        viewModelScope.launch {
+            val list = historyList.value
+            for (item in list) {
+                if (!File(item.localFilePath).exists()) {
+                    repository.deleteHistory(item)
+                }
+            }
+        }
+    }
+
     fun clearAllHistory() {
         viewModelScope.launch {
             repository.clearAllHistory()
