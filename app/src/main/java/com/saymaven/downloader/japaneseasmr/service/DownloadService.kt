@@ -150,6 +150,47 @@ class DownloadService : Service() {
             log("---------------------------------------------------")
             log("[${i + 1}/${items.size}] Memproses: ${item.rjid}")
 
+            // 0. Cek apakah file audio untuk kode RJ ini sudah ada di folder penyimpanan
+            val existingFile = AudioStorageHelper.findExistingAudioFile(downloadDir, item.rjid)
+            if (existingFile != null && existingFile.exists() && existingFile.length() > 0) {
+                val sizeStr = AudioDownloader.formatFileSize(existingFile.length())
+                log("[i] File untuk ${item.rjid} sudah ada di penyimpanan: ${existingFile.name} ($sizeStr)")
+
+                // Pastikan karya ini tercatat di database riwayat
+                val existingHistory = historyDao.getHistoryById(item.rjid)
+                if (existingHistory == null || existingHistory.localFilePath != existingFile.absolutePath) {
+                    val meta = DLsiteScraper.fetchMetadata(item.rjid)
+                    val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+                    historyDao.insertHistory(
+                        HistoryEntity(
+                            rjid = item.rjid,
+                            title = meta.title,
+                            cv = meta.cv,
+                            circle = meta.circle,
+                            genre = meta.genre,
+                            ageRating = meta.ageRating,
+                            coverUrl = meta.coverUrl,
+                            localFilePath = existingFile.absolutePath,
+                            downloadDate = dateStr,
+                            fileSize = sizeStr
+                        )
+                    )
+                    log("[+] Sinkronisasi riwayat untuk ${item.rjid} berhasil.")
+                }
+
+                updateItem(i) {
+                    it.copy(
+                        title = item.title.ifBlank { existingFile.nameWithoutExtension },
+                        status = DownloadStatus.COMPLETED,
+                        statusText = "File sudah ada di penyimpanan (${existingFile.name})",
+                        progress = 1f,
+                        downloadedSize = sizeStr,
+                        totalSize = sizeStr
+                    )
+                }
+                continue
+            }
+
             // 1. Fetch Metadata
             updateItem(i) {
                 it.copy(

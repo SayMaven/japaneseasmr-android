@@ -13,21 +13,26 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
+import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
 import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
+import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
+import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.service.PlaybackService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val prefs = PreferencesManager(application)
     private val historyDao = AsmrDatabase.getDatabase(application).historyDao()
     val playlist = historyDao.getAllHistory().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -112,38 +117,51 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = playlist.value) {
-        val p = player ?: return
-        val targetFile = File(history.localFilePath)
-        if (!targetFile.exists()) return
+        viewModelScope.launch {
+            val p = player ?: return@launch
+            val customDirStr = prefs.downloadDirFlow.first()
+            val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
 
-        val validItems = fullList.filter { File(it.localFilePath).exists() }
-        if (validItems.isEmpty()) return
+            val validItemsWithFiles = fullList.mapNotNull { item ->
+                val resolved = AudioStorageHelper.resolveValidAudioFile(downloadDir, item.localFilePath, item.rjid)
+                if (resolved != null) {
+                    // Update database jika path lokal berubah (misal dari RJxxxxxx ke [RJxxxxxx] Judul)
+                    if (resolved.absolutePath != item.localFilePath) {
+                        historyDao.insertHistory(item.copy(localFilePath = resolved.absolutePath))
+                    }
+                    Pair(item, resolved)
+                } else null
+            }
 
-        val mediaItems = validItems.map { item ->
-            val f = File(item.localFilePath)
-            val metadata = MediaMetadata.Builder()
-                .setTitle("[${item.rjid}] ${item.title}")
-                .setArtist(item.cv)
-                .setAlbumTitle(item.circle)
-                .setArtworkUri(Uri.parse(item.coverUrl))
-                .build()
+            if (validItemsWithFiles.isEmpty()) return@launch
 
-            MediaItem.Builder()
-                .setUri(Uri.fromFile(f))
-                .setMediaId(item.rjid)
-                .setMediaMetadata(metadata)
-                .build()
+            val targetPair = validItemsWithFiles.firstOrNull { it.first.rjid == history.rjid } ?: validItemsWithFiles.first()
+            val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
+
+            val mediaItems = validItemsWithFiles.map { (item, file) ->
+                val metadata = MediaMetadata.Builder()
+                    .setTitle("[${item.rjid}] ${item.title}")
+                    .setArtist(item.cv)
+                    .setAlbumTitle(item.circle)
+                    .setArtworkUri(Uri.parse(item.coverUrl))
+                    .build()
+
+                MediaItem.Builder()
+                    .setUri(Uri.fromFile(file))
+                    .setMediaId(item.rjid)
+                    .setMediaMetadata(metadata)
+                    .build()
+            }
+
+            _currentRjId.value = targetPair.first.rjid
+            _currentTitle.value = "[${targetPair.first.rjid}] ${targetPair.first.title}"
+            _currentArtist.value = targetPair.first.cv
+            _currentCoverUrl.value = targetPair.first.coverUrl
+
+            p.setMediaItems(mediaItems, targetIndex, 0L)
+            p.prepare()
+            p.play()
         }
-
-        val targetIndex = validItems.indexOfFirst { it.rjid == history.rjid }.coerceAtLeast(0)
-        _currentRjId.value = history.rjid
-        _currentTitle.value = "[${history.rjid}] ${history.title}"
-        _currentArtist.value = history.cv
-        _currentCoverUrl.value = history.coverUrl
-
-        p.setMediaItems(mediaItems, targetIndex, 0L)
-        p.prepare()
-        p.play()
     }
 
     fun streamOnline(rawRjId: String) {
