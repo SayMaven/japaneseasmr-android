@@ -1,0 +1,33 @@
+package com.saymaven.downloader.japaneseasmr.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+// Dark Palette (Dracula / Catppuccin Modern)
+val DarkBackground = Color(0xFF181825)
+val DarkSurface = Color(0xFF1E1E2E)
+val DarkSurfaceVariant = Color(0xFF282A36)
+val DarkPrimary = Color(0xFFBD93F9)
+val DarkOnPrimary = Color(0xFF1E1E2E)
+val DarkSecondary = Color(0xFF50FA7B)
+val DarkOnSecondary = Color(0xFF1E1E2E)
+val DarkTertiary = Color(0xFFFF79C6)
+val DarkCyan = Color(0xFF8BE9FD)
+val DarkYellow = Color(0xFFF1FA8C)
+val DarkText = Color(0xFFF8F8F2)
+val DarkTextMuted = Color(0xFF6272A4)
+val DarkOutline = Color(0xFF44475A)
+val DarkError = Color(0xFFFF5555)
+
+// Light Palette (Clean Modern)
+val LightBackground = Color(0xFFF4F4F9)
+val LightSurface = Color(0xFFFFFFFF)
+val LightSurfaceVariant = Color(0xFFE9ECEF)
+val LightPrimary = Color(0xFF6750A4)
+val LightOnPrimary = Color(0xFFFFFFFF)
+val LightSecondary = Color(0xFF006C50)
+val LightOnSecondary = Color(0xFFFFFFFF)
+val LightTertiary = Color(0xFF7D5260)
+val LightText = Color(0xFF1A1A24)
+val LightTextMuted = Color(0xFF6C757D)
+val LightOutline = Color(0xFFCED4DA)
+val LightError = Color(0xFFBA1A1A)

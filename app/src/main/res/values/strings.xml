@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">JapaneseASMR</string>
+    <string name="tab_queue">Antrean</string>
+    <string name="tab_history">Riwayat</string>
+    <string name="tab_player">Pemutar</string>
+    <string name="tab_settings">Pengaturan</string>
+</resources>
