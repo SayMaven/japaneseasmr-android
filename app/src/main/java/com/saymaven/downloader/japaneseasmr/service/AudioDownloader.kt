@@ -177,7 +177,7 @@ object AudioDownloader {
                 }
             }
 
-            onLog("[i] Mengemas audio ke container ISO M4A (Ultra-Fast Memory-Mapped Engine)...")
+            onLog("[i] Mengemas audio ke container ISO M4A (100% Seekable & Indeks Durasi Presisi)...")
             destFile.parentFile?.mkdirs()
 
             val muxSuccess = muxAdtsFileToM4a(tempAdtsCombined, destFile)
@@ -187,7 +187,7 @@ object AudioDownloader {
             tempAdtsCombined.delete()
 
             val finalSizeStr = formatFileSize(destFile.length())
-            onLog("[SUCCESS] File M4A berhasil dibuat: $finalSizeStr (100% Seekable & Jernih)")
+            onLog("[SUCCESS] File audio berhasil dibuat: $finalSizeStr (100% Seekable & Jernih)")
             onProgress(1f, "Selesai", "00:00", finalSizeStr, finalSizeStr)
             true
         } catch (e: Exception) {
@@ -202,8 +202,7 @@ object AudioDownloader {
     }
 
     /**
-     * Muxing super cepat (< 2 detik untuk 220MB) menggunakan FileChannel & MappedByteBuffer.
-     * Tidak memakan RAM heap Java (0 MB Heap Memory), menggunakan native address space virtual memory OS.
+     * Muxing cepat dan akurat ke container ISO M4A dengan offset buffer nol yang kompatibel 100% dengan MediaMuxer Android.
      */
     private fun muxAdtsFileToM4a(adtsFile: File, outputFile: File): Boolean {
         if (!adtsFile.exists() || adtsFile.length() < 7) return false
@@ -260,6 +259,7 @@ object AudioDownloader {
             val trackIndex = muxer.addTrack(mediaFormat)
             muxer.start()
 
+            val directBuf = ByteBuffer.allocateDirect(64 * 1024)
             val bufferInfo = MediaCodec.BufferInfo()
             var frameIndex = 0L
             var pos = firstOffset
@@ -276,16 +276,20 @@ object AudioDownloader {
                             ((mappedBuf.get(pos + 5).toInt() and 0xE0) ushr 5))
 
                     val rawPayloadLen = frameLen - headerLen
-                    if (rawPayloadLen > 0 && pos + frameLen <= fileSize) {
+                    if (rawPayloadLen in 1..65535 && pos + frameLen <= fileSize) {
                         mappedBuf.position(pos + headerLen)
                         mappedBuf.limit(pos + frameLen)
 
-                        bufferInfo.offset = pos + headerLen
+                        directBuf.clear()
+                        directBuf.put(mappedBuf)
+                        directBuf.flip()
+
+                        bufferInfo.offset = 0
                         bufferInfo.size = rawPayloadLen
                         bufferInfo.presentationTimeUs = (frameIndex * 1024L * 1000000L) / sampleRate
                         bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME
 
-                        muxer.writeSampleData(trackIndex, mappedBuf, bufferInfo)
+                        muxer.writeSampleData(trackIndex, directBuf, bufferInfo)
                         frameIndex++
                         pos += frameLen
                     } else {
