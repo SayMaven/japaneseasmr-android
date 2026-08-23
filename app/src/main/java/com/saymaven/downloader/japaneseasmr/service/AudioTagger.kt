@@ -14,7 +14,7 @@ object AudioTagger {
         artist: String,
         album: String,
         genre: String,
-        comment: String = "JapaneseASMR"
+        comment: String = "Downloaded with JapaneseASMR by SayMaven (https://github.com/SayMaven)"
     ): Boolean {
         return try {
             val f = AudioFileIO.read(audioFile)
@@ -25,6 +25,10 @@ object AudioTagger {
             tag.setField(FieldKey.ALBUM, if (album.isBlank() || album == "-") "JapaneseASMR" else album)
             tag.setField(FieldKey.GENRE, if (genre.isBlank() || genre == "-") "ASMR" else genre)
             tag.setField(FieldKey.COMMENT, comment)
+            
+            try {
+                tag.setField(FieldKey.ENCODER, "SayMaven (High-Speed Native Engine)")
+            } catch (e: Exception) {}
 
             if (coverFile != null && coverFile.exists() && coverFile.length() > 0) {
                 try {
