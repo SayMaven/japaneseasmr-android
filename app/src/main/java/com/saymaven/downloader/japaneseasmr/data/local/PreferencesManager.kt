@@ -21,6 +21,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_PARALLEL_CONNECTIONS = intPreferencesKey("parallel_connections")
         val KEY_AUTO_CLIPBOARD = booleanPreferencesKey("auto_clipboard")
         val KEY_USE_DETAILED_FILENAME = booleanPreferencesKey("use_detailed_filename")
+        val KEY_SHOW_CONSOLE = booleanPreferencesKey("show_console")
 
         // Playback State Persistence
         val KEY_LAST_PLAYED_RJID = stringPreferencesKey("last_played_rjid")
@@ -65,6 +66,10 @@ class PreferencesManager(private val context: Context) {
 
     val useDetailedFilenameFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_USE_DETAILED_FILENAME] ?: false
+    }
+
+    val showConsoleFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_SHOW_CONSOLE] ?: true
     }
 
     val lastPlayedRjidFlow: Flow<String?> = context.dataStore.data.map { preferences ->
@@ -122,6 +127,12 @@ class PreferencesManager(private val context: Context) {
     suspend fun setUseDetailedFilename(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_USE_DETAILED_FILENAME] = enabled
+        }
+    }
+
+    suspend fun setShowConsole(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_SHOW_CONSOLE] = enabled
         }
     }
 

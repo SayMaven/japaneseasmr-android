@@ -2,6 +2,10 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.queue
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,9 +45,14 @@ fun QueueScreen(viewModel: QueueViewModel) {
     val previewWork by viewModel.previewWork.collectAsState()
     val isLoadingPreview by viewModel.isLoadingPreview.collectAsState()
     val logs by DownloadService.logsState.collectAsState()
+    val showConsole by viewModel.showConsole.collectAsState()
     val listState = rememberLazyListState()
 
-    var showLogs by remember { mutableStateOf(true) }
+    var showLogsInside by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        viewModel.initPreferences(context)
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -58,7 +67,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
     }
 
     LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty() && showLogs) {
+        if (logs.isNotEmpty() && showConsole && showLogsInside) {
             listState.animateScrollToItem(logs.size - 1)
         }
     }
@@ -69,15 +78,34 @@ fun QueueScreen(viewModel: QueueViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // ================= 0. TOP APP HEADER =================
+        // ================= 0. TOP APP HEADER WITH CONSOLE TOGGLE =================
         item {
-            Text(
-                text = "JapaneseASMR Downloader",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "JapaneseASMR Downloader",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                IconButton(
+                    onClick = { viewModel.toggleShowConsole(context) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (showConsole) Icons.Default.Terminal else Icons.Default.Code,
+                        contentDescription = if (showConsole) "Sembunyikan Konsol Log" else "Tampilkan Konsol Log",
+                        tint = if (showConsole) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
         }
 
         // ================= 1. INPUT CARD =================
@@ -154,7 +182,6 @@ fun QueueScreen(viewModel: QueueViewModel) {
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Dua Tombol Simetris, Rapi, dan Berukuran Sama
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -277,100 +304,102 @@ fun QueueScreen(viewModel: QueueViewModel) {
             }
         }
 
-        // ================= 3. REAL-TIME LOG CONSOLE =================
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Terminal,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Live Log Proses Unduhan",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { showLogs = !showLogs },
-                            modifier = Modifier.size(24.dp)
+        // ================= 3. REAL-TIME LOG CONSOLE (PERSISTED HIDE/UNHIDE) =================
+        if (showConsole) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                if (showLogs) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Toggle Log",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Terminal,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Live Log Proses Unduhan",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
 
-                    AnimatedVisibility(visible = showLogs) {
-                        Column(modifier = Modifier.padding(top = 10.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 120.dp, max = 240.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .padding(10.dp)
+                            IconButton(
+                                onClick = { showLogsInside = !showLogsInside },
+                                modifier = Modifier.size(24.dp)
                             ) {
-                                if (logs.isEmpty()) {
-                                    Text(
-                                        text = "Belum ada proses unduhan berjalan.\nMasukkan kode RJ di atas lalu tekan 'Unduh' atau 'Antrean'.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                } else {
-                                    LazyColumn(
-                                        state = listState,
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        items(logs) { logLine ->
-                                            Text(
-                                                text = logLine,
-                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                                fontFamily = FontFamily.Monospace,
-                                                color = when {
-                                                    logLine.contains("[ERROR]") || logLine.contains("[!]") -> MaterialTheme.colorScheme.error
-                                                    logLine.contains("[SUCCESS]") -> MaterialTheme.colorScheme.primary
-                                                    logLine.contains("====") -> MaterialTheme.colorScheme.secondary
-                                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-                                                }
-                                            )
+                                Icon(
+                                    if (showLogsInside) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Toggle Log",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        AnimatedVisibility(visible = showLogsInside) {
+                            Column(modifier = Modifier.padding(top = 10.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 120.dp, max = 240.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .padding(10.dp)
+                                ) {
+                                    if (logs.isEmpty()) {
+                                        Text(
+                                            text = "Belum ada proses unduhan berjalan.\nMasukkan kode RJ di atas lalu tekan 'Unduh' atau 'Antrean'.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    } else {
+                                        LazyColumn(
+                                            state = listState,
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            items(logs) { logLine ->
+                                                Text(
+                                                    text = logLine,
+                                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                                    fontFamily = FontFamily.Monospace,
+                                                    color = when {
+                                                        logLine.contains("[ERROR]") || logLine.contains("[!]") -> MaterialTheme.colorScheme.error
+                                                        logLine.contains("[SUCCESS]") -> MaterialTheme.colorScheme.primary
+                                                        logLine.contains("====") -> MaterialTheme.colorScheme.secondary
+                                                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            if (logs.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(
-                                        onClick = { DownloadService.clearLogs() },
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                if (logs.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End
                                     ) {
-                                        Icon(Icons.Default.ClearAll, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Bersihkan Log", style = MaterialTheme.typography.labelSmall)
+                                        TextButton(
+                                            onClick = { DownloadService.clearLogs() },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(Icons.Default.ClearAll, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Bersihkan Log", style = MaterialTheme.typography.labelSmall)
+                                        }
                                     }
                                 }
                             }
@@ -427,7 +456,6 @@ fun QueueItemCard(
                     )
                 }
 
-                // Tombol Hapus item dari antrean
                 if (item.status != DownloadStatus.DOWNLOADING && item.status != DownloadStatus.PROCESSING) {
                     IconButton(
                         onClick = onDismiss,

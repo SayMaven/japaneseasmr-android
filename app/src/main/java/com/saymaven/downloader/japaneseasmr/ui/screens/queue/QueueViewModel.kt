@@ -31,9 +31,32 @@ class QueueViewModel : ViewModel() {
     private val _isLoadingPreview = MutableStateFlow(false)
     val isLoadingPreview = _isLoadingPreview.asStateFlow()
 
+    private val _showConsole = MutableStateFlow(true)
+    val showConsole = _showConsole.asStateFlow()
+
     private var previewJob: Job? = null
     private var lastProcessedClipboardText: String? = null
     private var isFirstResume = true
+    private var isPrefsLoaded = false
+
+    fun initPreferences(context: Context) {
+        if (isPrefsLoaded) return
+        isPrefsLoaded = true
+        viewModelScope.launch {
+            val prefs = PreferencesManager(context)
+            prefs.showConsoleFlow.collect {
+                _showConsole.value = it
+            }
+        }
+    }
+
+    fun toggleShowConsole(context: Context) {
+        val next = !_showConsole.value
+        _showConsole.value = next
+        viewModelScope.launch {
+            PreferencesManager(context).setShowConsole(next)
+        }
+    }
 
     fun onInputChanged(text: String) {
         _inputText.value = text
