@@ -8,7 +8,6 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -368,12 +367,21 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Text(
-                            text = "Geser Ikon ≡ Bebas ke Atas/Bawah",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        IconButton(
+                            onClick = {
+                                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                    showBottomSheet = false
+                                }
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Tutup",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
                     HorizontalDivider()
@@ -422,7 +430,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
                                                 val currentIdx = playlist.indexOfFirst { it.rjid == draggedRjid }
                                                 if (currentIdx != -1) {
-                                                    // Threshold 45% of item height for fluid continuous swapping
                                                     val threshold = itemHeightPx * 0.45f
                                                     if (dragOffsetY > threshold && currentIdx < playlist.size - 1) {
                                                         viewModel.reorderPlaylist(currentIdx, currentIdx + 1)
