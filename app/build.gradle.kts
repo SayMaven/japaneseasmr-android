@@ -47,6 +47,17 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // Penamaan otomatis file output APK sesuai versi di build.gradle.kts
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val vName = variant.versionName
+            val bType = variant.buildType.name
+            output.outputFileName = "JapaneseASMR-v${vName}-${bType}.apk"
+        }
+    }
 }
 
 dependencies {
