@@ -1,38 +1,50 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(viewModel: PlayerViewModel) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
 
     val currentRjId by viewModel.currentRjId.collectAsState()
@@ -55,6 +67,12 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     // Bottom Sheet state for YouTube Music style playlist drawer
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showBottomSheet by remember { mutableStateOf(false) }
+
+    // Multi-track continuous fluid drag-and-drop state
+    var draggedRjid by remember { mutableStateOf<String?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    val itemHeightPx = with(density) { 68.dp.toPx() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -301,7 +319,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            Icons.Default.QueueMusic,
+                            Icons.AutoMirrored.Filled.QueueMusic,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
@@ -334,7 +352,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight(0.75f)
+                        .fillMaxHeight(0.80f)
                         .padding(horizontal = 16.dp)
                 ) {
                     Row(
@@ -351,9 +369,10 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "Geser / Pilih Track",
+                            text = "Geser Ikon ≡ Bebas ke Atas/Bawah",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
 
@@ -383,10 +402,47 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             itemsIndexed(playlist, key = { _, item -> item.rjid }) { index, item ->
                                 val fileExists = remember(item.localFilePath) { File(item.localFilePath).exists() }
                                 val isCurrentTrack = item.rjid == currentRjId
+                                val isDragged = draggedRjid == item.rjid
+
                                 PlaylistItemCard(
                                     item = item,
                                     isCurrentTrack = isCurrentTrack,
                                     fileExists = fileExists,
+                                    isDragged = isDragged,
+                                    dragOffsetY = if (isDragged) dragOffsetY else 0f,
+                                    onDragHandleGesture = {
+                                        detectVerticalDragGestures(
+                                            onDragStart = {
+                                                draggedRjid = item.rjid
+                                                dragOffsetY = 0f
+                                            },
+                                            onVerticalDrag = { change, dragAmount ->
+                                                change.consume()
+                                                dragOffsetY += dragAmount
+
+                                                val currentIdx = playlist.indexOfFirst { it.rjid == draggedRjid }
+                                                if (currentIdx != -1) {
+                                                    // Threshold 45% of item height for fluid continuous swapping
+                                                    val threshold = itemHeightPx * 0.45f
+                                                    if (dragOffsetY > threshold && currentIdx < playlist.size - 1) {
+                                                        viewModel.reorderPlaylist(currentIdx, currentIdx + 1)
+                                                        dragOffsetY -= itemHeightPx
+                                                    } else if (dragOffsetY < -threshold && currentIdx > 0) {
+                                                        viewModel.reorderPlaylist(currentIdx, currentIdx - 1)
+                                                        dragOffsetY += itemHeightPx
+                                                    }
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                draggedRjid = null
+                                                dragOffsetY = 0f
+                                            },
+                                            onDragCancel = {
+                                                draggedRjid = null
+                                                dragOffsetY = 0f
+                                            }
+                                        )
+                                    },
                                     onClick = {
                                         if (fileExists) {
                                             viewModel.playLocalTrack(item, playlist)
@@ -412,15 +468,28 @@ fun PlaylistItemCard(
     item: HistoryEntity,
     isCurrentTrack: Boolean,
     fileExists: Boolean,
+    isDragged: Boolean,
+    dragOffsetY: Float,
+    onDragHandleGesture: suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit,
     onClick: () -> Unit
 ) {
+    val scale by animateFloatAsState(if (isDragged) 1.04f else 1.0f, label = "scale")
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .zIndex(if (isDragged) 20f else 1f)
+            .offset { IntOffset(0, dragOffsetY.roundToInt()) }
+            .scale(scale)
+            .shadow(
+                elevation = if (isDragged) 16.dp else 0.dp,
+                shape = RoundedCornerShape(12.dp)
+            )
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {
+                isDragged -> MaterialTheme.colorScheme.secondaryContainer
                 !fileExists -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
                 isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
                 else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
@@ -487,15 +556,27 @@ fun PlaylistItemCard(
                 )
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
-            // Ikon Drag Handle (Garis-garis untuk mengatur / menggeser posisi track atas-bawah)
-            Icon(
-                imageVector = Icons.Default.DragHandle,
-                contentDescription = "Atur Urutan",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.size(24.dp)
-            )
+            // Area Ikon Drag Handle (Geser terus-menerus ke atas/bawah tanpa jeda)
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .pointerInput(item.rjid, onDragHandleGesture),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DragHandle,
+                    contentDescription = "Atur Urutan",
+                    tint = if (isDragged) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    },
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     }
 }

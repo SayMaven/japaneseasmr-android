@@ -31,10 +31,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -45,12 +43,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val sp = application.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
     private val prefs = PreferencesManager(application)
     private val historyDao = AsmrDatabase.getDatabase(application).historyDao()
-    val playlist = historyDao.getAllHistory().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _playlist = MutableStateFlow<List<HistoryEntity>>(emptyList())
+    val playlist = _playlist.asStateFlow()
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     val player: MediaController? get() = if (controllerFuture?.isDone == true) controllerFuture?.get() else null
 
-    // Load instantly from fast cache so tab Pemutar renders immediately on start
+    // Fast Cache Restoration at 0ms
     private val _currentRjId = MutableStateFlow<String?>(sp.getString("cached_rjid", null))
     val currentRjId = _currentRjId.asStateFlow()
 
@@ -82,7 +82,37 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         initMediaController()
+        observeDatabasePlaylist()
         restorePlaybackState()
+    }
+
+    private fun observeDatabasePlaylist() {
+        viewModelScope.launch {
+            historyDao.getAllHistory().collect { dbList ->
+                if (_playlist.value.isEmpty()) {
+                    _playlist.value = dbList
+                } else {
+                    val orderMap = _playlist.value.mapIndexed { idx, item -> item.rjid to idx }.toMap()
+                    val sorted = dbList.sortedBy { orderMap[it.rjid] ?: Int.MAX_VALUE }
+                    _playlist.value = sorted
+                }
+            }
+        }
+    }
+
+    fun reorderPlaylist(fromIndex: Int, toIndex: Int) {
+        val current = _playlist.value.toMutableList()
+        if (fromIndex in current.indices && toIndex in current.indices && fromIndex != toIndex) {
+            val item = current.removeAt(fromIndex)
+            current.add(toIndex, item)
+            _playlist.value = current
+
+            player?.let { p ->
+                if (p.mediaItemCount > 0 && fromIndex < p.mediaItemCount && toIndex < p.mediaItemCount) {
+                    p.moveMediaItem(fromIndex, toIndex)
+                }
+            }
+        }
     }
 
     private fun initMediaController() {
@@ -160,7 +190,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         p.shuffleModeEnabled = _shuffleMode.value
     }
 
-    fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = playlist.value) {
+    fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = _playlist.value) {
         viewModelScope.launch {
             val p = player ?: return@launch
             val customDirStr = prefs.downloadDirFlow.first()
