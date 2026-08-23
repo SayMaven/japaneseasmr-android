@@ -45,3 +45,4 @@ keystore.properties
 
 # Batch files
 build_release.bat
+build_debug.bat

@@ -93,7 +93,6 @@ class QueueViewModel : ViewModel() {
                 if (clip != null && clip.itemCount > 0) {
                     val text = clip.getItemAt(0).text?.toString() ?: ""
                     
-                    // Pada saat pertama kali aplikasi dibuka (cold start), simpan baseline agar tidak otomatis mengisi teks lama
                     if (isFirstResume) {
                         isFirstResume = false
                         lastProcessedClipboardText = text
@@ -109,14 +108,13 @@ class QueueViewModel : ViewModel() {
                     }
                 }
             } catch (e: Exception) {
-                // Ignore clipboard access restrictions
             }
         }
     }
 
-    fun addToQueue() {
+    fun addToQueue(): Boolean {
         val ids = extractRjIds(_inputText.value)
-        if (ids.isEmpty()) return
+        if (ids.isEmpty()) return false
 
         val items = ids.map { id ->
             DownloadQueueItem(
@@ -133,6 +131,7 @@ class QueueViewModel : ViewModel() {
         DownloadService.enqueue(items)
         _inputText.value = ""
         _previewWork.value = null
+        return true
     }
 
     fun startDownload(context: Context) {

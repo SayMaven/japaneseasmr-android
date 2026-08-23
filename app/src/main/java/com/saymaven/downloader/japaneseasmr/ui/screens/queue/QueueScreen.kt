@@ -1,5 +1,6 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.queue
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -68,6 +69,22 @@ fun QueueScreen(viewModel: QueueViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // ================= 0. TOP APP HEADER (CLEAN SINGLE TITLE) =================
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 2.dp)
+            ) {
+                Text(
+                    text = "JapaneseASMR Downloader",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
         // ================= 1. INPUT CARD =================
         item {
             Card(
@@ -99,44 +116,41 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         singleLine = true
                     )
 
+                    // Preview Card
                     if (isLoadingPreview) {
                         Spacer(modifier = Modifier.height(8.dp))
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    }
-
-                    if (previewWork != null) {
+                    } else if (previewWork != null) {
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                                .padding(8.dp)
                         ) {
                             AsyncImage(
-                                model = previewWork!!.coverUrl,
+                                model = previewWork?.coverUrl,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(50.dp, 38.dp)
+                                    .size(54.dp, 40.dp)
                                     .clip(RoundedCornerShape(6.dp))
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = previewWork!!.title,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    text = previewWork?.title ?: "",
+                                    style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "CV: ${previewWork!!.cv}",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    text = "CV: ${previewWork?.cv ?: "-"}",
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    maxLines = 1
                                 )
                             }
                         }
@@ -149,31 +163,51 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = { viewModel.addToQueue() },
+                            onClick = {
+                                if (inputText.isBlank()) {
+                                    Toast.makeText(context, "Masukkan kode RJ terlebih dahulu", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val added = viewModel.addToQueue()
+                                    if (!added) {
+                                        Toast.makeText(context, "Format kode RJ tidak valid", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Tambah")
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Antrean")
                         }
 
-                        FilledTonalButton(
-                            onClick = { viewModel.startDownload(context) },
-                            enabled = !isDownloading && queue.any { it.status != DownloadStatus.COMPLETED },
+                        Button(
+                            onClick = {
+                                if (inputText.isBlank() && queue.isEmpty()) {
+                                    Toast.makeText(context, "Masukkan kode RJ terlebih dahulu", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val added = viewModel.addToQueue()
+                                    if (added || queue.isNotEmpty()) {
+                                        viewModel.startDownload(context)
+                                    } else {
+                                        Toast.makeText(context, "Format kode RJ tidak valid", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Mulai Unduh")
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Unduh")
                         }
                     }
                 }
             }
         }
 
-        // ================= 2. DAFTAR ANTREAN UNDUHAN =================
+        // ================= 2. QUEUE LIST SECTION =================
         if (queue.isNotEmpty()) {
             item {
                 Row(
@@ -189,26 +223,32 @@ fun QueueScreen(viewModel: QueueViewModel) {
                     )
 
                     if (!isDownloading) {
-                        TextButton(onClick = { viewModel.clearQueue() }) {
-                            Text("Bersihkan Antrean", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                        FilledTonalButton(
+                            onClick = { viewModel.startDownload(context) },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Mulai Semua", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
             }
 
-            items(queue) { item ->
+            items(queue, key = { it.rjid }) { item ->
                 QueueItemCard(item = item)
             }
         }
 
-        // ================= 3. LOG UNDUHAN REAL-TIME =================
+        // ================= 3. REAL-TIME LOG CONSOLE =================
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -219,84 +259,82 @@ fun QueueScreen(viewModel: QueueViewModel) {
                                 Icons.Default.Terminal,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Log Unduhan Real-time",
+                                text = "Live Log Proses Unduhan",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                fontWeight = FontWeight.Bold
                             )
                         }
 
-                        Row {
-                            if (logs.isNotEmpty()) {
-                                TextButton(
-                                    onClick = { DownloadService.clearLogs() },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text("Bersihkan", style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-                            IconButton(onClick = { showLogs = !showLogs }) {
-                                Icon(
-                                    if (showLogs) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                    contentDescription = "Toggle Logs",
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                        IconButton(
+                            onClick = { showLogs = !showLogs },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                if (showLogs) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Toggle Log",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 
                     AnimatedVisibility(visible = showLogs) {
-                        Column {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                            if (logs.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(100.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                        Column(modifier = Modifier.padding(top = 10.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 120.dp, max = 240.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .padding(10.dp)
+                            ) {
+                                if (logs.isEmpty()) {
                                     Text(
-                                        text = "Belum ada log unduhan.",
+                                        text = "Belum ada proses unduhan berjalan.\nMasukkan kode RJ di atas lalu tekan 'Unduh' atau 'Antrean'.",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                         fontFamily = FontFamily.Monospace
                                     )
-                                }
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = 100.dp, max = 220.dp)
-                                ) {
+                                } else {
                                     LazyColumn(
                                         state = listState,
                                         modifier = Modifier.fillMaxSize()
                                     ) {
-                                        items(logs) { log ->
-                                            val logColor = when {
-                                                log.contains("[SUCCESS]") -> MaterialTheme.colorScheme.primary
-                                                log.contains("[ERROR]") || log.contains("[!]") -> MaterialTheme.colorScheme.error
-                                                log.contains("[download]") -> MaterialTheme.colorScheme.tertiary
-                                                log.contains("[+]") -> MaterialTheme.colorScheme.secondary
-                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                            }
-
+                                        items(logs) { logLine ->
                                             Text(
-                                                text = log,
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    fontSize = 11.sp,
-                                                    lineHeight = 15.sp,
-                                                    fontFamily = FontFamily.Monospace
-                                                ),
-                                                color = logColor,
-                                                modifier = Modifier.padding(vertical = 1.dp)
+                                                text = logLine,
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                                fontFamily = FontFamily.Monospace,
+                                                color = when {
+                                                    logLine.contains("[ERROR]") || logLine.contains("[!]") -> MaterialTheme.colorScheme.error
+                                                    logLine.contains("[SUCCESS]") -> MaterialTheme.colorScheme.primary
+                                                    logLine.contains("====") -> MaterialTheme.colorScheme.secondary
+                                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                                                }
                                             )
                                         }
+                                    }
+                                }
+                            }
+
+                            if (logs.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(
+                                        onClick = { DownloadService.clearLogs() },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(Icons.Default.ClearAll, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Bersihkan Log", style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
                             }
@@ -313,14 +351,7 @@ fun QueueItemCard(item: DownloadQueueItem) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = when (item.status) {
-                DownloadStatus.DOWNLOADING -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                DownloadStatus.FAILED -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
-                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-            }
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -337,7 +368,7 @@ fun QueueItemCard(item: DownloadQueueItem) {
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "[${item.rjid}] ${item.title}",
+                        text = "[${item.rjid}] ${item.title.ifBlank { "Mengambil info..." }}",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -348,7 +379,7 @@ fun QueueItemCard(item: DownloadQueueItem) {
                         style = MaterialTheme.typography.bodySmall,
                         color = when (item.status) {
                             DownloadStatus.DOWNLOADING -> MaterialTheme.colorScheme.primary
-                            DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.primary
+                            DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
                             DownloadStatus.FAILED -> MaterialTheme.colorScheme.error
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
@@ -356,22 +387,13 @@ fun QueueItemCard(item: DownloadQueueItem) {
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-
-                if (item.status == DownloadStatus.DOWNLOADING) {
-                    Text(
-                        text = "${(item.progress * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
 
-            if (item.status == DownloadStatus.DOWNLOADING) {
+            if (item.status == DownloadStatus.DOWNLOADING || item.status == DownloadStatus.PROCESSING) {
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
                     progress = { item.progress },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -380,12 +402,12 @@ fun QueueItemCard(item: DownloadQueueItem) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "${item.downloadedSize} / ${item.totalSize}",
+                        text = "${(item.progress * 100).toInt()}% • ${item.speed}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${item.speed} • ETA ${item.eta}",
+                        text = "${item.downloadedSize} / ${item.totalSize} • ETA: ${item.eta}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -20,6 +20,7 @@ import com.saymaven.downloader.japaneseasmr.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -31,8 +32,9 @@ import java.util.Locale
 
 class DownloadService : Service() {
 
-    private val serviceJob = Job()
+    private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+
     private lateinit var notificationManager: NotificationManager
 
     companion object {
@@ -49,10 +51,12 @@ class DownloadService : Service() {
 
         fun log(msg: String) {
             val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-            val entry = "[$time] $msg"
+            val formatted = "[$time] $msg"
             val current = _logsState.value.toMutableList()
-            current.add(entry)
-            if (current.size > 250) current.removeAt(0)
+            if (current.size > 200) {
+                current.removeAt(0)
+            }
+            current.add(formatted)
             _logsState.value = current
         }
 
@@ -62,21 +66,21 @@ class DownloadService : Service() {
 
         fun enqueue(items: List<DownloadQueueItem>) {
             val current = _queueState.value.toMutableList()
-            val existingIds = current.map { it.rjid }.toSet()
-            val newOnes = items.filter { !existingIds.contains(it.rjid) }
-            current.addAll(newOnes)
+            for (item in items) {
+                if (current.none { it.rjid == item.rjid }) {
+                    current.add(item)
+                    log("[+] Ditambahkan ke antrean: ${item.rjid}")
+                }
+            }
             _queueState.value = current
-            log("[+] Menambahkan ${newOnes.size} karya ke antrean.")
         }
 
         fun clearQueue() {
-            if (!_isDownloading.value) {
-                _queueState.value = emptyList()
-                log("[i] Antrean dibersihkan.")
-            }
+            _queueState.value = emptyList()
         }
 
         fun startDownload(context: Context) {
+            if (_queueState.value.isEmpty()) return
             val intent = Intent(context, DownloadService::class.java)
             context.startForegroundService(intent)
         }
@@ -104,13 +108,19 @@ class DownloadService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification("Mempersiapkan unduhan...", 0, true))
+        if (_queueState.value.isEmpty()) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification("Memulai unduhan antrean...", 0, true)
+        )
 
         if (!_isDownloading.value) {
-            _isDownloading.value = true
             serviceScope.launch {
                 processQueue()
-                _isDownloading.value = false
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
@@ -120,6 +130,12 @@ class DownloadService : Service() {
     }
 
     private suspend fun processQueue() {
+        val items = _queueState.value.toList()
+        if (items.isEmpty()) {
+            _isDownloading.value = false
+            return
+        }
+
         val database = AsmrDatabase.getDatabase(this)
         val historyDao = database.historyDao()
         val prefs = PreferencesManager(this)
@@ -136,74 +152,37 @@ class DownloadService : Service() {
             getDefaultDownloadDirectory()
         }
 
-        log("📁 Folder penyimpanan: ${downloadDir.absolutePath}")
-        log("⚡ Koneksi paralel: $parallelConn")
+        _isDownloading.value = true
+        log("===================================================")
+        log("[i] Memulai proses unduhan untuk ${items.size} antrean...")
 
-        val tempDir = File(cacheDir, "temp_downloads")
-        tempDir.mkdirs()
+        val tempDir = File(cacheDir, "download_temp").apply { mkdirs() }
 
-        val items = _queueState.value
         for (i in items.indices) {
-            val item = _queueState.value[i]
-            if (item.status == DownloadStatus.COMPLETED) continue
+            val item = items[i]
+            log("[*] Memproses [${i + 1}/${items.size}]: ${item.rjid}")
 
-            log("---------------------------------------------------")
-            log("[${i + 1}/${items.size}] Memproses: ${item.rjid}")
+            updateItem(i) {
+                it.copy(
+                    status = DownloadStatus.DOWNLOADING,
+                    statusText = "Mengambil metadata karya..."
+                )
+            }
 
-            // 0. Cek apakah file audio untuk kode RJ ini sudah ada di folder penyimpanan
-            val existingFile = AudioStorageHelper.findExistingAudioFile(downloadDir, item.rjid)
-            if (existingFile != null && existingFile.exists() && existingFile.length() > 0) {
-                val sizeStr = AudioDownloader.formatFileSize(existingFile.length())
-                log("[i] File untuk ${item.rjid} sudah ada di penyimpanan: ${existingFile.name} ($sizeStr)")
-
-                // Pastikan karya ini tercatat di database riwayat
-                val existingHistory = historyDao.getHistoryById(item.rjid)
-                if (existingHistory == null || existingHistory.localFilePath != existingFile.absolutePath) {
-                    val meta = DLsiteScraper.fetchMetadata(item.rjid)
-                    val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-                    historyDao.insertHistory(
-                        HistoryEntity(
-                            rjid = item.rjid,
-                            title = meta.title,
-                            cv = meta.cv,
-                            circle = meta.circle,
-                            genre = meta.genre,
-                            ageRating = meta.ageRating,
-                            coverUrl = meta.coverUrl,
-                            localFilePath = existingFile.absolutePath,
-                            downloadDate = dateStr,
-                            fileSize = sizeStr
-                        )
-                    )
-                    log("[+] Sinkronisasi riwayat untuk ${item.rjid} berhasil.")
-                }
-
+            // 1. Scrape Metadata
+            val meta = try {
+                DLsiteScraper.fetchMetadata(item.rjid)
+            } catch (e: Exception) {
+                log("[!] Gagal mengambil metadata ${item.rjid}: ${e.message}")
                 updateItem(i) {
                     it.copy(
-                        title = item.title.ifBlank { existingFile.nameWithoutExtension },
-                        status = DownloadStatus.COMPLETED,
-                        statusText = "File sudah ada di penyimpanan (${existingFile.name})",
-                        progress = 1f,
-                        downloadedSize = sizeStr,
-                        totalSize = sizeStr
+                        status = DownloadStatus.FAILED,
+                        statusText = "Gagal mengambil metadata",
+                        error = e.message
                     )
                 }
                 continue
             }
-
-            // 1. Fetch Metadata
-            updateItem(i) {
-                it.copy(
-                    status = DownloadStatus.FETCHING_METADATA,
-                    statusText = "Mengambil info DLsite..."
-                )
-            }
-            updateNotification("Mengambil metadata: ${item.rjid}", 0, true)
-
-            val meta = DLsiteScraper.fetchMetadata(item.rjid)
-            log("  [i] Judul: ${meta.title}")
-            log("  [i] CV: ${meta.cv} | Circle: ${meta.circle}")
-            log("  [i] Genre: ${meta.genre} | Rating: ${meta.ageRating}")
 
             val tracks = TrackDiscoveryService.discoverAllTracks(item.rjid)
             log("  [i] Ditemukan ${tracks.size} track (${tracks.joinToString { it.name }})")
@@ -329,7 +308,7 @@ class DownloadService : Service() {
                 artist = meta.cv,
                 album = meta.circle,
                 genre = meta.genre,
-                comment = "JapaneseASMR"
+                comment = "Downloaded with JapaneseASMR by SayMaven (https://github.com/SayMaven)"
             )
 
             val fileSizeStr = AudioDownloader.formatFileSize(finalOutputFile.length())
@@ -369,6 +348,7 @@ class DownloadService : Service() {
 
         log("===================================================")
         log("[i] Semua antrean telah selesai diproses.")
+        _isDownloading.value = false
     }
 
     private fun updateItem(index: Int, transform: (DownloadQueueItem) -> DownloadQueueItem) {
