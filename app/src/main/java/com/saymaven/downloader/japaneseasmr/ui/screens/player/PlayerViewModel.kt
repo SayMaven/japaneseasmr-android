@@ -89,15 +89,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun observeDatabasePlaylist() {
         viewModelScope.launch {
             historyDao.getAllHistory().collect { dbList ->
-                if (_playlist.value.isEmpty()) {
-                    _playlist.value = dbList
+                val savedOrderStr = sp.getString("custom_playlist_order", null)
+                val orderMap = if (!savedOrderStr.isNullOrBlank()) {
+                    savedOrderStr.split(",")
+                        .mapIndexed { idx, rjid -> rjid.trim() to idx }
+                        .toMap()
+                } else if (_playlist.value.isNotEmpty()) {
+                    _playlist.value.mapIndexed { idx, item -> item.rjid to idx }.toMap()
                 } else {
-                    val orderMap = _playlist.value.mapIndexed { idx, item -> item.rjid to idx }.toMap()
-                    val sorted = dbList.sortedBy { orderMap[it.rjid] ?: Int.MAX_VALUE }
-                    _playlist.value = sorted
+                    emptyMap()
                 }
+
+                val sorted = if (orderMap.isNotEmpty()) {
+                    dbList.sortedBy { orderMap[it.rjid] ?: Int.MAX_VALUE }
+                } else {
+                    dbList
+                }
+                _playlist.value = sorted
             }
         }
+    }
+
+    private fun saveCustomPlaylistOrder(rjidList: List<String>) {
+        val str = rjidList.joinToString(",")
+        sp.edit().putString("custom_playlist_order", str).apply()
     }
 
     fun reorderPlaylist(fromIndex: Int, toIndex: Int) {
@@ -106,6 +121,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val item = current.removeAt(fromIndex)
             current.add(toIndex, item)
             _playlist.value = current
+            saveCustomPlaylistOrder(current.map { it.rjid })
 
             player?.let { p ->
                 if (p.mediaItemCount > 0 && fromIndex < p.mediaItemCount && toIndex < p.mediaItemCount) {
@@ -122,56 +138,78 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         )
         controllerFuture = MediaController.Builder(getApplication(), sessionToken).buildAsync()
         controllerFuture?.addListener({
-            setupPlayerListener()
+            try {
+                val p = controllerFuture?.get() ?: return@addListener
+                setupPlayerListener(p)
+                syncPlayerWithCurrentState(p)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }, MoreExecutors.directExecutor())
+    }
+
+    private fun syncPlayerWithCurrentState(p: Player) {
+        _isPlaying.value = p.isPlaying
+        _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+        _duration.value = p.duration.coerceAtLeast(0L)
+        _repeatMode.value = p.repeatMode
+        _shuffleMode.value = p.shuffleModeEnabled
+
+        p.currentMediaItem?.let { item ->
+            _currentRjId.value = item.mediaId
+            item.mediaMetadata.let { meta ->
+                _currentTitle.value = meta.title?.toString() ?: _currentTitle.value
+                _currentArtist.value = meta.artist?.toString() ?: _currentArtist.value
+                _currentCoverUrl.value = meta.artworkUri?.toString() ?: _currentCoverUrl.value
+            }
+        }
+
+        if (p.isPlaying) {
+            startProgressTracking()
+        }
     }
 
     private fun restorePlaybackState() {
         viewModelScope.launch {
-            val savedRjid = prefs.lastPlayedRjidFlow.first() ?: sp.getString("cached_rjid", null)
-            val savedPos = prefs.lastPositionMsFlow.first()
-            val savedRepeat = prefs.repeatModeFlow.first()
-            val savedShuffle = prefs.shuffleModeFlow.first()
-
-            _repeatMode.value = savedRepeat
-            _shuffleMode.value = savedShuffle
-            if (savedPos > 0L) _currentPosition.value = savedPos
-
-            if (!savedRjid.isNullOrBlank()) {
-                val history = historyDao.getHistoryById(savedRjid)
-                if (history != null) {
-                    _currentRjId.value = history.rjid
-                    _currentTitle.value = "[${history.rjid}] ${history.title}"
-                    _currentArtist.value = history.cv
-                    _currentCoverUrl.value = history.coverUrl
-                    saveCacheSynchronously()
-                }
+            val lastRj = prefs.lastPlayedRjidFlow.first()
+            if (!lastRj.isNullOrBlank() && _currentRjId.value == null) {
+                _currentRjId.value = lastRj
+                _currentPosition.value = prefs.lastPositionMsFlow.first()
+                _repeatMode.value = prefs.repeatModeFlow.first()
+                _shuffleMode.value = prefs.shuffleModeFlow.first()
             }
         }
     }
 
-    private fun setupPlayerListener() {
-        val p = player ?: return
+    private fun setupPlayerListener(p: Player) {
         p.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                _isPlaying.value = playing
-                if (playing) startProgressTracking() else stopProgressTracking()
-            }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_READY) {
-                    _duration.value = p.duration.coerceAtLeast(0L)
-                    saveCacheSynchronously()
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                _isPlaying.value = isPlaying
+                if (isPlaying) {
+                    startProgressTracking()
+                } else {
+                    stopProgressTracking()
                 }
+                saveCurrentState()
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (mediaItem != null) {
                     _currentRjId.value = mediaItem.mediaId
-                    _currentTitle.value = mediaItem.mediaMetadata.title?.toString() ?: "JapaneseASMR"
-                    _currentArtist.value = mediaItem.mediaMetadata.artist?.toString() ?: "-"
-                    _currentCoverUrl.value = mediaItem.mediaMetadata.artworkUri?.toString()
+                    mediaItem.mediaMetadata.let { meta ->
+                        _currentTitle.value = meta.title?.toString() ?: ""
+                        _currentArtist.value = meta.artist?.toString() ?: "-"
+                        _currentCoverUrl.value = meta.artworkUri?.toString()
+                    }
+                    _currentPosition.value = 0L
+                    _duration.value = p.duration.coerceAtLeast(0L)
                     saveCurrentState()
+                }
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    _duration.value = p.duration.coerceAtLeast(0L)
                 }
             }
 
