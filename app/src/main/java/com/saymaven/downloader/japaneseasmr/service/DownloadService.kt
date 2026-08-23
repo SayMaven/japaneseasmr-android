@@ -76,7 +76,22 @@ class DownloadService : Service() {
         }
 
         fun clearQueue() {
-            _queueState.value = emptyList()
+            val current = _queueState.value.toMutableList()
+            if (_isDownloading.value) {
+                // Pertahankan item yang sedang didownload, hapus yang sudah selesai atau belum mulai
+                current.removeAll { it.status != DownloadStatus.DOWNLOADING && it.status != DownloadStatus.PROCESSING }
+            } else {
+                current.clear()
+            }
+            _queueState.value = current
+            log("[i] Antrean unduhan dibersihkan.")
+        }
+
+        fun removeItem(rjid: String) {
+            val current = _queueState.value.toMutableList()
+            current.removeAll { it.rjid.equals(rjid, ignoreCase = true) }
+            _queueState.value = current
+            log("[-] Dihapus dari antrean: $rjid")
         }
 
         fun startDownload(context: Context) {
@@ -162,6 +177,48 @@ class DownloadService : Service() {
             val item = items[i]
             log("[*] Memproses [${i + 1}/${items.size}]: ${item.rjid}")
 
+            // === 1. CEK FILE SUDAH ADA DI PENYIMPANAN (SKIP OTOMATIS) ===
+            val existingFile = AudioStorageHelper.findExistingAudioFile(downloadDir, item.rjid)
+            if (existingFile != null && existingFile.length() > 0) {
+                val fileSizeStr = AudioDownloader.formatFileSize(existingFile.length())
+                val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(existingFile.lastModified()))
+
+                log("  [i] File audio [${item.rjid}] sudah ada di penyimpanan (${existingFile.name}).")
+                log("  [i] Melewati proses unduhan...")
+
+                // Pastikan tersimpan di Room database
+                val existingHistory = historyDao.getHistoryById(item.rjid)
+                if (existingHistory == null) {
+                    historyDao.insertHistory(
+                        HistoryEntity(
+                            rjid = item.rjid,
+                            title = item.title.ifBlank { existingFile.nameWithoutExtension },
+                            cv = item.cv,
+                            circle = item.circle,
+                            genre = item.genre,
+                            ageRating = item.ageRating,
+                            coverUrl = item.coverUrl,
+                            localFilePath = existingFile.absolutePath,
+                            downloadDate = dateStr,
+                            fileSize = fileSizeStr
+                        )
+                    )
+                }
+
+                updateItem(i) {
+                    it.copy(
+                        status = DownloadStatus.COMPLETED,
+                        statusText = "Sudah ada di penyimpanan (Dilewati)",
+                        progress = 1f,
+                        speed = "-",
+                        eta = "-",
+                        downloadedSize = fileSizeStr,
+                        totalSize = fileSizeStr
+                    )
+                }
+                continue
+            }
+
             updateItem(i) {
                 it.copy(
                     status = DownloadStatus.DOWNLOADING,
@@ -169,7 +226,7 @@ class DownloadService : Service() {
                 )
             }
 
-            // 1. Scrape Metadata
+            // 2. Scrape Metadata
             val meta = try {
                 DLsiteScraper.fetchMetadata(item.rjid)
             } catch (e: Exception) {
@@ -199,12 +256,12 @@ class DownloadService : Service() {
                 )
             }
 
-            // 2. Download Cover
+            // 3. Download Cover
             log("  [1/3] Mengunduh cover image...")
             val coverFile = File(tempDir, "${item.rjid}_cover.jpg")
             AudioDownloader.downloadImage(meta.coverUrl, coverFile)
 
-            // 3. Download Tracks
+            // 4. Download Tracks
             val downloadedTracks = mutableListOf<File>()
             var isFailed = false
             val isHls = tracks.any { it.url.endsWith(".m3u8", ignoreCase = true) }
@@ -273,7 +330,7 @@ class DownloadService : Service() {
                 continue
             }
 
-            // 4. Finalizing & Metadata Tagging
+            // 5. Finalizing & Metadata Tagging
             log("  [3/3] Menyematkan metadata & cover art...")
             updateItem(i) {
                 it.copy(

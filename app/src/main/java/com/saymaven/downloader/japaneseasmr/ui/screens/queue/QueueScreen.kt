@@ -69,20 +69,15 @@ fun QueueScreen(viewModel: QueueViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // ================= 0. TOP APP HEADER (CLEAN SINGLE TITLE) =================
+        // ================= 0. TOP APP HEADER =================
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp, bottom = 2.dp)
-            ) {
-                Text(
-                    text = "JapaneseASMR Downloader",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            Text(
+                text = "JapaneseASMR Downloader",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+            )
         }
 
         // ================= 1. INPUT CARD =================
@@ -105,7 +100,8 @@ fun QueueScreen(viewModel: QueueViewModel) {
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { viewModel.onInputChanged(it) },
-                        label = { Text("Kode RJ (misal: RJ01673437)") },
+                        label = { Text("Kode RJ (misal: RJ337874)") },
+                        placeholder = { Text("RJ337874") },
                         trailingIcon = {
                             IconButton(onClick = { viewModel.pasteFromClipboard(context) }) {
                                 Icon(Icons.Default.ContentPaste, contentDescription = "Tempel Clipboard", tint = MaterialTheme.colorScheme.primary)
@@ -158,27 +154,38 @@ fun QueueScreen(viewModel: QueueViewModel) {
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // Dua Tombol Simetris, Rapi, dan Berukuran Sama
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Button(
+                        OutlinedButton(
                             onClick = {
                                 if (inputText.isBlank()) {
                                     Toast.makeText(context, "Masukkan kode RJ terlebih dahulu", Toast.LENGTH_SHORT).show()
                                 } else {
                                     val added = viewModel.addToQueue()
-                                    if (!added) {
+                                    if (added) {
+                                        Toast.makeText(context, "Berhasil ditambahkan ke antrean", Toast.LENGTH_SHORT).show()
+                                    } else {
                                         Toast.makeText(context, "Format kode RJ tidak valid", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Antrean")
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Antrean",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
                         }
 
                         Button(
@@ -194,13 +201,24 @@ fun QueueScreen(viewModel: QueueViewModel) {
                                     }
                                 }
                             },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Unduh")
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Unduh",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
@@ -222,22 +240,40 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         color = MaterialTheme.colorScheme.primary
                     )
 
-                    if (!isDownloading) {
-                        FilledTonalButton(
-                            onClick = { viewModel.startDownload(context) },
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = { viewModel.clearQueue() },
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Mulai Semua", style = MaterialTheme.typography.labelMedium)
+                            Text("Bersihkan", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        if (!isDownloading) {
+                            FilledTonalButton(
+                                onClick = { viewModel.startDownload(context) },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Mulai", style = MaterialTheme.typography.labelMedium)
+                            }
                         }
                     }
                 }
             }
 
             items(queue, key = { it.rjid }) { item ->
-                QueueItemCard(item = item)
+                QueueItemCard(
+                    item = item,
+                    onDismiss = { viewModel.removeItem(item.rjid) }
+                )
             }
         }
 
@@ -347,7 +383,10 @@ fun QueueScreen(viewModel: QueueViewModel) {
 }
 
 @Composable
-fun QueueItemCard(item: DownloadQueueItem) {
+fun QueueItemCard(
+    item: DownloadQueueItem,
+    onDismiss: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -386,6 +425,21 @@ fun QueueItemCard(item: DownloadQueueItem) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+
+                // Tombol Hapus item dari antrean
+                if (item.status != DownloadStatus.DOWNLOADING && item.status != DownloadStatus.PROCESSING) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Hapus Antrean",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 

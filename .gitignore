@@ -39,8 +39,10 @@ local.properties
 Thumbs.db
 
 # Local ADB helper
-install_to_phone.bat
+install_to_phone_release.bat
+install_to_phone_debug.bat
 
+# Keystore files
 keystore.properties
 
 # Batch files
