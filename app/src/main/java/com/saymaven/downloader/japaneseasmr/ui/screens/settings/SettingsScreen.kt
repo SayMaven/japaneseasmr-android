@@ -328,7 +328,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Horizontal Palettes Preview Carousel with Realtime Scroll Tracking
+                        // Horizontal Palettes Preview Carousel with Exact 4-Palettes = 1 Dot indicator
                         ColorPaletteCarousel(
                             selectedPalette = colorPalette,
                             onSelectPalette = { viewModel.setColorPalette(it) }
@@ -573,25 +573,14 @@ fun ColorPaletteCarousel(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // Auto-scroll to currently selected palette on initial display
-    LaunchedEffect(Unit) {
-        val selIdx = palettes.indexOf(selectedPalette)
-        if (selIdx != -1) {
-            listState.scrollToItem((selIdx - 1).coerceAtLeast(0))
-        }
-    }
+    // 1 Page Indicator = Setiap 4 Palet Warna (24 Palet = 6 Titik Indikator)
+    val totalPages = remember(palettes.size) { (palettes.size + 3) / 4 }
 
-    // Dynamic Active Indicator calculated from real-time scroll offset & visible items
-    val activeDotIndex by remember {
+    // Hitung dot index secara dinamis: bergeser setiap 4 warna dilewati
+    val activePageIndex by remember {
         derivedStateOf {
             val firstIdx = listState.firstVisibleItemIndex
-            val offset = listState.firstVisibleItemScrollOffset
-            val totalItems = palettes.size
-            if (offset > 120 && firstIdx < totalItems - 1) {
-                firstIdx + 1
-            } else {
-                firstIdx
-            }.coerceIn(0, totalItems - 1)
+            (firstIdx / 4).coerceIn(0, totalPages - 1)
         }
     }
 
@@ -653,15 +642,9 @@ fun ColorPaletteCarousel(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Sleek 10-Dot Sliding Window Page Indicators tracking horizontal swipe in real-time
-        val totalDots = 10
-        val maxScrollable = (palettes.size - 1).coerceAtLeast(1)
-        val normalizedDotPos = remember(activeDotIndex) {
-            ((activeDotIndex.toFloat() / maxScrollable.toFloat()) * (totalDots - 1)).toInt().coerceIn(0, totalDots - 1)
-        }
-
+        // Indikator Titik: 1 Titik per 4 Warna (Total 6 Titik untuk 24 Palet)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -669,12 +652,12 @@ fun ColorPaletteCarousel(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            repeat(totalDots) { dotIdx ->
-                val isCurrent = (dotIdx == normalizedDotPos)
+            repeat(totalPages) { pageIdx ->
+                val isCurrent = (pageIdx == activePageIndex)
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 3.dp)
-                        .size(if (isCurrent) 8.dp else 5.dp)
+                        .padding(horizontal = 4.dp)
+                        .size(if (isCurrent) 8.dp else 6.dp)
                         .clip(CircleShape)
                         .background(
                             if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)

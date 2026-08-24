@@ -39,7 +39,7 @@ fun HistoryScreen(
 
     val listState = rememberLazyListState()
 
-    // Saat urutan (Ascend/Descend/Waktu/Nama) diganti, tampilan tetap diam di paling atas (index 0)
+    // Saat urutan diubah, paksa posisi scroll tetap diam di index 0 (paling atas)
     LaunchedEffect(sortOrder) {
         listState.scrollToItem(0)
     }
@@ -190,12 +190,13 @@ fun HistoryScreen(
                 )
             }
         } else {
+            // Menggunakan key bertaut sortOrder agar Compose tidak melompat melacak item lama ke bawah
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(historyList, key = { it.rjid }) { item ->
+                items(historyList, key = { "${sortOrder.name}_${it.rjid}" }) { item ->
                     val isPresent = remember(item.localFilePath) { viewModel.isFilePresent(item) }
 
                     Card(
