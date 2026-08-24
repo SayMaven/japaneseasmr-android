@@ -181,7 +181,7 @@ class DownloadService : Service() {
             val existingFile = AudioStorageHelper.findExistingAudioFile(downloadDir, item.rjid)
             if (existingFile != null && existingFile.length() > 0) {
                 val fileSizeStr = AudioDownloader.formatFileSize(existingFile.length())
-                val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(existingFile.lastModified()))
+                val dateStr = AudioStorageHelper.formatDateForDisplay(existingFile.lastModified())
 
                 log("  [i] File audio [${item.rjid}] sudah ada di penyimpanan (${existingFile.name}).")
                 log("  [i] Melewati proses unduhan...")
@@ -369,7 +369,7 @@ class DownloadService : Service() {
             )
 
             val fileSizeStr = AudioDownloader.formatFileSize(finalOutputFile.length())
-            val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+            val dateStr = AudioStorageHelper.formatDateForDisplay(System.currentTimeMillis())
 
             historyDao.insertHistory(
                 HistoryEntity(

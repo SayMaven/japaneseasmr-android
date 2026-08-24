@@ -4,8 +4,61 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object AudioStorageHelper {
+
+    val INDONESIAN_LOCALE = Locale("id", "ID")
+    val DISPLAY_DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", INDONESIAN_LOCALE)
+
+    fun formatDateForDisplay(timestamp: Long): String {
+        return DISPLAY_DATE_FORMAT.format(Date(timestamp))
+    }
+
+    /**
+     * Mengurai string tanggal ke milidetik secara akurat untuk pengurutan kronologis.
+     */
+    fun parseDateToTimestamp(dateStr: String?, localFilePath: String?): Long {
+        // 1. Jika file lokal ada di memori HP, gunakan lastModified fisik file (paling akurat)
+        if (!localFilePath.isNullOrBlank()) {
+            val file = File(localFilePath)
+            if (file.exists() && file.lastModified() > 0L) {
+                return file.lastModified()
+            }
+        }
+
+        if (dateStr.isNullOrBlank()) return 0L
+
+        // 2. Parse format string yang tersimpan
+        val formats = listOf(
+            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()),
+            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()),
+            SimpleDateFormat("dd MMM yyyy, HH:mm", INDONESIAN_LOCALE),
+            SimpleDateFormat("dd MMM yyyy", INDONESIAN_LOCALE),
+            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()),
+            SimpleDateFormat("dd MMM yyyy", Locale.ENGLISH)
+        )
+
+        for (fmt in formats) {
+            try {
+                val parsed = fmt.parse(dateStr)
+                if (parsed != null) return parsed.time
+            } catch (e: Exception) {
+            }
+        }
+
+        return 0L
+    }
+
+    /**
+     * Menyeragamkan format tampilan tanggal menjadi "dd MMM yyyy" (contoh: 24 Agu 2026).
+     */
+    fun normalizeDateString(dateStr: String?, localFilePath: String?): String {
+        val ts = parseDateToTimestamp(dateStr, localFilePath)
+        return if (ts > 0L) formatDateForDisplay(ts) else (dateStr ?: formatDateForDisplay(System.currentTimeMillis()))
+    }
 
     /**
      * Mencari file audio yang cocok untuk kode RJ di folder unduhan.

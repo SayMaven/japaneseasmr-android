@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 enum class HistorySortOrder {
-    DATE_DESC, // Waktu Terbaru (Default)
+    DATE_DESC, // Waktu Terbaru (Default - Audio Baru Paling Atas)
     DATE_ASC,  // Waktu Terlama
     TITLE_ASC, // Nama A - Z
     TITLE_DESC // Nama Z - A
@@ -57,16 +57,22 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         flow.map { list ->
             val resolved = list.map { item ->
                 val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)
+                val normalizedDate = AudioStorageHelper.normalizeDateString(item.downloadDate, item.localFilePath)
                 if (localCover != null && localCover.exists()) {
-                    item.copy(coverUrl = localCover.absolutePath)
+                    item.copy(coverUrl = localCover.absolutePath, downloadDate = normalizedDate)
                 } else {
-                    item
+                    item.copy(downloadDate = normalizedDate)
                 }
             }
 
+            // Pengurutan berbasis Timestamp Milidetik Nyata (Bukan sorting string alfabetis)
             when (order) {
-                HistorySortOrder.DATE_DESC -> resolved
-                HistorySortOrder.DATE_ASC -> resolved.reversed()
+                HistorySortOrder.DATE_DESC -> resolved.sortedByDescending {
+                    AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath)
+                }
+                HistorySortOrder.DATE_ASC -> resolved.sortedBy {
+                    AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath)
+                }
                 HistorySortOrder.TITLE_ASC -> resolved.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
                 HistorySortOrder.TITLE_DESC -> resolved.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.title })
             }

@@ -13,9 +13,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 object StorageSyncManager {
 
@@ -25,8 +22,7 @@ object StorageSyncManager {
 
     /**
      * Memindai direktori unduhan secara realtime.
-     * Jika ada file audio baru di memori yang belum ada di database, otomatis mengambil metadata dan menambahkannya ke riwayat.
-     * Jika ada path file yang berubah/pindah/kembali, otomatis diperbarui dan memicu update realtime ke seluruh layar.
+     * Menyeragamkan format tanggal di database dan memastikan audio baru langsung muncul di paling atas.
      */
     fun syncStorageWithDatabase(context: Context) {
         scope.launch {
@@ -37,19 +33,30 @@ object StorageSyncManager {
                 val customDirStr = prefs.downloadDirFlow.first()
                 val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
 
+                // 1. Normalisasi semua format tanggal lama di database
+                val existingHistoryList = dao.getAllHistoryDirect()
+                for (item in existingHistoryList) {
+                    val normalized = AudioStorageHelper.normalizeDateString(item.downloadDate, item.localFilePath)
+                    if (normalized != item.downloadDate) {
+                        dao.insertHistory(item.copy(downloadDate = normalized))
+                    }
+                }
+
+                // 2. Cek file fisik di direktori unduhan
                 if (downloadDir.exists() && downloadDir.isDirectory) {
                     val audioFiles = downloadDir.listFiles { file ->
                         file.isFile && (file.extension.equals("m4a", true) || file.extension.equals("mp3", true) || file.extension.equals("aac", true) || file.extension.equals("flac", true) || file.extension.equals("wav", true))
                     } ?: emptyArray()
 
                     val rjRegex = Regex("(RJ\\d{6,8})", RegexOption.IGNORE_CASE)
-                    val dateFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
 
                     for (f in audioFiles) {
                         val match = rjRegex.find(f.name) ?: continue
                         val rjid = match.value.uppercase()
 
                         val existing = dao.getHistoryById(rjid)
+                        val formattedDate = AudioStorageHelper.formatDateForDisplay(f.lastModified())
+
                         if (existing == null) {
                             val retriever = MediaMetadataRetriever()
                             var title = f.nameWithoutExtension.replace("[$rjid]", "").trim().ifEmpty { rjid }
@@ -78,7 +85,7 @@ object StorageSyncManager {
                                 ageRating = "-",
                                 coverUrl = coverUrl,
                                 localFilePath = f.absolutePath,
-                                downloadDate = dateFormat.format(Date(f.lastModified())),
+                                downloadDate = formattedDate,
                                 fileSize = AudioDownloader.formatFileSize(f.length())
                             )
                             dao.insertHistory(restored)
@@ -96,8 +103,8 @@ object StorageSyncManager {
                                     )
                                 } catch (e: Exception) {}
                             }
-                        } else if (existing.localFilePath != f.absolutePath) {
-                            dao.insertHistory(existing.copy(localFilePath = f.absolutePath))
+                        } else if (existing.localFilePath != f.absolutePath || existing.downloadDate != formattedDate) {
+                            dao.insertHistory(existing.copy(localFilePath = f.absolutePath, downloadDate = formattedDate))
                         }
                     }
                 }
