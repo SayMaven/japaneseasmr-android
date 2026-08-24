@@ -27,19 +27,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val themeMode = preferencesManager.themeModeFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        ThemeMode.SYSTEM
+        preferencesManager.getInitialThemeMode()
     )
 
     val dynamicColor = preferencesManager.dynamicColorFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        true
+        preferencesManager.getInitialDynamicColor()
     )
 
     val colorPalette = preferencesManager.colorPaletteFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        ColorPalette.DEFAULT
+        preferencesManager.getInitialColorPalette()
     )
 
     val downloadDir = preferencesManager.downloadDirFlow.stateIn(

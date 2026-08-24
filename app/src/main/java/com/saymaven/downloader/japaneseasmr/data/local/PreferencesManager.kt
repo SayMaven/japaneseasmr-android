@@ -42,6 +42,26 @@ class PreferencesManager(private val context: Context) {
         val KEY_SHOW_REMAINING_TIME = booleanPreferencesKey("show_remaining_time")
     }
 
+    fun getInitialThemeMode(): ThemeMode {
+        val str = fastSp.getString("cached_theme_mode", null)
+        if (str != null) {
+            return try { ThemeMode.valueOf(str) } catch (e: Exception) { ThemeMode.SYSTEM }
+        }
+        return ThemeMode.SYSTEM
+    }
+
+    fun getInitialDynamicColor(): Boolean {
+        return fastSp.getBoolean("cached_dynamic_color", false)
+    }
+
+    fun getInitialColorPalette(): ColorPalette {
+        val str = fastSp.getString("cached_color_palette", null)
+        if (str != null) {
+            return try { ColorPalette.valueOf(str) } catch (e: Exception) { ColorPalette.DEFAULT }
+        }
+        return ColorPalette.DEFAULT
+    }
+
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
         val modeStr = preferences[KEY_THEME_MODE] ?: ThemeMode.SYSTEM.name
         try {
@@ -52,7 +72,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     val dynamicColorFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[KEY_DYNAMIC_COLOR] ?: true
+        preferences[KEY_DYNAMIC_COLOR] ?: false
     }
 
     val colorPaletteFlow: Flow<ColorPalette> = context.dataStore.data.map { preferences ->
@@ -136,20 +156,27 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
+        fastSp.edit().putString("cached_theme_mode", mode.name).apply()
         context.dataStore.edit { preferences ->
             preferences[KEY_THEME_MODE] = mode.name
         }
     }
 
     suspend fun setDynamicColor(enabled: Boolean) {
+        fastSp.edit().putBoolean("cached_dynamic_color", enabled).apply()
         context.dataStore.edit { preferences ->
             preferences[KEY_DYNAMIC_COLOR] = enabled
         }
     }
 
     suspend fun setColorPalette(palette: ColorPalette) {
+        fastSp.edit()
+            .putString("cached_color_palette", palette.name)
+            .putBoolean("cached_dynamic_color", false)
+            .apply()
         context.dataStore.edit { preferences ->
             preferences[KEY_COLOR_PALETTE] = palette.name
+            preferences[KEY_DYNAMIC_COLOR] = false
         }
     }
 
