@@ -54,18 +54,25 @@ JapaneseASMR Downloader is a full-featured, open-source Android application engi
 
 ### Integrated Native Audio Player
 * **Android MediaSession Integration**: Foreground audio playback service with rich notification controls and lock screen artwork display.
-* **Continuous Fluid Drag-and-Drop**: Multi-track dynamic reordering in the playlist bottom drawer with immediate playback queue synchronization.
-* **Comprehensive Playback Modes**: 3-state repeat (Off, Repeat All, Repeat One), shuffle, precise timeline scrubber, and elapsed/remaining duration toggling.
-* **Instant State Restoration**: Automatically remembers last played track, playback position, repeat mode, and shuffle state upon restart.
+* **Dedicated Audio Player Settings**: Configurable auto-resume playback, keep screen on, USB DAC exclusive bit-perfect mode, and custom download directory.
+* **Replay 10s & Forward 10s Controls**: Quick jump controls for navigating audio dialogue and chapters effortlessly.
+* **Persistent Timeline Mode**: Toggling between total elapsed duration and remaining time (`-mm:ss`) persists across app restarts.
+* **GPU Hardware-Accelerated ASMR Breathing Wave**: Calm, slow-tempo dynamic equalizer animation on active tracks in the playlist drawer.
+* **Continuous Fluid Drag-and-Drop**: Multi-track dynamic reordering in the playlist bottom drawer with immediate playback queue synchronization and dedicated touch drag handles.
+* **Strict Physical File Validation**: Automatically hides missing files in the playlist collection and refreshes in real-time when audio files are restored to storage.
 
 ### Library & Metadata Management
-* **Automatic Storage Recovery**: Background scanning engine that detects and restores previously downloaded audio files and metadata into the local database upon launch.
+* **Realtime Storage Synchronization (StorageSyncManager)**: Automatically scans physical storage on launch/resume, synchronizing new, moved, or deleted audio files with the local Room database.
+* **Smart Sorting Filters**: Instant ordering by Date (Newest / Oldest) with real millisecond timestamp precision and Title (A-Z / Z-A) with rock-solid list anchoring at index 0.
+* **Uniform Date Formatting**: Clean, standardized date strings (`dd MMM yyyy`) across the entire app.
 * **Complete Metadata Tagging**: Embeds high-resolution cover artwork, Voice Actor (CV), Circle/Author, Work Title, and Genre tags directly into audio files (ID3v2 / MP4 atom).
 * **Search & Collection Filtering**: Search your offline library by RJ Code, title, voice actor, or circle.
 
-### Modern Material Design 3 UI
+### Modern Material Design 3 UI & Theming
 * **Dynamic Material You / Monet Engine**: Automatic color palette generation based on Android 12+ wallpaper colors.
-* **Curated Color Palettes**: Tailored themes including Deep Purple, Cyber Slate, Crimson Velvet, Emerald Forest, and Royal Blue.
+* **36 Curated Color Palettes**: Comprehensive theme selection with 3-segment circle previews, smooth horizontal carousel, and 9-dot pagination.
+* **0ms Instant Startup Fast Cache**: Synchronous caching of theme preferences eliminates cold start dynamic color flicker.
+* **Instant 0ms Tab Switching**: Retained GPU RenderNode layer architecture for zero-delay switching across Home, History, Player, and Settings.
 * **System, Dark, and Light Modes**: Full day/night theme support with smooth transitions.
 
 ---
@@ -80,7 +87,7 @@ JapaneseASMR Downloader adheres strictly to Modern Android Architecture guidelin
 | **State Management** | Kotlin Coroutines + StateFlow | Reactive, lifecycle-aware unidirectional data flow |
 | **Media Player** | AndroidX Media3 (ExoPlayer) | Native audio decoding, MediaSession, Foreground Service |
 | **Local Database** | Room Database (SQLite) | Local library persistence, query caching, reactive observers |
-| **Preferences** | AndroidX DataStore | Type-safe asynchronous key-value persistence |
+| **Preferences** | AndroidX DataStore + SharedPreferences Fast Cache | Type-safe persistence with 0ms synchronous startup cache |
 | **Networking** | OkHttp 4 | HTTP/2 connection pooling, multi-thread segment downloads |
 | **Audio Tagging** | Jaudiotagger | ID3v2, MP4 atom, and metadata embedding |
 | **Image Loading** | Coil Compose | Asynchronous image decoding, memory and disk caching |
@@ -117,7 +124,7 @@ cd japaneseasmr-android
 
 The compiled APK will be located at:
 ```
-app/build/outputs/apk/release/JapaneseASMR-v1.0.0-release.apk
+app/build/outputs/apk/release/JapaneseASMR-v1.1.0-release.apk
 ```
 
 ---
