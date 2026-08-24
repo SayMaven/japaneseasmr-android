@@ -64,45 +64,59 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     val player: MediaController? get() = if (controllerFuture?.isDone == true) controllerFuture?.get() else null
 
-    // Fast Cache Restoration at 0ms
-    private val _currentRjId = MutableStateFlow<String?>(sp.getString("cached_rjid", null))
+    // Synchronous immediate 0ms restoration flags
+    private val isAutoResumeActive: Boolean = sp.getBoolean("setting_auto_resume", true)
+
+    // Playback States (Synchronously restored from cache on launch if auto-resume is ON)
+    private val _currentRjId = MutableStateFlow<String?>(if (isAutoResumeActive) sp.getString("cached_rjid", null) else null)
     val currentRjId = _currentRjId.asStateFlow()
 
-    private val _currentTitle = MutableStateFlow(sp.getString("cached_title", "Belum ada lagu yang diputar") ?: "Belum ada lagu yang diputar")
+    private val _currentTitle = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_title", "Belum ada lagu yang diputar") ?: "Belum ada lagu yang diputar" else "Belum ada lagu yang diputar")
     val currentTitle = _currentTitle.asStateFlow()
 
-    private val _currentArtist = MutableStateFlow(sp.getString("cached_artist", "-") ?: "-")
+    private val _currentArtist = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_artist", "-") ?: "-" else "-")
     val currentArtist = _currentArtist.asStateFlow()
 
-    private val _currentCoverUrl = MutableStateFlow<String?>(sp.getString("cached_cover", null))
+    private val _currentCoverUrl = MutableStateFlow<String?>(if (isAutoResumeActive) sp.getString("cached_cover", null) else null)
     val currentCoverUrl = _currentCoverUrl.asStateFlow()
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying = _isPlaying.asStateFlow()
 
-    private val _currentPosition = MutableStateFlow(sp.getLong("cached_pos", 0L))
+    private val _currentPosition = MutableStateFlow(if (isAutoResumeActive) sp.getLong("cached_pos", 0L) else 0L)
     val currentPosition = _currentPosition.asStateFlow()
 
-    private val _duration = MutableStateFlow(sp.getLong("cached_duration", 0L))
+    private val _duration = MutableStateFlow(if (isAutoResumeActive) sp.getLong("cached_duration", 0L) else 0L)
     val duration = _duration.asStateFlow()
 
-    private val _repeatMode = MutableStateFlow(sp.getInt("cached_repeat", Player.REPEAT_MODE_OFF))
+    private val _repeatMode = MutableStateFlow(if (isAutoResumeActive) sp.getInt("cached_repeat", Player.REPEAT_MODE_OFF) else Player.REPEAT_MODE_OFF)
     val repeatMode = _repeatMode.asStateFlow()
 
-    private val _shuffleMode = MutableStateFlow(sp.getBoolean("cached_shuffle", false))
+    private val _shuffleMode = MutableStateFlow(if (isAutoResumeActive) sp.getBoolean("cached_shuffle", false) else false)
     val shuffleMode = _shuffleMode.asStateFlow()
 
-    // Dynamic Audio Specs (- | - | - by default when no audio is playing)
-    private val _audioSpecs = MutableStateFlow("- | - | -")
+    private val _audioSpecs = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_specs", "- | - | -") ?: "- | - | -" else "- | - | -")
     val audioSpecs = _audioSpecs.asStateFlow()
 
     private var progressJob: Job? = null
 
     init {
+        preloadCoverArtInMemory(_currentCoverUrl.value)
         initMediaController()
         observeDatabasePlaylist()
         restorePlaybackState()
         observeAudioSettings()
+    }
+
+    private fun preloadCoverArtInMemory(url: String?) {
+        if (!url.isNullOrBlank()) {
+            val req = ImageRequest.Builder(getApplication())
+                .data(url)
+                .memoryCacheKey(url)
+                .allowHardware(true)
+                .build()
+            Coil.imageLoader(getApplication()).enqueue(req)
+        }
     }
 
     private fun observeDatabasePlaylist() {
@@ -125,6 +139,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     dbList
                 }
                 _playlist.value = sorted
+
+                // Preload all playlist covers into RAM memory cache in background
+                sorted.take(15).forEach { item ->
+                    preloadCoverArtInMemory(item.coverUrl)
+                }
             }
         }
     }
@@ -152,7 +171,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             player?.let { p ->
                 if (p.mediaItemCount > 0 && fromIndex < p.mediaItemCount && toIndex < p.mediaItemCount) {
-                    p.moveMediaItem(fromIndex, toIndex)
+                    try {
+                        p.moveMediaItem(fromIndex, toIndex)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             }
         }
@@ -176,38 +199,128 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun syncPlayerWithCurrentState(p: Player) {
-        _isPlaying.value = p.isPlaying
-        _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
-        _duration.value = p.duration.coerceAtLeast(0L)
-        _repeatMode.value = p.repeatMode
-        _shuffleMode.value = p.shuffleModeEnabled
-
-        p.currentMediaItem?.let { item ->
-            _currentRjId.value = item.mediaId
-            item.mediaMetadata.let { meta ->
-                _currentTitle.value = meta.title?.toString() ?: _currentTitle.value
-                _currentArtist.value = meta.artist?.toString() ?: _currentArtist.value
-                _currentCoverUrl.value = meta.artworkUri?.toString() ?: _currentCoverUrl.value
+        if (p.mediaItemCount > 0) {
+            _isPlaying.value = p.isPlaying
+            if (p.isPlaying || p.currentPosition > 0L) {
+                _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
             }
-        }
+            if (p.duration > 0L) {
+                _duration.value = p.duration.coerceAtLeast(0L)
+            }
+            _repeatMode.value = p.repeatMode
+            _shuffleMode.value = p.shuffleModeEnabled
 
-        if (p.isPlaying) {
-            startProgressTracking()
+            p.currentMediaItem?.let { item ->
+                _currentRjId.value = item.mediaId
+                item.mediaMetadata.let { meta ->
+                    _currentTitle.value = meta.title?.toString() ?: _currentTitle.value
+                    _currentArtist.value = meta.artist?.toString() ?: _currentArtist.value
+                    val cover = meta.artworkUri?.toString() ?: _currentCoverUrl.value
+                    _currentCoverUrl.value = cover
+                    preloadCoverArtInMemory(cover)
+                }
+            }
+
+            if (p.isPlaying) {
+                startProgressTracking()
+            }
+        } else {
+            // Player idle on launch: If Auto-Resume is active and we have a track, prepare it silently in player!
+            val autoResume = sp.getBoolean("setting_auto_resume", true)
+            val lastRj = _currentRjId.value
+            val lastPos = _currentPosition.value
+            if (autoResume && !lastRj.isNullOrBlank()) {
+                viewModelScope.launch {
+                    val history = historyDao.getHistoryById(lastRj)
+                    if (history != null) {
+                        prepareTrackSilently(history, _playlist.value, lastPos)
+                    }
+                }
+            }
         }
     }
 
     private fun restorePlaybackState() {
         viewModelScope.launch {
             val autoResume = prefs.autoResumeFlow.first()
-            if (!autoResume) return@launch
+            if (!autoResume) {
+                _currentRjId.value = null
+                _currentTitle.value = "Belum ada lagu yang diputar"
+                _currentArtist.value = "-"
+                _currentCoverUrl.value = null
+                _currentPosition.value = 0L
+                _duration.value = 0L
+                _audioSpecs.value = "- | - | -"
+                return@launch
+            }
 
             val lastRj = prefs.lastPlayedRjidFlow.first()
-            if (!lastRj.isNullOrBlank() && _currentRjId.value == null) {
-                _currentRjId.value = lastRj
-                _currentPosition.value = prefs.lastPositionMsFlow.first()
-                _repeatMode.value = prefs.repeatModeFlow.first()
-                _shuffleMode.value = prefs.shuffleModeFlow.first()
+            val lastPos = prefs.lastPositionMsFlow.first()
+
+            if (!lastRj.isNullOrBlank()) {
+                val history = historyDao.getHistoryById(lastRj)
+                if (history != null) {
+                    _currentRjId.value = history.rjid
+                    _currentTitle.value = "[${history.rjid}] ${history.title}"
+                    _currentArtist.value = history.cv
+                    _currentCoverUrl.value = history.coverUrl
+                    preloadCoverArtInMemory(history.coverUrl)
+                    if (_currentPosition.value == 0L && lastPos > 0L) {
+                        _currentPosition.value = lastPos
+                    }
+                    _repeatMode.value = prefs.repeatModeFlow.first()
+                    _shuffleMode.value = prefs.shuffleModeFlow.first()
+
+                    val p = player
+                    if (p != null && p.mediaItemCount == 0) {
+                        prepareTrackSilently(history, _playlist.value, _currentPosition.value)
+                    }
+                }
             }
+        }
+    }
+
+    private fun prepareTrackSilently(history: HistoryEntity, fullList: List<HistoryEntity>, startPositionMs: Long) {
+        viewModelScope.launch {
+            val p = player ?: return@launch
+            val customDirStr = prefs.downloadDirFlow.first()
+            val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
+
+            val validItemsWithFiles = fullList.mapNotNull { item ->
+                val resolved = AudioStorageHelper.resolveValidAudioFile(downloadDir, item.localFilePath, item.rjid)
+                if (resolved != null) Pair(item, resolved) else null
+            }
+
+            if (validItemsWithFiles.isEmpty()) return@launch
+
+            val targetPair = validItemsWithFiles.firstOrNull { it.first.rjid == history.rjid } ?: validItemsWithFiles.first()
+            val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
+
+            calculateAudioSpecs(targetPair.second)
+
+            val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, targetPair.first.coverUrl)
+
+            val mediaItems = validItemsWithFiles.map { (item, file) ->
+                val metaBuilder = MediaMetadata.Builder()
+                    .setTitle("[${item.rjid}] ${item.title}")
+                    .setArtist(item.cv)
+                    .setAlbumTitle(item.circle)
+                    .setArtworkUri(Uri.parse(item.coverUrl))
+
+                if (coverBytes != null && item.rjid == targetPair.first.rjid) {
+                    metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                }
+
+                MediaItem.Builder()
+                    .setUri(Uri.fromFile(file))
+                    .setMediaId(item.rjid)
+                    .setMediaMetadata(metaBuilder.build())
+                    .build()
+            }
+
+            p.setMediaItems(mediaItems, targetIndex, startPositionMs)
+            p.prepare()
+            _currentPosition.value = startPositionMs
         }
     }
 
@@ -229,17 +342,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     mediaItem.mediaMetadata.let { meta ->
                         _currentTitle.value = meta.title?.toString() ?: ""
                         _currentArtist.value = meta.artist?.toString() ?: "-"
-                        _currentCoverUrl.value = meta.artworkUri?.toString()
+                        val cover = meta.artworkUri?.toString()
+                        _currentCoverUrl.value = cover
+                        preloadCoverArtInMemory(cover)
                     }
-                    _currentPosition.value = 0L
-                    _duration.value = p.duration.coerceAtLeast(0L)
+                    if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
+                        _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                    } else if (p.isPlaying) {
+                        _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                    }
+                    if (p.duration > 0L) {
+                        _duration.value = p.duration.coerceAtLeast(0L)
+                    }
                     saveCurrentState()
                 }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_READY) {
-                    _duration.value = p.duration.coerceAtLeast(0L)
+                    if (p.duration > 0L) {
+                        _duration.value = p.duration.coerceAtLeast(0L)
+                    }
+                    if (p.isPlaying) {
+                        _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                    }
                 }
             }
 
@@ -308,14 +434,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (bitrateKbps <= 0) bitrateKbps = 1064
 
                 val sampleRateKhz = String.format(Locale.US, "%.1fkHz", sampleRate / 1000.0)
-                _audioSpecs.value = "$sampleRateKhz | ${bitDepth}bits | ${bitrateKbps}kbps"
+                val specsStr = "$sampleRateKhz | ${bitDepth}bits | ${bitrateKbps}kbps"
+                _audioSpecs.value = specsStr
+                if (sp.getBoolean("setting_auto_resume", true)) {
+                    sp.edit().putString("cached_specs", specsStr).commit()
+                }
             } catch (e: Exception) {
                 _audioSpecs.value = "44.1kHz | 16bits | 1064kbps"
             }
         }
     }
 
-    fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = _playlist.value) {
+    fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = _playlist.value, startPositionMs: Long = 0L) {
         viewModelScope.launch {
             val p = player ?: return@launch
             val customDirStr = prefs.downloadDirFlow.first()
@@ -362,8 +492,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _currentTitle.value = "[${targetPair.first.rjid}] ${targetPair.first.title}"
             _currentArtist.value = targetPair.first.cv
             _currentCoverUrl.value = targetPair.first.coverUrl
+            preloadCoverArtInMemory(targetPair.first.coverUrl)
 
-            p.setMediaItems(mediaItems, targetIndex, 0L)
+            p.setMediaItems(mediaItems, targetIndex, startPositionMs)
             p.prepare()
             p.play()
             saveCurrentState()
@@ -449,7 +580,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (!rj.isNullOrBlank()) {
                     viewModelScope.launch {
                         val history = historyDao.getHistoryById(rj)
-                        if (history != null) playLocalTrack(history)
+                        if (history != null) {
+                            val savedPos = _currentPosition.value
+                            playLocalTrack(history, _playlist.value, startPositionMs = savedPos)
+                        }
                     }
                 }
             } else {
@@ -525,27 +659,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun saveCacheSynchronously() {
-        sp.edit()
-            .putString("cached_rjid", _currentRjId.value)
-            .putString("cached_title", _currentTitle.value)
-            .putString("cached_artist", _currentArtist.value)
-            .putString("cached_cover", _currentCoverUrl.value)
-            .putLong("cached_pos", _currentPosition.value)
-            .putLong("cached_duration", _duration.value)
-            .putInt("cached_repeat", _repeatMode.value)
-            .putBoolean("cached_shuffle", _shuffleMode.value)
-            .apply()
+        val autoResume = sp.getBoolean("setting_auto_resume", true)
+        if (autoResume) {
+            sp.edit()
+                .putString("cached_rjid", _currentRjId.value)
+                .putString("cached_title", _currentTitle.value)
+                .putString("cached_artist", _currentArtist.value)
+                .putString("cached_cover", _currentCoverUrl.value)
+                .putLong("cached_pos", _currentPosition.value)
+                .putLong("cached_duration", _duration.value)
+                .putString("cached_specs", _audioSpecs.value)
+                .putInt("cached_repeat", _repeatMode.value)
+                .putBoolean("cached_shuffle", _shuffleMode.value)
+                .commit()
+        }
     }
 
     private fun saveCurrentState() {
         saveCacheSynchronously()
         viewModelScope.launch {
-            prefs.savePlaybackState(
-                rjid = _currentRjId.value,
-                positionMs = _currentPosition.value,
-                repeatMode = _repeatMode.value,
-                shuffleMode = _shuffleMode.value
-            )
+            val autoResume = prefs.autoResumeFlow.first()
+            if (autoResume) {
+                prefs.savePlaybackState(
+                    rjid = _currentRjId.value,
+                    positionMs = _currentPosition.value,
+                    repeatMode = _repeatMode.value,
+                    shuffleMode = _shuffleMode.value
+                )
+            }
         }
     }
 
@@ -556,8 +697,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 player?.let { p ->
                     _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
                     _duration.value = p.duration.coerceAtLeast(0L)
+                    saveCacheSynchronously()
                 }
-                delay(500)
+                delay(1000)
             }
         }
     }

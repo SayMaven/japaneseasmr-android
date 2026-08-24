@@ -2,13 +2,17 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import android.app.Activity
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,19 +28,29 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import java.io.File
 import java.util.Locale
+import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PlayerScreen(viewModel: PlayerViewModel) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val currentRjId by viewModel.currentRjId.collectAsState()
     val currentTitle by viewModel.currentTitle.collectAsState()
     val currentArtist by viewModel.currentArtist.collectAsState()
@@ -64,9 +78,50 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     var isSliderDragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableLongStateOf(0L) }
     var showRemainingTime by remember { mutableStateOf(false) }
-    var showPlaylistSheet by remember { mutableStateOf(false) }
+    var showBottomSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val effectivePosition = if (isSliderDragging) dragPosition else currentPosition
+
+    // Standard Smooth Drag-to-Reorder States
+    val listState = rememberLazyListState()
+    var draggedIndex by remember { mutableStateOf<Int?>(null) }
+    var dragAccumulatedY by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val slotHeightPx = remember(density) { with(density) { 74.dp.toPx() } }
+
+    // Controlled Gentle Auto-Scroll only when held at the very edge (<42dp from boundary)
+    LaunchedEffect(draggedIndex) {
+        while (isActive && draggedIndex != null) {
+            val curIdx = draggedIndex ?: break
+            val visibleInfo = listState.layoutInfo.visibleItemsInfo
+            val itemInfo = visibleInfo.firstOrNull { it.index == curIdx }
+
+            if (itemInfo != null) {
+                val itemTop = itemInfo.offset + dragAccumulatedY
+                val itemBottom = itemTop + itemInfo.size
+                val viewportHeight = listState.layoutInfo.viewportSize.height.toFloat()
+                val edgeZone = with(density) { 42.dp.toPx() }
+
+                if (itemTop < edgeZone && listState.canScrollBackward) {
+                    listState.scrollBy(-12f)
+                    if (curIdx > 0 && dragAccumulatedY < -slotHeightPx * 0.5f) {
+                        viewModel.reorderPlaylist(curIdx, curIdx - 1)
+                        draggedIndex = curIdx - 1
+                        dragAccumulatedY += slotHeightPx
+                    }
+                } else if (itemBottom > viewportHeight - edgeZone && listState.canScrollForward) {
+                    listState.scrollBy(12f)
+                    if (curIdx < playlist.size - 1 && dragAccumulatedY > slotHeightPx * 0.5f) {
+                        viewModel.reorderPlaylist(curIdx, curIdx + 1)
+                        draggedIndex = curIdx + 1
+                        dragAccumulatedY -= slotHeightPx
+                    }
+                }
+            }
+            delay(18)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -107,7 +162,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Big Center Cover Art
+            // Big Center Cover Art (0ms Instant Image with RAM cache preloaded)
             Card(
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
@@ -115,9 +170,16 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     .size(260.dp)
                     .aspectRatio(1f)
             ) {
-                if (currentCoverUrl != null) {
+                if (!currentCoverUrl.isNullOrBlank()) {
+                    val imageRequest = remember(currentCoverUrl) {
+                        ImageRequest.Builder(context)
+                            .data(currentCoverUrl)
+                            .memoryCacheKey(currentCoverUrl)
+                            .crossfade(false)
+                            .build()
+                    }
                     AsyncImage(
-                        model = currentCoverUrl,
+                        model = imageRequest,
                         contentDescription = "Cover Art",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -322,7 +384,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
             // Bottom Playlist Drawer Opener Button (Exact Screenshot 2 style)
             Surface(
-                onClick = { showPlaylistSheet = true },
+                onClick = { showBottomSheet = true },
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier
@@ -359,18 +421,19 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
         }
     }
 
-    // ================= 3. PLAYLIST BOTTOM SHEET WITH RELIABLE REORDERING =================
-    if (showPlaylistSheet) {
+    // ================= 3. PLAYLIST BOTTOM SHEET =================
+    if (showBottomSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showPlaylistSheet = false },
+            onDismissRequest = { showBottomSheet = false },
+            sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .fillMaxHeight(0.75f)
                     .padding(horizontal = 16.dp)
-                    .padding(bottom = 24.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -380,71 +443,108 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "BERIKUTNYA • DAFTAR PUTAR (${playlist.size})",
+                        text = "Daftar Putar Koleksi (${playlist.size})",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-
                     IconButton(
-                        onClick = { showPlaylistSheet = false },
-                        modifier = Modifier.size(32.dp)
+                        onClick = {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                showBottomSheet = false
+                            }
+                        },
+                        modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Close,
+                            Icons.Default.Close,
                             contentDescription = "Tutup",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 if (playlist.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 40.dp),
+                            .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Belum ada audio yang diunduh.",
+                            text = "Belum ada audio di koleksi. Unduh kode RJ terlebih dahulu.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 420.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(top = 10.dp, bottom = 52.dp)
                     ) {
-                        itemsIndexed(
-                            items = playlist,
-                            key = { _, item -> item.rjid }
-                        ) { index, item ->
-                            val isCurrent = item.rjid == currentRjId
-                            PlaylistTrackCard(
+                        itemsIndexed(playlist, key = { _, item -> item.rjid }) { index, item ->
+                            val fileExists = remember(item.localFilePath) { File(item.localFilePath).exists() }
+                            val isCurrentTrack = item.rjid == currentRjId
+                            val isDragged = draggedIndex == index
+
+                            PlaylistItemCard(
+                                modifier = Modifier.animateItemPlacement(),
                                 item = item,
-                                isCurrent = isCurrent,
-                                isFirst = index == 0,
-                                isLast = index == playlist.size - 1,
+                                isCurrentTrack = isCurrentTrack,
+                                fileExists = fileExists,
+                                isDragged = isDragged,
+                                dragOffsetY = if (isDragged) dragAccumulatedY else 0f,
+                                onDragHandleGesture = {
+                                    detectVerticalDragGestures(
+                                        onDragStart = {
+                                            val realIdx = playlist.indexOfFirst { it.rjid == item.rjid }
+                                            if (realIdx != -1) {
+                                                draggedIndex = realIdx
+                                                dragAccumulatedY = 0f
+                                            }
+                                        },
+                                        onVerticalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragAccumulatedY += dragAmount
+
+                                            val curIdx = draggedIndex ?: return@detectVerticalDragGestures
+                                            val threshold = slotHeightPx * 0.55f
+
+                                            if (dragAccumulatedY > threshold && curIdx < playlist.size - 1) {
+                                                viewModel.reorderPlaylist(curIdx, curIdx + 1)
+                                                draggedIndex = curIdx + 1
+                                                dragAccumulatedY -= slotHeightPx
+                                            } else if (dragAccumulatedY < -threshold && curIdx > 0) {
+                                                viewModel.reorderPlaylist(curIdx, curIdx - 1)
+                                                draggedIndex = curIdx - 1
+                                                dragAccumulatedY += slotHeightPx
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            draggedIndex = null
+                                            dragAccumulatedY = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggedIndex = null
+                                            dragAccumulatedY = 0f
+                                        }
+                                    )
+                                },
                                 onClick = {
-                                    viewModel.playLocalTrack(item, playlist)
-                                },
-                                onMoveUp = {
-                                    if (index > 0) {
-                                        viewModel.reorderPlaylist(index, index - 1)
-                                    }
-                                },
-                                onMoveDown = {
-                                    if (index < playlist.size - 1) {
-                                        viewModel.reorderPlaylist(index, index + 1)
-                                    }
-                                },
-                                onReorderSteps = { steps ->
-                                    val target = (index + steps).coerceIn(0, playlist.size - 1)
-                                    if (target != index) {
-                                        viewModel.reorderPlaylist(index, target)
+                                    if (fileExists) {
+                                        viewModel.playLocalTrack(item, playlist)
+                                        scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                            showBottomSheet = false
+                                        }
+                                    } else {
+                                        Toast.makeText(context, "File [${item.rjid}] tidak ditemukan di memori HP.", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             )
@@ -457,53 +557,59 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 }
 
 @Composable
-fun PlaylistTrackCard(
+fun PlaylistItemCard(
+    modifier: Modifier = Modifier,
     item: HistoryEntity,
-    isCurrent: Boolean,
-    isFirst: Boolean,
-    isLast: Boolean,
-    onClick: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
-    onReorderSteps: (Int) -> Unit
+    isCurrentTrack: Boolean,
+    fileExists: Boolean,
+    isDragged: Boolean,
+    dragOffsetY: Float,
+    onDragHandleGesture: suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit,
+    onClick: () -> Unit
 ) {
-    var isDragging by remember { mutableStateOf(false) }
-    var dragOffsetAccumulator by remember { mutableFloatStateOf(0f) }
-    val stepThresholdPx = 100f
-
-    val scale by animateFloatAsState(targetValue = if (isDragging) 1.03f else 1.0f, label = "cardScale")
+    val scale by animateFloatAsState(if (isDragged) 1.04f else 1.0f, label = "scale")
+    val context = LocalContext.current
 
     Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isCurrent) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-            }
-        ),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .zIndex(if (isDragged) 100f else 1f)
+            .offset { IntOffset(0, if (isDragged) dragOffsetY.roundToInt() else 0) }
             .scale(scale)
             .shadow(
-                elevation = if (isDragging) 8.dp else 0.dp,
-                shape = RoundedCornerShape(14.dp)
+                elevation = if (isDragged) 16.dp else 0.dp,
+                shape = RoundedCornerShape(12.dp)
             )
-            .clickable { onClick() }
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                isDragged -> MaterialTheme.colorScheme.secondaryContainer
+                !fileExists -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            }
+        )
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
+            modifier = Modifier.padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val imageReq = remember(item.coverUrl) {
+                ImageRequest.Builder(context)
+                    .data(item.coverUrl)
+                    .memoryCacheKey(item.coverUrl)
+                    .crossfade(false)
+                    .build()
+            }
+
             AsyncImage(
-                model = item.coverUrl,
+                model = imageReq,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .size(54.dp, 40.dp)
+                    .clip(RoundedCornerShape(6.dp))
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -512,97 +618,65 @@ fun PlaylistTrackCard(
                 Text(
                     text = "[${item.rjid}] ${item.title}",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = when {
+                        !fileExists -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        isCurrentTrack -> MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
                 )
                 Text(
-                    text = "CV: ${item.cv}",
+                    text = if (fileExists) "CV: ${item.cv} \u2022 ${item.fileSize}" else "File belum diunduh / terhapus",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (fileExists) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            if (isCurrent) {
+            if (!fileExists) {
                 Icon(
-                    imageVector = Icons.Default.VolumeUp,
-                    contentDescription = "Sedang Diputar",
+                    Icons.Default.FileDownloadOff,
+                    contentDescription = "File Hilang",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                    modifier = Modifier.size(22.dp)
+                )
+            } else if (isCurrentTrack) {
+                Icon(
+                    Icons.Default.GraphicEq,
+                    contentDescription = "Playing",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .padding(end = 4.dp)
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            // Up / Down Quick Reordering Buttons
-            Column(
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                IconButton(
-                    onClick = onMoveUp,
-                    enabled = !isFirst,
-                    modifier = Modifier.size(22.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowUp,
-                        contentDescription = "Pindah Ke Atas",
-                        tint = if (!isFirst) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onMoveDown,
-                    enabled = !isLast,
-                    modifier = Modifier.size(22.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Pindah Ke Bawah",
-                        tint = if (!isLast) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.width(6.dp))
 
-            // Hold & Drag Handle
+            // Area Ikon Drag Handle Hamburger
             Box(
-                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(36.dp)
-                    .pointerInput(item.rjid) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = {
-                                isDragging = true
-                                dragOffsetAccumulator = 0f
-                            },
-                            onDragEnd = {
-                                isDragging = false
-                                dragOffsetAccumulator = 0f
-                            },
-                            onDragCancel = {
-                                isDragging = false
-                                dragOffsetAccumulator = 0f
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                dragOffsetAccumulator += dragAmount.y
-                                val steps = (dragOffsetAccumulator / stepThresholdPx).toInt()
-                                if (steps != 0) {
-                                    onReorderSteps(steps)
-                                    dragOffsetAccumulator -= (steps * stepThresholdPx)
-                                }
-                            }
-                        )
-                    }
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .pointerInput(item.rjid, onDragHandleGesture),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.DragHandle,
-                    contentDescription = "Tahan & Geser",
-                    tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    contentDescription = "Atur Urutan",
+                    tint = if (isDragged) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    },
                     modifier = Modifier.size(24.dp)
                 )
             }

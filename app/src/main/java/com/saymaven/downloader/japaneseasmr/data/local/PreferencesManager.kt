@@ -13,6 +13,8 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "us
 
 class PreferencesManager(private val context: Context) {
 
+    private val fastSp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+
     companion object {
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
@@ -24,8 +26,8 @@ class PreferencesManager(private val context: Context) {
         val KEY_SHOW_CONSOLE = booleanPreferencesKey("show_console")
 
         // Audio Player Settings
-        val KEY_AUDIO_FOCUS = booleanPreferencesKey("audio_focus")
         val KEY_EXCLUSIVE_USB_DAC = booleanPreferencesKey("exclusive_usb_dac")
+        val KEY_EXCLUSIVE_AUDIO_FOCUS = booleanPreferencesKey("exclusive_audio_focus")
         val KEY_PAUSE_ON_UNPLUG = booleanPreferencesKey("pause_on_unplug")
         val KEY_SKIP_SILENCE = booleanPreferencesKey("skip_silence")
         val KEY_KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
@@ -82,13 +84,15 @@ class PreferencesManager(private val context: Context) {
     }
 
     // Audio Player Settings Flows
-    val audioFocusFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[KEY_AUDIO_FOCUS] ?: true
-    }
-
     val exclusiveUsbDacFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_EXCLUSIVE_USB_DAC] ?: true
     }
+
+    val exclusiveAudioFocusFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_EXCLUSIVE_AUDIO_FOCUS] ?: true
+    }
+
+    val audioFocusFlow: Flow<Boolean> get() = exclusiveAudioFocusFlow
 
     val pauseOnUnplugFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_PAUSE_ON_UNPLUG] ?: true
@@ -174,17 +178,19 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
-    suspend fun setAudioFocus(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[KEY_AUDIO_FOCUS] = enabled
-        }
-    }
-
     suspend fun setExclusiveUsbDac(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_EXCLUSIVE_USB_DAC] = enabled
         }
     }
+
+    suspend fun setExclusiveAudioFocus(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_EXCLUSIVE_AUDIO_FOCUS] = enabled
+        }
+    }
+
+    suspend fun setAudioFocus(enabled: Boolean) = setExclusiveAudioFocus(enabled)
 
     suspend fun setPauseOnUnplug(enabled: Boolean) {
         context.dataStore.edit { preferences ->
@@ -205,8 +211,24 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setAutoResume(enabled: Boolean) {
+        fastSp.edit().putBoolean("setting_auto_resume", enabled).apply()
+        if (!enabled) {
+            fastSp.edit()
+                .remove("cached_rjid")
+                .remove("cached_title")
+                .remove("cached_artist")
+                .remove("cached_cover")
+                .remove("cached_pos")
+                .remove("cached_duration")
+                .remove("cached_specs")
+                .apply()
+        }
         context.dataStore.edit { preferences ->
             preferences[KEY_AUTO_RESUME] = enabled
+            if (!enabled) {
+                preferences.remove(KEY_LAST_PLAYED_RJID)
+                preferences.remove(KEY_LAST_POSITION_MS)
+            }
         }
     }
 
@@ -217,11 +239,14 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun savePlaybackState(rjid: String?, positionMs: Long, repeatMode: Int, shuffleMode: Boolean) {
-        context.dataStore.edit { preferences ->
-            if (rjid != null) preferences[KEY_LAST_PLAYED_RJID] = rjid
-            preferences[KEY_LAST_POSITION_MS] = positionMs
-            preferences[KEY_REPEAT_MODE] = repeatMode
-            preferences[KEY_SHUFFLE_MODE] = shuffleMode
+        val autoResume = fastSp.getBoolean("setting_auto_resume", true)
+        if (autoResume) {
+            context.dataStore.edit { preferences ->
+                if (rjid != null) preferences[KEY_LAST_PLAYED_RJID] = rjid
+                preferences[KEY_LAST_POSITION_MS] = positionMs
+                preferences[KEY_REPEAT_MODE] = repeatMode
+                preferences[KEY_SHUFFLE_MODE] = shuffleMode
+            }
         }
     }
 }
