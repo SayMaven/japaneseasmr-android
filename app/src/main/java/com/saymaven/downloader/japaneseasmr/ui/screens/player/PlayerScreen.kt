@@ -80,17 +80,20 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
     val effectivePosition = if (isSliderDragging) dragPosition else currentPosition
 
-    // Standard High-Performance Drag-to-Reorder States
+    // Standard High-Performance Drag-to-Reorder States using unique draggedRjid
     val listState = rememberLazyListState()
-    var draggedIndex by remember { mutableStateOf<Int?>(null) }
+    var draggedRjid by remember { mutableStateOf<String?>(null) }
     var dragAccumulatedY by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     val slotHeightPx = remember(density) { with(density) { 74.dp.toPx() } }
 
-    // Controlled Gentle Auto-Scroll only when held at the very edge (<42dp from boundary)
-    LaunchedEffect(draggedIndex) {
-        while (isActive && draggedIndex != null) {
-            val curIdx = draggedIndex ?: break
+    // Controlled Gentle Auto-Scroll only when held at the very edge (<44dp from boundary)
+    LaunchedEffect(draggedRjid) {
+        while (isActive && draggedRjid != null) {
+            val targetRjid = draggedRjid ?: break
+            val curIdx = playlist.indexOfFirst { it.rjid == targetRjid }
+            if (curIdx == -1) break
+
             val visibleInfo = listState.layoutInfo.visibleItemsInfo
             val itemInfo = visibleInfo.firstOrNull { it.index == curIdx }
 
@@ -104,14 +107,12 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     listState.scrollBy(-12f)
                     if (curIdx > 0 && dragAccumulatedY < -slotHeightPx * 0.4f) {
                         viewModel.reorderPlaylistInMemory(curIdx, curIdx - 1)
-                        draggedIndex = curIdx - 1
                         dragAccumulatedY += slotHeightPx
                     }
                 } else if (itemBottom > viewportHeight - edgeZone && listState.canScrollForward) {
                     listState.scrollBy(12f)
                     if (curIdx < playlist.size - 1 && dragAccumulatedY > slotHeightPx * 0.4f) {
                         viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
-                        draggedIndex = curIdx + 1
                         dragAccumulatedY -= slotHeightPx
                     }
                 }
@@ -159,7 +160,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Big Center Cover Art (0ms Instant Image with RAM cache preloaded)
+            // Big Center Cover Art (Instant display from preloaded memory cache)
             Card(
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
@@ -167,11 +168,12 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     .size(260.dp)
                     .aspectRatio(1f)
             ) {
-                if (!currentCoverUrl.isNullOrBlank()) {
-                    val imageRequest = remember(currentCoverUrl) {
+                val cover = currentCoverUrl
+                if (!cover.isNullOrBlank()) {
+                    val imageRequest = remember(cover) {
                         ImageRequest.Builder(context)
-                            .data(currentCoverUrl)
-                            .memoryCacheKey(currentCoverUrl)
+                            .data(cover)
+                            .memoryCacheKey(cover)
                             .crossfade(false)
                             .build()
                     }
@@ -486,10 +488,10 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(top = 10.dp, bottom = 52.dp)
                     ) {
-                        itemsIndexed(playlist, key = { _, item -> item.rjid }) { index, item ->
+                        itemsIndexed(playlist, key = { _, item -> item.rjid }) { _, item ->
                             val fileExists = fileExistenceMap[item.rjid] ?: true
-                            val isCurrentTrack = item.rjid == currentRjId
-                            val isDragged = draggedIndex == index
+                            val isCurrentTrack = (item.rjid == currentRjId)
+                            val isDragged = (draggedRjid == item.rjid)
 
                             PlaylistItemCard(
                                 modifier = Modifier.animateItemPlacement(
@@ -500,40 +502,34 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 fileExists = fileExists,
                                 isDragged = isDragged,
                                 dragOffsetY = if (isDragged) dragAccumulatedY else 0f,
-                                onDragHandleGesture = {
-                                    detectVerticalDragGestures(
-                                        onDragStart = {
-                                            draggedIndex = index
-                                            dragAccumulatedY = 0f
-                                        },
-                                        onVerticalDrag = { change, dragAmount ->
-                                            change.consume()
-                                            dragAccumulatedY += dragAmount
+                                onDragStart = { rjid ->
+                                    val currentIdx = playlist.indexOfFirst { it.rjid == rjid }
+                                    if (currentIdx != -1) {
+                                        draggedRjid = rjid
+                                        dragAccumulatedY = 0f
+                                    }
+                                },
+                                onDrag = { dragAmount ->
+                                    dragAccumulatedY += dragAmount
 
-                                            val curIdx = draggedIndex ?: return@detectVerticalDragGestures
-                                            val threshold = slotHeightPx * 0.48f
+                                    val targetRjid = draggedRjid ?: return@PlaylistItemCard
+                                    val curIdx = playlist.indexOfFirst { it.rjid == targetRjid }
+                                    if (curIdx == -1) return@PlaylistItemCard
 
-                                            if (dragAccumulatedY > threshold && curIdx < playlist.size - 1) {
-                                                viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
-                                                draggedIndex = curIdx + 1
-                                                dragAccumulatedY -= slotHeightPx
-                                            } else if (dragAccumulatedY < -threshold && curIdx > 0) {
-                                                viewModel.reorderPlaylistInMemory(curIdx, curIdx - 1)
-                                                draggedIndex = curIdx - 1
-                                                dragAccumulatedY += slotHeightPx
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            viewModel.commitPlaylistReorder()
-                                            draggedIndex = null
-                                            dragAccumulatedY = 0f
-                                        },
-                                        onDragCancel = {
-                                            viewModel.commitPlaylistReorder()
-                                            draggedIndex = null
-                                            dragAccumulatedY = 0f
-                                        }
-                                    )
+                                    val threshold = slotHeightPx * 0.48f
+
+                                    if (dragAccumulatedY > threshold && curIdx < playlist.size - 1) {
+                                        viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
+                                        dragAccumulatedY -= slotHeightPx
+                                    } else if (dragAccumulatedY < -threshold && curIdx > 0) {
+                                        viewModel.reorderPlaylistInMemory(curIdx, curIdx - 1)
+                                        dragAccumulatedY += slotHeightPx
+                                    }
+                                },
+                                onDragEnd = {
+                                    viewModel.commitPlaylistReorder()
+                                    draggedRjid = null
+                                    dragAccumulatedY = 0f
                                 },
                                 onClick = {
                                     if (fileExists) {
@@ -562,10 +558,16 @@ fun PlaylistItemCard(
     fileExists: Boolean,
     isDragged: Boolean,
     dragOffsetY: Float,
-    onDragHandleGesture: suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit,
+    onDragStart: (String) -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+    val currentRjid by rememberUpdatedState(item.rjid)
 
     Card(
         modifier = modifier
@@ -595,22 +597,39 @@ fun PlaylistItemCard(
             modifier = Modifier.padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val imageReq = remember(item.coverUrl) {
-                ImageRequest.Builder(context)
-                    .data(item.coverUrl)
-                    .memoryCacheKey(item.coverUrl)
-                    .crossfade(false)
-                    .build()
+            val cover = item.coverUrl
+            if (!cover.isNullOrBlank()) {
+                val imageReq = remember(cover) {
+                    ImageRequest.Builder(context)
+                        .data(cover)
+                        .memoryCacheKey(cover)
+                        .crossfade(false)
+                        .build()
+                }
+                AsyncImage(
+                    model = imageReq,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(54.dp, 40.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(54.dp, 40.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
-
-            AsyncImage(
-                model = imageReq,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(54.dp, 40.dp)
-                    .clip(RoundedCornerShape(6.dp))
-            )
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -661,12 +680,22 @@ fun PlaylistItemCard(
 
             Spacer(modifier = Modifier.width(6.dp))
 
-            // Area Ikon Drag Handle Hamburger
+            // Dedicated Drag Handle Touch Target (pointerInput with rememberUpdatedState)
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
-                    .pointerInput(item.rjid, onDragHandleGesture),
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragStart = { currentOnDragStart(currentRjid) },
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                currentOnDrag(dragAmount)
+                            },
+                            onDragEnd = { currentOnDragEnd() },
+                            onDragCancel = { currentOnDragEnd() }
+                        )
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(

@@ -54,13 +54,13 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
         return ImageLoader.Builder(this)
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.25)
+                    .maxSizePercent(0.35)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.05)
+                    .maxSizePercent(0.10)
                     .build()
             }
             .okHttpClient {
@@ -74,7 +74,7 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
                     }
                     .build()
             }
-            .crossfade(true)
+            .crossfade(false)
             .build()
     }
 }

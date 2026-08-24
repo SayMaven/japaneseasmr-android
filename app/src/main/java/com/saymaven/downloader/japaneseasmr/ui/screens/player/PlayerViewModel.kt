@@ -105,7 +105,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var progressJob: Job? = null
 
     init {
-        preloadCoverArtInMemory(_currentCoverUrl.value)
+        val initialCover = _currentCoverUrl.value
+        if (!initialCover.isNullOrBlank()) {
+            preloadCoverArtInMemory(initialCover)
+        }
         initMediaController()
         observeDatabasePlaylist()
         restorePlaybackState()
@@ -114,12 +117,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun preloadCoverArtInMemory(url: String?) {
         if (!url.isNullOrBlank()) {
-            val req = ImageRequest.Builder(getApplication())
-                .data(url)
-                .memoryCacheKey(url)
-                .allowHardware(true)
-                .build()
-            Coil.imageLoader(getApplication()).enqueue(req)
+            try {
+                val req = ImageRequest.Builder(getApplication())
+                    .data(url)
+                    .memoryCacheKey(url)
+                    .crossfade(false)
+                    .build()
+                Coil.imageLoader(getApplication()).enqueue(req)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -146,7 +153,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 // Update file existence map in background (IO thread)
                 withContext(Dispatchers.IO) {
-                    val map = sorted.associate { it.rjid to File(it.localFilePath).exists() }
+                    val map = sorted.associate { item ->
+                        val path = item.localFilePath
+                        item.rjid to (!path.isNullOrBlank() && File(path).exists())
+                    }
                     _fileExistenceMap.value = map
                 }
 
@@ -176,7 +186,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // Persist reorder to disk & ExoPlayer only once when drag gesture finishes
+    // Persist reorder to disk only once when drag gesture finishes
     fun commitPlaylistReorder() {
         val current = _playlist.value
         if (current.isNotEmpty()) {
@@ -184,16 +194,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             viewModelScope.launch(Dispatchers.IO) {
                 val str = rjidList.joinToString(",")
                 sp.edit().putString("custom_playlist_order", str).commit()
-            }
-
-            player?.let { p ->
-                if (p.mediaItemCount == current.size) {
-                    try {
-                        // Re-sync media items order if needed
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
             }
         }
     }
@@ -327,7 +327,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     .setTitle("[${item.rjid}] ${item.title}")
                     .setArtist(item.cv)
                     .setAlbumTitle(item.circle)
-                    .setArtworkUri(Uri.parse(item.coverUrl))
+                    .setArtworkUri(Uri.parse(item.coverUrl ?: ""))
 
                 if (coverBytes != null && item.rjid == targetPair.first.rjid) {
                     metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
@@ -497,7 +497,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     .setTitle("[${item.rjid}] ${item.title}")
                     .setArtist(item.cv)
                     .setAlbumTitle(item.circle)
-                    .setArtworkUri(Uri.parse(item.coverUrl))
+                    .setArtworkUri(Uri.parse(item.coverUrl ?: ""))
 
                 if (coverBytes != null && item.rjid == targetPair.first.rjid) {
                     metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
@@ -525,7 +525,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun loadArtworkBytes(localFilePath: String?, coverUrl: String?): ByteArray? = withContext(Dispatchers.IO) {
         try {
-            if (localFilePath != null) {
+            if (!localFilePath.isNullOrBlank()) {
                 val f = File(localFilePath)
                 if (f.exists()) {
                     val retriever = MediaMetadataRetriever()
@@ -573,7 +573,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 .setTitle("[${meta.rjid}] ${meta.title}")
                 .setArtist(meta.cv)
                 .setAlbumTitle(meta.circle)
-                .setArtworkUri(Uri.parse(meta.coverUrl))
+                .setArtworkUri(Uri.parse(meta.coverUrl ?: ""))
 
             if (coverBytes != null) {
                 metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)

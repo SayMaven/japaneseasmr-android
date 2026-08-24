@@ -1,6 +1,7 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.history
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import java.io.File
 
@@ -34,14 +36,19 @@ fun HistoryScreen(
 
     var itemToDelete by remember { mutableStateOf<HistoryEntity?>(null) }
     var showMenu by remember { mutableStateOf(false) }
-    val hasMissingFiles = remember(historyList) { historyList.any { !File(it.localFilePath).exists() } }
+    val hasMissingFiles = remember(historyList) {
+        historyList.any { item ->
+            val path = item.localFilePath
+            path.isNullOrBlank() || !File(path).exists()
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Clean Header with Overflow Menu (Fixes all text wrapping/squishing bugs)
+        // Clean Header with Overflow Menu
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -127,36 +134,161 @@ fun HistoryScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(historyList) { item ->
-                    val fileExists = remember(item.localFilePath) { File(item.localFilePath).exists() }
-                    HistoryItemCard(
-                        item = item,
-                        fileExists = fileExists,
-                        onPlay = {
-                            if (fileExists) {
-                                onPlayTrack(item)
+                items(historyList, key = { it.rjid }) { item ->
+                    val isPresent = remember(item.localFilePath) { viewModel.isFilePresent(item) }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (isPresent) {
+                                    onPlayTrack(item)
+                                } else {
+                                    Toast.makeText(context, "File audio tidak ditemukan. Silakan unduh ulang.", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isPresent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(12.dp)
+                                .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val coverUrl = item.coverUrl
+                            if (!coverUrl.isNullOrBlank()) {
+                                val imageReq = remember(coverUrl) {
+                                    ImageRequest.Builder(context)
+                                        .data(coverUrl)
+                                        .memoryCacheKey(coverUrl)
+                                        .crossfade(false)
+                                        .build()
+                                }
+                                AsyncImage(
+                                    model = imageReq,
+                                    contentDescription = "Cover",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(70.dp, 52.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
                             } else {
-                                onRedownload(item)
+                                Box(
+                                    modifier = Modifier
+                                        .size(70.dp, 52.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                                }
                             }
-                        },
-                        onRedownload = { onRedownload(item) },
-                        onDelete = { itemToDelete = item }
-                    )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "[${item.rjid}] ${item.title}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = if (isPresent) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                                Text(
+                                    text = "CV: ${item.cv} \u2022 ${item.circle}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = if (isPresent) "${item.downloadDate} \u2022 ${item.fileSize}" else "File belum diunduh / hilang",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isPresent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Row {
+                                if (isPresent) {
+                                    IconButton(onClick = { onPlayTrack(item) }) {
+                                        Icon(
+                                            Icons.Default.PlayArrow,
+                                            contentDescription = "Putar",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                } else {
+                                    IconButton(onClick = { onRedownload(item) }) {
+                                        Icon(
+                                            Icons.Default.Download,
+                                            contentDescription = "Unduh Ulang",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+
+                                IconButton(onClick = { itemToDelete = item }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Hapus Riwayat",
+                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    if (itemToDelete != null) {
+    itemToDelete?.let { item ->
+        val fileExists = remember(item.localFilePath) {
+            val path = item.localFilePath
+            !path.isNullOrBlank() && File(path).exists()
+        }
+        var alsoDeleteLocalFile by remember { mutableStateOf(false) }
+
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
-            title = { Text("Hapus dari Riwayat?") },
-            text = { Text("Apakah Anda ingin menghapus [${itemToDelete!!.rjid}] ${itemToDelete!!.title} dari riwayat?") },
+            title = { Text("Hapus Riwayat") },
+            text = {
+                Column {
+                    Text("Hapus [${item.rjid}] ${item.title} dari riwayat koleksi?")
+                    if (fileExists) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { alsoDeleteLocalFile = !alsoDeleteLocalFile }
+                        ) {
+                            Checkbox(
+                                checked = alsoDeleteLocalFile,
+                                onCheckedChange = { alsoDeleteLocalFile = it }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Hapus juga file audio dari memori HP", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.deleteHistory(itemToDelete!!, deleteFile = true)
-                    itemToDelete = null
-                }) {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteHistory(item, deleteFile = alsoDeleteLocalFile)
+                        itemToDelete = null
+                        Toast.makeText(context, "Riwayat dihapus", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
                     Text("Hapus", color = MaterialTheme.colorScheme.error)
                 }
             },
@@ -166,92 +298,5 @@ fun HistoryScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-fun HistoryItemCard(
-    item: HistoryEntity,
-    fileExists: Boolean,
-    onPlay: () -> Unit,
-    onRedownload: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onPlay() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (fileExists) MaterialTheme.colorScheme.surface
-            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = item.coverUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(64.dp, 48.dp)
-                    .clip(RoundedCornerShape(6.dp))
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "[${item.rjid}] ${item.title}",
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = if (fileExists) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-                Text(
-                    text = "CV: ${item.cv} • ${item.circle}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = if (fileExists) "${item.fileSize} • ${item.downloadDate}" else "File belum diunduh / terhapus",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (fileExists) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
-                )
-            }
-
-            if (fileExists) {
-                IconButton(onClick = onPlay) {
-                    Icon(
-                        Icons.Default.PlayCircle,
-                        contentDescription = "Play",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            } else {
-                // Download Again Button
-                IconButton(onClick = onRedownload) {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = "Unduh Lagi",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
     }
 }

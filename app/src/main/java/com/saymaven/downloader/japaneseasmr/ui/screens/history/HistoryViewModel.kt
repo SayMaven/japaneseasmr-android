@@ -4,6 +4,8 @@ import android.app.Application
 import android.media.MediaMetadataRetriever
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import coil.Coil
+import coil.request.ImageRequest
 import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
@@ -34,6 +36,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         syncStorageWithDatabase()
+        preloadHistoryCovers()
     }
 
     val historyList = _searchQuery.flatMapLatest { query ->
@@ -44,9 +47,28 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /**
-     * Memindai folder unduhan dan otomatis memulihkan seluruh riwayat audio yang ada di penyimpanan HP.
-     */
+    private fun preloadHistoryCovers() {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.getAllHistory().collect { list ->
+                list.take(40).forEach { item ->
+                    val url = item.coverUrl
+                    if (!url.isNullOrBlank()) {
+                        try {
+                            val req = ImageRequest.Builder(getApplication())
+                                .data(url)
+                                .memoryCacheKey(url)
+                                .crossfade(false)
+                                .build()
+                            Coil.imageLoader(getApplication()).enqueue(req)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fun syncStorageWithDatabase() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -83,7 +105,8 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                         }
 
                         val coverFile = File(downloadDir, "${rjid}_cover.jpg")
-                        val coverUrl = if (coverFile.exists()) coverFile.absolutePath else "https://img.dlsite.jp/modpub/images2/work/doujin/${rjid.substring(0, 2)}0000/${rjid}_img_main.jpg"
+                        val prefix = if (rjid.length >= 2) rjid.substring(0, 2) else "RJ"
+                        val coverUrl = if (coverFile.exists()) coverFile.absolutePath else "https://img.dlsite.jp/modpub/images2/work/doujin/${prefix}0000/${rjid}_img_main.jpg"
 
                         val restored = HistoryEntity(
                             rjid = rjid,
@@ -99,7 +122,6 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                         )
                         dao.insertHistory(restored)
 
-                        // Update metadata scraper di background
                         launch {
                             try {
                                 val meta = DLsiteScraper.fetchMetadata(rjid)
@@ -128,8 +150,11 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun isFilePresent(item: HistoryEntity): Boolean {
-        val direct = File(item.localFilePath)
-        if (direct.exists() && direct.length() > 0) return true
+        val path = item.localFilePath
+        if (!path.isNullOrBlank()) {
+            val direct = File(path)
+            if (direct.exists() && direct.length() > 0) return true
+        }
         val defaultDir = DownloadService.getDefaultDownloadDirectory()
         return AudioStorageHelper.findExistingAudioFile(defaultDir, item.rjid) != null
     }
@@ -137,11 +162,14 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     fun deleteHistory(item: HistoryEntity, deleteFile: Boolean = false) {
         viewModelScope.launch {
             if (deleteFile) {
-                try {
-                    val file = File(item.localFilePath)
-                    if (file.exists()) file.delete()
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                val path = item.localFilePath
+                if (!path.isNullOrBlank()) {
+                    try {
+                        val file = File(path)
+                        if (file.exists()) file.delete()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             }
             dao.deleteHistory(item)
