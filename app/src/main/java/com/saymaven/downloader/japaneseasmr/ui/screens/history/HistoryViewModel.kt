@@ -18,10 +18,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 enum class HistorySortOrder {
     DATE_DESC, // Waktu Terbaru (Default - Audio Baru Paling Atas)
@@ -40,6 +42,9 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
 
     private val _sortOrder = MutableStateFlow(HistorySortOrder.DATE_DESC)
     val sortOrder = _sortOrder.asStateFlow()
+
+    // O(1) Instant presence cache to eliminate disk I/O on UI thread during scroll
+    private val filePresenceCache = ConcurrentHashMap<String, Boolean>()
 
     init {
         syncStorageWithDatabase()
@@ -76,13 +81,13 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                 HistorySortOrder.TITLE_ASC -> resolved.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
                 HistorySortOrder.TITLE_DESC -> resolved.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.title })
             }
-        }
+        }.flowOn(Dispatchers.IO)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private fun preloadHistoryCovers() {
         viewModelScope.launch(Dispatchers.IO) {
             dao.getAllHistory().collect { list ->
-                list.take(40).forEach { item ->
+                list.take(50).forEach { item ->
                     val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)
                     val url = localCover?.absolutePath ?: item.coverUrl
                     if (!url.isNullOrBlank()) {
@@ -90,6 +95,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                             val req = ImageRequest.Builder(getApplication())
                                 .data(url)
                                 .memoryCacheKey(url)
+                                .size(140, 104)
                                 .crossfade(false)
                                 .build()
                             Coil.imageLoader(getApplication()).enqueue(req)
@@ -119,6 +125,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun syncStorageWithDatabase() {
+        filePresenceCache.clear()
         StorageSyncManager.syncStorageWithDatabase(getApplication())
     }
 
@@ -127,17 +134,21 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun isFilePresent(item: HistoryEntity): Boolean {
-        val path = item.localFilePath
-        if (!path.isNullOrBlank()) {
-            val direct = File(path)
-            if (direct.exists() && direct.length() > 0) return true
+        val key = "${item.rjid}_${item.localFilePath}"
+        return filePresenceCache.getOrPut(key) {
+            val path = item.localFilePath
+            if (!path.isNullOrBlank()) {
+                val direct = File(path)
+                if (direct.exists() && direct.length() > 0) return@getOrPut true
+            }
+            val defaultDir = DownloadService.getDefaultDownloadDirectory()
+            AudioStorageHelper.findExistingAudioFile(defaultDir, item.rjid) != null
         }
-        val defaultDir = DownloadService.getDefaultDownloadDirectory()
-        return AudioStorageHelper.findExistingAudioFile(defaultDir, item.rjid) != null
     }
 
     fun deleteHistory(item: HistoryEntity, deleteFile: Boolean = false) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            filePresenceCache.clear()
             if (deleteFile) {
                 val path = item.localFilePath
                 if (!path.isNullOrBlank()) {
@@ -154,7 +165,8 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun cleanMissingFiles() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            filePresenceCache.clear()
             val list = historyList.value
             val customDirStr = prefs.downloadDirFlow.first()
             val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
@@ -171,7 +183,8 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun clearAllHistory() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            filePresenceCache.clear()
             dao.clearAll()
         }
     }

@@ -603,6 +603,7 @@ fun PlaylistItemCard(
                     ImageRequest.Builder(context)
                         .data(cover)
                         .memoryCacheKey(cover)
+                        .size(120, 90) // Exact thumbnail resolution
                         .crossfade(false)
                         .build()
                 }
@@ -720,20 +721,24 @@ fun AnimatedEqualizerWave(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
+    val barColor = color
     if (!isPlaying) {
-        Row(
-            modifier = modifier.size(width = 22.dp, height = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        androidx.compose.foundation.Canvas(modifier = modifier.size(width = 22.dp, height = 18.dp)) {
+            val totalWidth = size.width
+            val totalHeight = size.height
+            val barWidth = 3.dp.toPx()
+            val spacing = (totalWidth - (4 * barWidth)) / 3
             val staticHeights = listOf(0.35f, 0.6f, 0.45f, 0.7f)
-            staticHeights.forEach { h ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(h)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(color.copy(alpha = 0.6f))
+
+            staticHeights.forEachIndexed { i, hFraction ->
+                val barHeight = totalHeight * hFraction
+                val left = i * (barWidth + spacing)
+                val top = (totalHeight - barHeight) / 2
+                drawRoundRect(
+                    color = barColor.copy(alpha = 0.6f),
+                    topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                    size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
                 )
             }
         }
@@ -777,19 +782,22 @@ fun AnimatedEqualizerWave(
             label = "bar4"
         )
 
-        Row(
-            modifier = modifier.size(width = 22.dp, height = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val animHeights: List<Float> = listOf(anim1, anim2, anim3, anim4)
-            animHeights.forEach { h ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(h)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(color)
+        androidx.compose.foundation.Canvas(modifier = modifier.size(width = 22.dp, height = 18.dp)) {
+            val totalWidth = size.width
+            val totalHeight = size.height
+            val barWidth = 3.dp.toPx()
+            val spacing = (totalWidth - (4 * barWidth)) / 3
+            val animHeights = listOf(anim1, anim2, anim3, anim4)
+
+            animHeights.forEachIndexed { i, hFraction ->
+                val barHeight = totalHeight * hFraction
+                val left = i * (barWidth + spacing)
+                val top = (totalHeight - barHeight) / 2
+                drawRoundRect(
+                    color = barColor,
+                    topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                    size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
                 )
             }
         }
