@@ -3,7 +3,7 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.player
 import android.app.Activity
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,8 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -32,7 +31,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.media3.common.Player
@@ -42,9 +40,7 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.File
 import java.util.Locale
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -61,6 +57,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val repeatMode by viewModel.repeatMode.collectAsState()
     val shuffleMode by viewModel.shuffleMode.collectAsState()
     val playlist by viewModel.playlist.collectAsState()
+    val fileExistenceMap by viewModel.fileExistenceMap.collectAsState()
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
     val dacState by viewModel.dacState.collectAsState()
     val audioSpecs by viewModel.audioSpecs.collectAsState()
@@ -83,7 +80,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
     val effectivePosition = if (isSliderDragging) dragPosition else currentPosition
 
-    // Standard Smooth Drag-to-Reorder States
+    // Standard High-Performance Drag-to-Reorder States
     val listState = rememberLazyListState()
     var draggedIndex by remember { mutableStateOf<Int?>(null) }
     var dragAccumulatedY by remember { mutableFloatStateOf(0f) }
@@ -101,25 +98,25 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 val itemTop = itemInfo.offset + dragAccumulatedY
                 val itemBottom = itemTop + itemInfo.size
                 val viewportHeight = listState.layoutInfo.viewportSize.height.toFloat()
-                val edgeZone = with(density) { 42.dp.toPx() }
+                val edgeZone = with(density) { 44.dp.toPx() }
 
                 if (itemTop < edgeZone && listState.canScrollBackward) {
                     listState.scrollBy(-12f)
-                    if (curIdx > 0 && dragAccumulatedY < -slotHeightPx * 0.5f) {
-                        viewModel.reorderPlaylist(curIdx, curIdx - 1)
+                    if (curIdx > 0 && dragAccumulatedY < -slotHeightPx * 0.4f) {
+                        viewModel.reorderPlaylistInMemory(curIdx, curIdx - 1)
                         draggedIndex = curIdx - 1
                         dragAccumulatedY += slotHeightPx
                     }
                 } else if (itemBottom > viewportHeight - edgeZone && listState.canScrollForward) {
                     listState.scrollBy(12f)
-                    if (curIdx < playlist.size - 1 && dragAccumulatedY > slotHeightPx * 0.5f) {
-                        viewModel.reorderPlaylist(curIdx, curIdx + 1)
+                    if (curIdx < playlist.size - 1 && dragAccumulatedY > slotHeightPx * 0.4f) {
+                        viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
                         draggedIndex = curIdx + 1
                         dragAccumulatedY -= slotHeightPx
                     }
                 }
             }
-            delay(18)
+            delay(16)
         }
     }
 
@@ -490,12 +487,14 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         contentPadding = PaddingValues(top = 10.dp, bottom = 52.dp)
                     ) {
                         itemsIndexed(playlist, key = { _, item -> item.rjid }) { index, item ->
-                            val fileExists = remember(item.localFilePath) { File(item.localFilePath).exists() }
+                            val fileExists = fileExistenceMap[item.rjid] ?: true
                             val isCurrentTrack = item.rjid == currentRjId
                             val isDragged = draggedIndex == index
 
                             PlaylistItemCard(
-                                modifier = Modifier.animateItemPlacement(),
+                                modifier = Modifier.animateItemPlacement(
+                                    animationSpec = spring(stiffness = 800f)
+                                ),
                                 item = item,
                                 isCurrentTrack = isCurrentTrack,
                                 fileExists = fileExists,
@@ -504,34 +503,33 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 onDragHandleGesture = {
                                     detectVerticalDragGestures(
                                         onDragStart = {
-                                            val realIdx = playlist.indexOfFirst { it.rjid == item.rjid }
-                                            if (realIdx != -1) {
-                                                draggedIndex = realIdx
-                                                dragAccumulatedY = 0f
-                                            }
+                                            draggedIndex = index
+                                            dragAccumulatedY = 0f
                                         },
                                         onVerticalDrag = { change, dragAmount ->
                                             change.consume()
                                             dragAccumulatedY += dragAmount
 
                                             val curIdx = draggedIndex ?: return@detectVerticalDragGestures
-                                            val threshold = slotHeightPx * 0.55f
+                                            val threshold = slotHeightPx * 0.48f
 
                                             if (dragAccumulatedY > threshold && curIdx < playlist.size - 1) {
-                                                viewModel.reorderPlaylist(curIdx, curIdx + 1)
+                                                viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
                                                 draggedIndex = curIdx + 1
                                                 dragAccumulatedY -= slotHeightPx
                                             } else if (dragAccumulatedY < -threshold && curIdx > 0) {
-                                                viewModel.reorderPlaylist(curIdx, curIdx - 1)
+                                                viewModel.reorderPlaylistInMemory(curIdx, curIdx - 1)
                                                 draggedIndex = curIdx - 1
                                                 dragAccumulatedY += slotHeightPx
                                             }
                                         },
                                         onDragEnd = {
+                                            viewModel.commitPlaylistReorder()
                                             draggedIndex = null
                                             dragAccumulatedY = 0f
                                         },
                                         onDragCancel = {
+                                            viewModel.commitPlaylistReorder()
                                             draggedIndex = null
                                             dragAccumulatedY = 0f
                                         }
@@ -567,19 +565,21 @@ fun PlaylistItemCard(
     onDragHandleGesture: suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit,
     onClick: () -> Unit
 ) {
-    val scale by animateFloatAsState(if (isDragged) 1.04f else 1.0f, label = "scale")
     val context = LocalContext.current
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .zIndex(if (isDragged) 100f else 1f)
-            .offset { IntOffset(0, if (isDragged) dragOffsetY.roundToInt() else 0) }
-            .scale(scale)
-            .shadow(
-                elevation = if (isDragged) 16.dp else 0.dp,
+            .graphicsLayer {
+                translationY = if (isDragged) dragOffsetY else 0f
+                val s = if (isDragged) 1.03f else 1.0f
+                scaleX = s
+                scaleY = s
+                shadowElevation = if (isDragged) 30f else 0f
                 shape = RoundedCornerShape(12.dp)
-            )
+                clip = false
+            }
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
