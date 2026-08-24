@@ -15,12 +15,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+
+enum class HistorySortOrder {
+    DATE_DESC, // Waktu Terbaru (Default)
+    DATE_ASC,  // Waktu Terlama
+    TITLE_ASC, // Nama A - Z
+    TITLE_DESC // Nama Z - A
+}
 
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -30,25 +38,37 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
+    private val _sortOrder = MutableStateFlow(HistorySortOrder.DATE_DESC)
+    val sortOrder = _sortOrder.asStateFlow()
+
     init {
         syncStorageWithDatabase()
         preloadHistoryCovers()
     }
 
-    val historyList = _searchQuery.flatMapLatest { query ->
+    val historyList = combine(_searchQuery, _sortOrder) { query, order ->
+        Pair(query, order)
+    }.flatMapLatest { (query, order) ->
         val flow = if (query.isBlank()) {
             dao.getAllHistory()
         } else {
             dao.searchHistory(query)
         }
         flow.map { list ->
-            list.map { item ->
+            val resolved = list.map { item ->
                 val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)
                 if (localCover != null && localCover.exists()) {
                     item.copy(coverUrl = localCover.absolutePath)
                 } else {
                     item
                 }
+            }
+
+            when (order) {
+                HistorySortOrder.DATE_DESC -> resolved
+                HistorySortOrder.DATE_ASC -> resolved.reversed()
+                HistorySortOrder.TITLE_ASC -> resolved.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+                HistorySortOrder.TITLE_DESC -> resolved.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.title })
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -73,6 +93,22 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
             }
+        }
+    }
+
+    fun toggleSortByDate() {
+        _sortOrder.value = if (_sortOrder.value == HistorySortOrder.DATE_DESC) {
+            HistorySortOrder.DATE_ASC
+        } else {
+            HistorySortOrder.DATE_DESC
+        }
+    }
+
+    fun toggleSortByTitle() {
+        _sortOrder.value = if (_sortOrder.value == HistorySortOrder.TITLE_ASC) {
+            HistorySortOrder.TITLE_DESC
+        } else {
+            HistorySortOrder.TITLE_ASC
         }
     }
 

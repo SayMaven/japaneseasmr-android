@@ -18,7 +18,7 @@ import androidx.core.view.WindowCompat
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 
-private val DefaultDarkScheme = darkColorScheme(
+private val BaseDarkScheme = darkColorScheme(
     primary = DarkPrimary,
     onPrimary = DarkOnPrimary,
     secondary = DarkSecondary,
@@ -34,7 +34,7 @@ private val DefaultDarkScheme = darkColorScheme(
     error = DarkError
 )
 
-private val DefaultLightScheme = lightColorScheme(
+private val BaseLightScheme = lightColorScheme(
     primary = LightPrimary,
     onPrimary = LightOnPrimary,
     secondary = LightSecondary,
@@ -51,28 +51,23 @@ private val DefaultLightScheme = lightColorScheme(
 )
 
 private fun getPaletteColorScheme(palette: ColorPalette, darkTheme: Boolean): ColorScheme {
-    return when (palette) {
-        ColorPalette.SAKURA -> if (darkTheme) {
-            DefaultDarkScheme.copy(primary = SakuraPrimary, background = SakuraDarkBackground, surface = SakuraDarkSurface)
-        } else {
-            DefaultLightScheme.copy(primary = SakuraPrimary)
-        }
-        ColorPalette.OCEAN -> if (darkTheme) {
-            DefaultDarkScheme.copy(primary = OceanPrimary, background = OceanDarkBackground, surface = OceanDarkSurface)
-        } else {
-            DefaultLightScheme.copy(primary = OceanPrimary)
-        }
-        ColorPalette.PURPLE -> if (darkTheme) {
-            DefaultDarkScheme.copy(primary = PurplePrimary, background = PurpleDarkBackground, surface = PurpleDarkSurface)
-        } else {
-            DefaultLightScheme.copy(primary = PurplePrimary)
-        }
-        ColorPalette.EMERALD -> if (darkTheme) {
-            DefaultDarkScheme.copy(primary = EmeraldPrimary, background = EmeraldDarkBackground, surface = EmeraldDarkSurface)
-        } else {
-            DefaultLightScheme.copy(primary = EmeraldPrimary)
-        }
-        ColorPalette.DEFAULT -> if (darkTheme) DefaultDarkScheme else DefaultLightScheme
+    return if (darkTheme) {
+        BaseDarkScheme.copy(
+            primary = palette.primary,
+            secondary = palette.secondary,
+            tertiary = palette.tertiary,
+            background = palette.darkBackground,
+            surface = palette.darkSurface,
+            surfaceVariant = palette.darkSurface.copy(alpha = 0.9f)
+        )
+    } else {
+        BaseLightScheme.copy(
+            primary = palette.primary,
+            secondary = palette.secondary,
+            tertiary = palette.tertiary,
+            background = palette.lightBackground,
+            surface = palette.lightSurface
+        )
     }
 }
 

@@ -24,6 +24,7 @@ import coil.request.ImageRequest
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import java.io.File
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel,
@@ -33,6 +34,7 @@ fun HistoryScreen(
     val context = LocalContext.current
     val historyList by viewModel.historyList.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val sortOrder by viewModel.sortOrder.collectAsState()
 
     var itemToDelete by remember { mutableStateOf<HistoryEntity?>(null) }
     var showMenu by remember { mutableStateOf(false) }
@@ -114,7 +116,57 @@ fun HistoryScreen(
             singleLine = true
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Sorting Filter Chips Row (Waktu & Nama with Asc/Desc toggle)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val isDateActive = (sortOrder == HistorySortOrder.DATE_DESC || sortOrder == HistorySortOrder.DATE_ASC)
+            val isTitleActive = (sortOrder == HistorySortOrder.TITLE_ASC || sortOrder == HistorySortOrder.TITLE_DESC)
+
+            FilterChip(
+                selected = isDateActive,
+                onClick = { viewModel.toggleSortByDate() },
+                label = {
+                    Text(
+                        text = if (sortOrder == HistorySortOrder.DATE_ASC) "Waktu (Terlama \u2191)" else "Waktu (Terbaru \u2193)",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = if (sortOrder == HistorySortOrder.DATE_ASC) Icons.Default.ArrowUpward else Icons.Default.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                shape = RoundedCornerShape(10.dp)
+            )
+
+            FilterChip(
+                selected = isTitleActive,
+                onClick = { viewModel.toggleSortByTitle() },
+                label = {
+                    Text(
+                        text = if (sortOrder == HistorySortOrder.TITLE_DESC) "Nama (Z - A \u2191)" else "Nama (A - Z \u2193)",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = if (sortOrder == HistorySortOrder.TITLE_DESC) Icons.Default.ArrowUpward else Icons.Default.SortByAlpha,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                shape = RoundedCornerShape(10.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         if (historyList.isEmpty()) {
             Box(
