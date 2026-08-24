@@ -13,6 +13,9 @@ interface HistoryDao {
     @Query("SELECT * FROM history_table ORDER BY downloadDate DESC")
     fun getAllHistory(): Flow<List<HistoryEntity>>
 
+    @Query("SELECT * FROM history_table ORDER BY downloadDate DESC")
+    suspend fun getAllHistoryDirect(): List<HistoryEntity>
+
     @Query("SELECT * FROM history_table WHERE rjid = :rjid LIMIT 1")
     suspend fun getHistoryById(rjid: String): HistoryEntity?
 

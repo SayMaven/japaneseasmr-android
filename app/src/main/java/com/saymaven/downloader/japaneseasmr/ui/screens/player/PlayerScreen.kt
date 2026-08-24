@@ -57,7 +57,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val repeatMode by viewModel.repeatMode.collectAsState()
     val shuffleMode by viewModel.shuffleMode.collectAsState()
     val playlist by viewModel.playlist.collectAsState()
-    val fileExistenceMap by viewModel.fileExistenceMap.collectAsState()
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
     val dacState by viewModel.dacState.collectAsState()
     val audioSpecs by viewModel.audioSpecs.collectAsState()
@@ -160,7 +159,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Big Center Cover Art (Instant display from preloaded memory cache)
+            // Big Center Cover Art (Instant 0ms display)
             Card(
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
@@ -489,7 +488,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         contentPadding = PaddingValues(top = 10.dp, bottom = 52.dp)
                     ) {
                         itemsIndexed(playlist, key = { _, item -> item.rjid }) { _, item ->
-                            val fileExists = fileExistenceMap[item.rjid] ?: true
                             val isCurrentTrack = (item.rjid == currentRjId)
                             val isDragged = (draggedRjid == item.rjid)
 
@@ -499,7 +497,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 ),
                                 item = item,
                                 isCurrentTrack = isCurrentTrack,
-                                fileExists = fileExists,
                                 isDragged = isDragged,
                                 dragOffsetY = if (isDragged) dragAccumulatedY else 0f,
                                 onDragStart = { rjid ->
@@ -532,13 +529,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                     dragAccumulatedY = 0f
                                 },
                                 onClick = {
-                                    if (fileExists) {
-                                        viewModel.playLocalTrack(item, playlist)
-                                        scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                            showBottomSheet = false
-                                        }
-                                    } else {
-                                        Toast.makeText(context, "File [${item.rjid}] tidak ditemukan di memori HP.", Toast.LENGTH_SHORT).show()
+                                    viewModel.playLocalTrack(item, playlist)
+                                    scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                        showBottomSheet = false
                                     }
                                 }
                             )
@@ -555,7 +548,6 @@ fun PlaylistItemCard(
     modifier: Modifier = Modifier,
     item: HistoryEntity,
     isCurrentTrack: Boolean,
-    fileExists: Boolean,
     isDragged: Boolean,
     dragOffsetY: Float,
     onDragStart: (String) -> Unit,
@@ -587,7 +579,6 @@ fun PlaylistItemCard(
         colors = CardDefaults.cardColors(
             containerColor = when {
                 isDragged -> MaterialTheme.colorScheme.secondaryContainer
-                !fileExists -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
                 isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
                 else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
             }
@@ -640,29 +631,18 @@ fun PlaylistItemCard(
                     fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = when {
-                        !fileExists -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        isCurrentTrack -> MaterialTheme.colorScheme.onPrimaryContainer
-                        else -> MaterialTheme.colorScheme.onSurface
-                    }
+                    color = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = if (fileExists) "CV: ${item.cv} \u2022 ${item.fileSize}" else "File belum diunduh / terhapus",
+                    text = "CV: ${item.cv} \u2022 ${item.fileSize}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (fileExists) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            if (!fileExists) {
-                Icon(
-                    Icons.Default.FileDownloadOff,
-                    contentDescription = "File Hilang",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
-                    modifier = Modifier.size(22.dp)
-                )
-            } else if (isCurrentTrack) {
+            if (isCurrentTrack) {
                 Icon(
                     Icons.Default.GraphicEq,
                     contentDescription = "Playing",

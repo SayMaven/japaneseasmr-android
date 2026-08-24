@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
+import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import com.saymaven.downloader.japaneseasmr.ui.components.BottomNavBar
 import com.saymaven.downloader.japaneseasmr.ui.components.NavTab
 import com.saymaven.downloader.japaneseasmr.ui.screens.history.HistoryScreen
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         checkAndRequestPermissions()
+        StorageSyncManager.syncStorageWithDatabase(this)
 
         setContent {
             val themeMode by settingsViewModel.themeMode.collectAsState()
@@ -110,6 +112,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        StorageSyncManager.syncStorageWithDatabase(this)
+        playerViewModel.refreshPlaylist()
     }
 
     private fun checkAndRequestPermissions() {

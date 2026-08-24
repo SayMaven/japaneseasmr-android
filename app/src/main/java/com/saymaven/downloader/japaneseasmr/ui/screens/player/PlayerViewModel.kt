@@ -3,8 +3,6 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.player
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
@@ -18,7 +16,6 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import coil.Coil
 import coil.request.ImageRequest
-import coil.request.SuccessResult
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
@@ -29,6 +26,7 @@ import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.service.PlaybackService
+import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,7 +38,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Locale
 
@@ -50,12 +47,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val prefs = PreferencesManager(application)
     private val historyDao = AsmrDatabase.getDatabase(application).historyDao()
 
+    // Playlist: HANYA berisi audio yang benar-benar ada filenya di HP (0 missing tracks)
     private val _playlist = MutableStateFlow<List<HistoryEntity>>(emptyList())
     val playlist = _playlist.asStateFlow()
-
-    // Cached file existence map computed in background (0 disk I/O on UI thread)
-    private val _fileExistenceMap = MutableStateFlow<Map<String, Boolean>>(emptyMap())
-    val fileExistenceMap = _fileExistenceMap.asStateFlow()
 
     val dacState = UsbDacManager.dacState
 
@@ -105,14 +99,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var progressJob: Job? = null
 
     init {
-        val initialCover = _currentCoverUrl.value
-        if (!initialCover.isNullOrBlank()) {
-            preloadCoverArtInMemory(initialCover)
-        }
+        resolveAndPreloadInitialCover()
         initMediaController()
         observeDatabasePlaylist()
         restorePlaybackState()
         observeAudioSettings()
+        StorageSyncManager.syncStorageWithDatabase(application)
+    }
+
+    private fun resolveAndPreloadInitialCover() {
+        val rj = _currentRjId.value
+        val cover = _currentCoverUrl.value
+        if (!rj.isNullOrBlank()) {
+            val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), rj, null)
+            if (localCover != null && localCover.exists()) {
+                _currentCoverUrl.value = localCover.absolutePath
+                preloadCoverArtInMemory(localCover.absolutePath)
+                return
+            }
+        }
+        if (!cover.isNullOrBlank()) {
+            preloadCoverArtInMemory(cover)
+        }
     }
 
     private fun preloadCoverArtInMemory(url: String?) {
@@ -133,38 +141,65 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun observeDatabasePlaylist() {
         viewModelScope.launch {
             historyDao.getAllHistory().collect { dbList ->
-                val savedOrderStr = sp.getString("custom_playlist_order", null)
-                val orderMap = if (!savedOrderStr.isNullOrBlank()) {
-                    savedOrderStr.split(",")
-                        .mapIndexed { idx, rjid -> rjid.trim() to idx }
-                        .toMap()
-                } else if (_playlist.value.isNotEmpty()) {
-                    _playlist.value.mapIndexed { idx, item -> item.rjid to idx }.toMap()
+                filterAndSetPlaylist(dbList)
+            }
+        }
+    }
+
+    fun refreshPlaylist() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val dbList = historyDao.getAllHistoryDirect()
+            filterAndSetPlaylist(dbList)
+        }
+    }
+
+    private suspend fun filterAndSetPlaylist(dbList: List<HistoryEntity>) {
+        val customDirStr = prefs.downloadDirFlow.first()
+        val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
+
+        // Filter HANYA audio yang file fisiknya benar-benar ada di HP
+        val validItems = withContext(Dispatchers.IO) {
+            dbList.mapNotNull { item ->
+                val direct = if (!item.localFilePath.isNullOrBlank()) File(item.localFilePath) else null
+                val validFile = if (direct != null && direct.exists() && direct.length() > 0L) {
+                    direct
                 } else {
-                    emptyMap()
+                    AudioStorageHelper.findExistingAudioFile(downloadDir, item.rjid)
                 }
 
-                val sorted = if (orderMap.isNotEmpty()) {
-                    dbList.sortedBy { orderMap[it.rjid] ?: Int.MAX_VALUE }
+                if (validFile != null && validFile.exists() && validFile.length() > 0L) {
+                    val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, validFile.absolutePath)
+                    val resolvedCover = localCover?.absolutePath ?: item.coverUrl
+                    item.copy(
+                        localFilePath = validFile.absolutePath,
+                        coverUrl = resolvedCover
+                    )
                 } else {
-                    dbList
-                }
-                _playlist.value = sorted
-
-                // Update file existence map in background (IO thread)
-                withContext(Dispatchers.IO) {
-                    val map = sorted.associate { item ->
-                        val path = item.localFilePath
-                        item.rjid to (!path.isNullOrBlank() && File(path).exists())
-                    }
-                    _fileExistenceMap.value = map
-                }
-
-                // Preload all playlist covers into RAM memory cache in background
-                sorted.take(15).forEach { item ->
-                    preloadCoverArtInMemory(item.coverUrl)
+                    null // File hilang / terhapus: DIHAPUS dari daftar putar koleksi
                 }
             }
+        }
+
+        val savedOrderStr = sp.getString("custom_playlist_order", null)
+        val orderMap = if (!savedOrderStr.isNullOrBlank()) {
+            savedOrderStr.split(",")
+                .mapIndexed { idx, rjid -> rjid.trim() to idx }
+                .toMap()
+        } else if (_playlist.value.isNotEmpty()) {
+            _playlist.value.mapIndexed { idx, item -> item.rjid to idx }.toMap()
+        } else {
+            emptyMap()
+        }
+
+        val sorted = if (orderMap.isNotEmpty()) {
+            validItems.sortedBy { orderMap[it.rjid] ?: Int.MAX_VALUE }
+        } else {
+            validItems
+        }
+        _playlist.value = sorted
+
+        sorted.take(20).forEach { item ->
+            preloadCoverArtInMemory(item.coverUrl)
         }
     }
 
@@ -282,11 +317,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (!lastRj.isNullOrBlank()) {
                 val history = historyDao.getHistoryById(lastRj)
                 if (history != null) {
+                    val localCover = withContext(Dispatchers.IO) {
+                        AudioStorageHelper.getLocalCoverFile(getApplication(), history.rjid, history.localFilePath)
+                    }
+                    val finalCover = localCover?.absolutePath ?: history.coverUrl
+
                     _currentRjId.value = history.rjid
                     _currentTitle.value = "[${history.rjid}] ${history.title}"
                     _currentArtist.value = history.cv
-                    _currentCoverUrl.value = history.coverUrl
-                    preloadCoverArtInMemory(history.coverUrl)
+                    _currentCoverUrl.value = finalCover
+                    preloadCoverArtInMemory(finalCover)
+
                     if (_currentPosition.value == 0L && lastPos > 0L) {
                         _currentPosition.value = lastPos
                     }
@@ -295,7 +336,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                     val p = player
                     if (p != null && p.mediaItemCount == 0) {
-                        prepareTrackSilently(history, _playlist.value, _currentPosition.value)
+                        prepareTrackSilently(history.copy(coverUrl = finalCover), _playlist.value, _currentPosition.value)
                     }
                 }
             }
@@ -490,7 +531,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             calculateAudioSpecs(targetPair.second)
 
-            val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, targetPair.first.coverUrl)
+            val localCover = withContext(Dispatchers.IO) {
+                AudioStorageHelper.getLocalCoverFile(getApplication(), targetPair.first.rjid, targetPair.second.absolutePath)
+            }
+            val finalCover = localCover?.absolutePath ?: targetPair.first.coverUrl
+
+            val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, finalCover)
 
             val mediaItems = validItemsWithFiles.map { (item, file) ->
                 val metaBuilder = MediaMetadata.Builder()
@@ -513,8 +559,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _currentRjId.value = targetPair.first.rjid
             _currentTitle.value = "[${targetPair.first.rjid}] ${targetPair.first.title}"
             _currentArtist.value = targetPair.first.cv
-            _currentCoverUrl.value = targetPair.first.coverUrl
-            preloadCoverArtInMemory(targetPair.first.coverUrl)
+            _currentCoverUrl.value = finalCover
+            preloadCoverArtInMemory(finalCover)
 
             p.setMediaItems(mediaItems, targetIndex, startPositionMs)
             p.prepare()
@@ -537,19 +583,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     } finally {
                         try { retriever.release() } catch (e: Exception) {}
                     }
-                }
-            }
-
-            if (!coverUrl.isNullOrBlank()) {
-                val req = ImageRequest.Builder(getApplication())
-                    .data(coverUrl)
-                    .allowHardware(false)
-                    .build()
-                val result = (Coil.imageLoader(getApplication()).execute(req) as? SuccessResult)?.drawable
-                if (result is BitmapDrawable) {
-                    val stream = ByteArrayOutputStream()
-                    result.bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-                    return@withContext stream.toByteArray()
                 }
             }
         } catch (e: Exception) {
