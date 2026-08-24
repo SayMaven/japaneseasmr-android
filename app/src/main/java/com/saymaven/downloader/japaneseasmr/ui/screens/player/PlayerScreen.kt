@@ -2,7 +2,7 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import android.app.Activity
 import android.view.WindowManager
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -503,6 +504,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 ),
                                 item = item,
                                 isCurrentTrack = isCurrentTrack,
+                                isPlaying = (isCurrentTrack && isPlaying),
                                 isDragged = isDragged,
                                 dragOffsetY = if (isDragged) dragAccumulatedY else 0f,
                                 onDragStart = { rjid ->
@@ -554,6 +556,7 @@ fun PlaylistItemCard(
     modifier: Modifier = Modifier,
     item: HistoryEntity,
     isCurrentTrack: Boolean,
+    isPlaying: Boolean,
     isDragged: Boolean,
     dragOffsetY: Float,
     onDragStart: (String) -> Unit,
@@ -649,11 +652,9 @@ fun PlaylistItemCard(
             }
 
             if (isCurrentTrack) {
-                Icon(
-                    Icons.Default.GraphicEq,
-                    contentDescription = "Playing",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                AnimatedEqualizerWave(
+                    isPlaying = isPlaying,
+                    color = MaterialTheme.colorScheme.primary
                 )
             } else {
                 Icon(
@@ -711,3 +712,88 @@ private fun formatDuration(ms: Long): String {
         String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
     }
 }
+
+
+@Composable
+fun AnimatedEqualizerWave(
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    if (!isPlaying) {
+        Row(
+            modifier = modifier.size(width = 22.dp, height = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val staticHeights = listOf(0.35f, 0.6f, 0.45f, 0.7f)
+            staticHeights.forEach { h ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(h)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(color.copy(alpha = 0.6f))
+                )
+            }
+        }
+    } else {
+        // Animasi bernapas sangat lembut, tenang, dan lambat (Slow ASMR Breathing Rhythm)
+        val infiniteTransition = rememberInfiniteTransition(label = "asmr_calm_wave")
+        val anim1 by infiniteTransition.animateFloat(
+            initialValue = 0.3f,
+            targetValue = 0.8f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "bar1"
+        )
+        val anim2 by infiniteTransition.animateFloat(
+            initialValue = 0.75f,
+            targetValue = 0.35f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "bar2"
+        )
+        val anim3 by infiniteTransition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 0.85f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2100, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "bar3"
+        )
+        val anim4 by infiniteTransition.animateFloat(
+            initialValue = 0.8f,
+            targetValue = 0.3f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1650, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "bar4"
+        )
+
+        Row(
+            modifier = modifier.size(width = 22.dp, height = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val animHeights: List<Float> = listOf(anim1, anim2, anim3, anim4)
+            animHeights.forEach { h ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(h)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(color)
+                )
+            }
+        }
+    }
+}
+
+
