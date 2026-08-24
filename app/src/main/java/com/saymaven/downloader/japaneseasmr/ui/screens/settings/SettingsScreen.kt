@@ -258,7 +258,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
         }
 
-        // ================= 3. TAMPILAN & TEMA (DENGAN 24 COLOR PALETTE PREVIEWS) =================
+        // ================= 3. TAMPILAN & TEMA (DENGAN 36 COLOR PALETTE PREVIEWS) =================
         SettingsCategoryHeader(title = "Tampilan & Warna", icon = Icons.Default.Palette)
 
         Card(
@@ -314,7 +314,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Palet Warna Aplikasi (24 Warna)",
+                                text = "Palet Warna Aplikasi (36 Warna)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -535,7 +535,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     Text("• Filter otomatis file hilang di daftar putar koleksi.", style = MaterialTheme.typography.bodySmall)
                     Text("• Auto-Sync Penyimpanan Realtime saat audio masuk/berpindah.", style = MaterialTheme.typography.bodySmall)
                     Text("• Mode Eksklusif USB DAC dengan direct USB hardware claim.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Mode Format Waktu Persisten & 24 Palet Warna Kustom.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Mode Format Waktu Persisten & 36 Palet Warna Kustom.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
@@ -573,7 +573,7 @@ fun ColorPaletteCarousel(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // 1 Page Indicator = Setiap 4 Palet Warna (24 Palet = 6 Titik Indikator)
+    // 1 Page Indicator = Setiap 4 Palet Warna (36 Palet = 9 Titik Indikator)
     val totalPages = remember(palettes.size) { (palettes.size + 3) / 4 }
 
     // Hitung dot index secara dinamis: bergeser setiap 4 warna dilewati
@@ -644,7 +644,7 @@ fun ColorPaletteCarousel(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Indikator Titik: 1 Titik per 4 Warna (Total 6 Titik untuk 24 Palet)
+        // Indikator Titik: 1 Titik per 4 Warna (Total 9 Titik untuk 36 Palet)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -656,8 +656,8 @@ fun ColorPaletteCarousel(
                 val isCurrent = (pageIdx == activePageIndex)
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .size(if (isCurrent) 8.dp else 6.dp)
+                        .padding(horizontal = 3.dp)
+                        .size(if (isCurrent) 8.dp else 5.dp)
                         .clip(CircleShape)
                         .background(
                             if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)

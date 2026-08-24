@@ -228,5 +228,113 @@ enum class ColorPalette(
         tertiary = Color(0xFF8D6E63),
         darkBackground = Color(0xFF141110),
         darkSurface = Color(0xFF1E1A18)
+    ),
+    AQUA_MARINE(
+        title = "Aquamarine",
+        description = "Kombinasi hijau toska & biru laut tropis",
+        primary = Color(0xFF00E676),
+        secondary = Color(0xFF1DE9B6),
+        tertiary = Color(0xFF00B0FF),
+        darkBackground = Color(0xFF0B1713),
+        darkSurface = Color(0xFF11221C)
+    ),
+    BLOOD_ORANGE(
+        title = "Blood Orange",
+        description = "Merah jingga menyala segar",
+        primary = Color(0xFFFF3D00),
+        secondary = Color(0xFFFF9E80),
+        tertiary = Color(0xFFFF6E40),
+        darkBackground = Color(0xFF1B0E09),
+        darkSurface = Color(0xFF26140E)
+    ),
+    CELESTIAL_BLUE(
+        title = "Celestial Blue",
+        description = "Biru langit malam bertabur bintang",
+        primary = Color(0xFF2979FF),
+        secondary = Color(0xFF82B1FF),
+        tertiary = Color(0xFF304FFE),
+        darkBackground = Color(0xFF0B121F),
+        darkSurface = Color(0xFF101B2E)
+    ),
+    AMETHYST_GEM(
+        title = "Amethyst Gem",
+        description = "Ungu batu mulia kecubung",
+        primary = Color(0xFFAB47BC),
+        secondary = Color(0xFFCE93D8),
+        tertiary = Color(0xFF8E24AA),
+        darkBackground = Color(0xFF180F1B),
+        darkSurface = Color(0xFF241629)
+    ),
+    SUNFLOWER(
+        title = "Sunflower Yellow",
+        description = "Kuning bunga matahari ceria",
+        primary = Color(0xFFFFEE58),
+        secondary = Color(0xFFFFF59D),
+        tertiary = Color(0xFFFDD835),
+        darkBackground = Color(0xFF18170B),
+        darkSurface = Color(0xFF242211)
+    ),
+    TURQUOISE_BAY(
+        title = "Turquoise Bay",
+        description = "Biru turkis teluk pantai indah",
+        primary = Color(0xFF26C6DA),
+        secondary = Color(0xFF80DEEA),
+        tertiary = Color(0xFF0097A7),
+        darkBackground = Color(0xFF0B1618),
+        darkSurface = Color(0xFF112124)
+    ),
+    CHERRY_VELVET(
+        title = "Cherry Velvet",
+        description = "Merah ceri velvet yang manis",
+        primary = Color(0xFFF06292),
+        secondary = Color(0xFFF8BBD0),
+        tertiary = Color(0xFFC2185B),
+        darkBackground = Color(0xFF190F14),
+        darkSurface = Color(0xFF26161F)
+    ),
+    DEEP_TEAL(
+        title = "Deep Teal",
+        description = "Hijau teal laut dalam yang pekat",
+        primary = Color(0xFF00897B),
+        secondary = Color(0xFF4DB6AC),
+        tertiary = Color(0xFF004D40),
+        darkBackground = Color(0xFF0A1614),
+        darkSurface = Color(0xFF0F211F)
+    ),
+    COFFEE_ESPRESSO(
+        title = "Coffee Espresso",
+        description = "Cokelat kopi espresso pekat",
+        primary = Color(0xFF8D6E63),
+        secondary = Color(0xFFBCAAA4),
+        tertiary = Color(0xFF4E342E),
+        darkBackground = Color(0xFF15100E),
+        darkSurface = Color(0xFF201916)
+    ),
+    SOLAR_FLARE(
+        title = "Solar Flare",
+        description = "Pijaran api matahari keemasan",
+        primary = Color(0xFFFF9100),
+        secondary = Color(0xFFFFD180),
+        tertiary = Color(0xFFFF3D00),
+        darkBackground = Color(0xFF191108),
+        darkSurface = Color(0xFF251A0D)
+    ),
+    MIDNIGHT_PURPLE(
+        title = "Midnight Purple",
+        description = "Ungu pekat tengah malam",
+        primary = Color(0xFF9C27B0),
+        secondary = Color(0xFFE1BEE7),
+        tertiary = Color(0xFF4A148C),
+        darkBackground = Color(0xFF140A18),
+        darkSurface = Color(0xFF1F1024)
+    ),
+    FROST_MINT(
+        title = "Frost Mint",
+        description = "Hijau mint dingin bersalju",
+        primary = Color(0xFF64FFDA),
+        secondary = Color(0xFFA7FFEB),
+        tertiary = Color(0xFF1DE9B6),
+        darkBackground = Color(0xFF0A1715),
+        darkSurface = Color(0xFF102320)
     )
 }
