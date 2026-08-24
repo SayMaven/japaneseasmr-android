@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -35,6 +36,13 @@ fun HistoryScreen(
     val historyList by viewModel.historyList.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
+
+    val listState = rememberLazyListState()
+
+    // Saat urutan (Ascend/Descend/Waktu/Nama) diganti, tampilan tetap diam di paling atas (index 0)
+    LaunchedEffect(sortOrder) {
+        listState.scrollToItem(0)
+    }
 
     var itemToDelete by remember { mutableStateOf<HistoryEntity?>(null) }
     var showMenu by remember { mutableStateOf(false) }
@@ -183,6 +191,7 @@ fun HistoryScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {

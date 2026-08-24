@@ -12,13 +12,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -256,7 +258,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
         }
 
-        // ================= 3. TAMPILAN & TEMA (DENGAN COLOR PALETTE PREVIEWS) =================
+        // ================= 3. TAMPILAN & TEMA (DENGAN 24 COLOR PALETTE PREVIEWS) =================
         SettingsCategoryHeader(title = "Tampilan & Warna", icon = Icons.Default.Palette)
 
         Card(
@@ -312,7 +314,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Palet Warna Aplikasi",
+                                text = "Palet Warna Aplikasi (24 Warna)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -326,7 +328,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Horizontal Palettes Preview Carousel
+                        // Horizontal Palettes Preview Carousel with Realtime Scroll Tracking
                         ColorPaletteCarousel(
                             selectedPalette = colorPalette,
                             onSelectPalette = { viewModel.setColorPalette(it) }
@@ -392,7 +394,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 ListItem(
                     headlineContent = { Text("Panduan Penggunaan", fontWeight = FontWeight.SemiBold) },
                     supportingContent = { Text("Ringkasan fitur & panduan pemutar audio", style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    leadingContent = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable { showGuideDialog = true }
                 )
 
@@ -533,7 +535,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     Text("• Filter otomatis file hilang di daftar putar koleksi.", style = MaterialTheme.typography.bodySmall)
                     Text("• Auto-Sync Penyimpanan Realtime saat audio masuk/berpindah.", style = MaterialTheme.typography.bodySmall)
                     Text("• Mode Eksklusif USB DAC dengan direct USB hardware claim.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Mode Format Waktu Persisten & 12 Palet Warna Kustom.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Mode Format Waktu Persisten & 24 Palet Warna Kustom.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
@@ -569,6 +571,29 @@ fun ColorPaletteCarousel(
 ) {
     val palettes = remember { ColorPalette.values().toList() }
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    // Auto-scroll to currently selected palette on initial display
+    LaunchedEffect(Unit) {
+        val selIdx = palettes.indexOf(selectedPalette)
+        if (selIdx != -1) {
+            listState.scrollToItem((selIdx - 1).coerceAtLeast(0))
+        }
+    }
+
+    // Dynamic Active Indicator calculated from real-time scroll offset & visible items
+    val activeDotIndex by remember {
+        derivedStateOf {
+            val firstIdx = listState.firstVisibleItemIndex
+            val offset = listState.firstVisibleItemScrollOffset
+            val totalItems = palettes.size
+            if (offset > 120 && firstIdx < totalItems - 1) {
+                firstIdx + 1
+            } else {
+                firstIdx
+            }.coerceIn(0, totalItems - 1)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         LazyRow(
@@ -577,7 +602,7 @@ fun ColorPaletteCarousel(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(palettes, key = { it.name }) { palette ->
+            itemsIndexed(palettes, key = { _, it -> it.name }) { idx, palette ->
                 val isSelected = (palette == selectedPalette)
 
                 Card(
@@ -588,7 +613,12 @@ fun ColorPaletteCarousel(
                     border = if (isSelected) BorderStroke(2.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, Color.Transparent),
                     modifier = Modifier
                         .size(width = 82.dp, height = 82.dp)
-                        .clickable { onSelectPalette(palette) }
+                        .clickable {
+                            onSelectPalette(palette)
+                            scope.launch {
+                                listState.animateScrollToItem((idx - 1).coerceAtLeast(0))
+                            }
+                        }
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -625,8 +655,13 @@ fun ColorPaletteCarousel(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Dot Page Indicators matching user uploaded mockup
-        val selectedIndex = palettes.indexOf(selectedPalette).coerceAtLeast(0)
+        // Sleek 10-Dot Sliding Window Page Indicators tracking horizontal swipe in real-time
+        val totalDots = 10
+        val maxScrollable = (palettes.size - 1).coerceAtLeast(1)
+        val normalizedDotPos = remember(activeDotIndex) {
+            ((activeDotIndex.toFloat() / maxScrollable.toFloat()) * (totalDots - 1)).toInt().coerceIn(0, totalDots - 1)
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -634,12 +669,12 @@ fun ColorPaletteCarousel(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            palettes.forEachIndexed { index, _ ->
-                val isCurrent = (index == selectedIndex)
+            repeat(totalDots) { dotIdx ->
+                val isCurrent = (dotIdx == normalizedDotPos)
                 Box(
                     modifier = Modifier
                         .padding(horizontal = 3.dp)
-                        .size(if (isCurrent) 8.dp else 6.dp)
+                        .size(if (isCurrent) 8.dp else 5.dp)
                         .clip(CircleShape)
                         .background(
                             if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)

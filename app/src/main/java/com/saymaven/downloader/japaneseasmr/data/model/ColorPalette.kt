@@ -120,5 +120,113 @@ enum class ColorPalette(
         tertiary = Color(0xFFFF4081),
         darkBackground = Color(0xFF1A0F11),
         darkSurface = Color(0xFF261518)
+    ),
+    NORDIC_ICE(
+        title = "Nordic Ice",
+        description = "Biru es kutub utara sejuk",
+        primary = Color(0xFF80DEEA),
+        secondary = Color(0xFFB2EBF2),
+        tertiary = Color(0xFF90CAF9),
+        darkBackground = Color(0xFF0F171B),
+        darkSurface = Color(0xFF152229)
+    ),
+    MATCHA_GREEN(
+        title = "Matcha Tea",
+        description = "Hijau teh matcha khas Jepang",
+        primary = Color(0xFF81C784),
+        secondary = Color(0xFFC8E6C9),
+        tertiary = Color(0xFFAED581),
+        darkBackground = Color(0xFF101711),
+        darkSurface = Color(0xFF172319)
+    ),
+    MIDNIGHT_OBSIDIAN(
+        title = "Midnight Obsidian",
+        description = "Hitam amoled pekat beraksen perak",
+        primary = Color(0xFFE0E0E0),
+        secondary = Color(0xFF9E9E9E),
+        tertiary = Color(0xFF616161),
+        darkBackground = Color(0xFF080808),
+        darkSurface = Color(0xFF121212)
+    ),
+    CORAL_PEACH(
+        title = "Coral Peach",
+        description = "Koral lembut & peach manis",
+        primary = Color(0xFFFF8A65),
+        secondary = Color(0xFFFFCCBC),
+        tertiary = Color(0xFFFFAB91),
+        darkBackground = Color(0xFF191210),
+        darkSurface = Color(0xFF241916)
+    ),
+    CYBERPUNK(
+        title = "Cyber Magenta",
+        description = "Magenta neon gaya cyberpunk",
+        primary = Color(0xFFFF007F),
+        secondary = Color(0xFF00F0FF),
+        tertiary = Color(0xFFFFE600),
+        darkBackground = Color(0xFF120814),
+        darkSurface = Color(0xFF1F0F23)
+    ),
+    ROYAL_INDIGO(
+        title = "Royal Indigo",
+        description = "Biru indigo kebangsawanan",
+        primary = Color(0xFF5C6BC0),
+        secondary = Color(0xFF9FA8DA),
+        tertiary = Color(0xFF3F51B5),
+        darkBackground = Color(0xFF0F111E),
+        darkSurface = Color(0xFF16192B)
+    ),
+    HONEY_GOLD(
+        title = "Honey Gold",
+        description = "Kuning madu keemasan mewah",
+        primary = Color(0xFFFFD54F),
+        secondary = Color(0xFFFFF59D),
+        tertiary = Color(0xFFFFB300),
+        darkBackground = Color(0xFF18150B),
+        darkSurface = Color(0xFF231F10)
+    ),
+    FOREST_MOSS(
+        title = "Forest Moss",
+        description = "Hijau lumut hutan lebat",
+        primary = Color(0xFF558B2F),
+        secondary = Color(0xFF9CCC65),
+        tertiary = Color(0xFF33691E),
+        darkBackground = Color(0xFF0D1409),
+        darkSurface = Color(0xFF141F0E)
+    ),
+    BUBBLEGUM(
+        title = "Bubblegum Sky",
+        description = "Merah muda permen karet & biru muda",
+        primary = Color(0xFFFF4081),
+        secondary = Color(0xFF40C4FF),
+        tertiary = Color(0xFF7C4DFF),
+        darkBackground = Color(0xFF160F1A),
+        darkSurface = Color(0xFF221627)
+    ),
+    ELECTRIC_VIOLET(
+        title = "Electric Violet",
+        description = "Violet elektrik menyala",
+        primary = Color(0xFF7C4DFF),
+        secondary = Color(0xFFB388FF),
+        tertiary = Color(0xFF536DFE),
+        darkBackground = Color(0xFF110E1C),
+        darkSurface = Color(0xFF1A152B)
+    ),
+    AUTUMN_MAPLE(
+        title = "Autumn Maple",
+        description = "Merah daun maple musim gugur",
+        primary = Color(0xFFD84315),
+        secondary = Color(0xFFFF8A65),
+        tertiary = Color(0xFFBF360C),
+        darkBackground = Color(0xFF170E0B),
+        darkSurface = Color(0xFF221410)
+    ),
+    CARAMEL_MOCHA(
+        title = "Caramel Mocha",
+        description = "Cokelat karamel & kopi hangat",
+        primary = Color(0xFFA1887F),
+        secondary = Color(0xFFD7CCC8),
+        tertiary = Color(0xFF8D6E63),
+        darkBackground = Color(0xFF141110),
+        darkSurface = Color(0xFF1E1A18)
     )
 }
