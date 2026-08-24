@@ -117,14 +117,11 @@ cd japaneseasmr-android
 
 # Compile Debug APK
 ./gradlew assembleDebug
-
-# Compile Release APK (requires keystore.properties or default debug key)
-./gradlew assembleRelease
 ```
 
 The compiled APK will be located at:
 ```
-app/build/outputs/apk/release/JapaneseASMR-v1.1.0-release.apk
+app/build/outputs/apk/debug/JapaneseASMR-v1.x.x-debug.apk
 ```
 
 ---
