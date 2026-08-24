@@ -34,10 +34,19 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val autoClipboard by viewModel.autoClipboard.collectAsState()
     val useDetailedFilename by viewModel.useDetailedFilename.collectAsState()
 
+    // Player Settings
+    val exclusiveAudioFocus by viewModel.exclusiveAudioFocus.collectAsState()
+    val pauseOnUnplug by viewModel.pauseOnUnplug.collectAsState()
+    val skipSilence by viewModel.skipSilence.collectAsState()
+    val keepScreenOn by viewModel.keepScreenOn.collectAsState()
+    val autoResume by viewModel.autoResume.collectAsState()
+    val defaultSpeed by viewModel.defaultSpeed.collectAsState()
+
     var showThemeDialog by remember { mutableStateOf(false) }
     var showPaletteDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showConnDialog by remember { mutableStateOf(false) }
+    var showSpeedDialog by remember { mutableStateOf(false) }
     var showChangelogDialog by remember { mutableStateOf(false) }
     var showReadmeDialog by remember { mutableStateOf(false) }
 
@@ -144,7 +153,106 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
         }
 
-        // ================= KATEGORI 2: JARINGAN =================
+        // ================= KATEGORI 2: PEMUTAR AUDIO (BARU) =================
+        item {
+            SettingsCategoryHeader(title = "Pemutar Audio", icon = Icons.Default.Headphones)
+        }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            ) {
+                Column {
+                    ListItem(
+                        headlineContent = { Text("Fokus Audio Eksklusif") },
+                        supportingContent = { Text("Jeda penuh saat ada audio/notifikasi lain agar fokus tidak terpecah", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.VolumeOff, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Switch(
+                                checked = exclusiveAudioFocus,
+                                onCheckedChange = { viewModel.setExclusiveAudioFocus(it) }
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Jeda Saat Headset Terputus") },
+                        supportingContent = { Text("Otomatis pause saat earphone kabel atau TWS Bluetooth terputus", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.HeadsetOff, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Switch(
+                                checked = pauseOnUnplug,
+                                onCheckedChange = { viewModel.setPauseOnUnplug(it) }
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Lewati Jeda Hening (Skip Silence)") },
+                        supportingContent = { Text("Otomatis mempercepat bagian hening tanpa merusak tempo dialog", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Switch(
+                                checked = skipSilence,
+                                onCheckedChange = { viewModel.setSkipSilence(it) }
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Layar Tetap Menyala") },
+                        supportingContent = { Text("Mencegah layar HP mati/terkunci saat berada di tab pemutar", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.StayCurrentPortrait, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Switch(
+                                checked = keepScreenOn,
+                                onCheckedChange = { viewModel.setKeepScreenOn(it) }
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text("Lanjutkan Pemutaran Otomatis") },
+                        supportingContent = { Text("Memuat track dan posisi detik terakhir saat aplikasi dibuka", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.Restore, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Switch(
+                                checked = autoResume,
+                                onCheckedChange = { viewModel.setAutoResume(it) }
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        modifier = Modifier.clickable { showSpeedDialog = true },
+                        headlineContent = { Text("Kecepatan Putar Bawaan") },
+                        supportingContent = { Text("Kecepatan awal saat memutar audio karya", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.SlowMotionVideo, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Text(
+                                text = "${defaultSpeed}x",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    )
+                }
+            }
+        }
+
+        // ================= KATEGORI 3: JARINGAN =================
         item {
             SettingsCategoryHeader(title = "Jaringan & Unduhan", icon = Icons.Default.Speed)
         }
@@ -171,7 +279,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
         }
 
-        // ================= KATEGORI 3: TAMPILAN & BAHASA =================
+        // ================= KATEGORI 4: TAMPILAN & BAHASA =================
         item {
             SettingsCategoryHeader(title = "Tampilan & Bahasa", icon = Icons.Default.Palette)
         }
@@ -219,7 +327,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             modifier = Modifier.clickable { showPaletteDialog = true },
                             headlineContent = { Text("Palet Warna Aksen") },
                             supportingContent = { Text(colorPalette.title, style = MaterialTheme.typography.bodySmall) },
-                            leadingContent = { Icon(Icons.Default.FormatPaint, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                            leadingContent = { Icon(Icons.Default.Brush, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                         )
                     }
 
@@ -235,7 +343,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
         }
 
-        // ================= KATEGORI 4: TENTANG =================
+        // ================= KATEGORI 5: TENTANG =================
         item {
             SettingsCategoryHeader(title = "Tentang Aplikasi", icon = Icons.Default.Info)
         }
@@ -269,7 +377,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                     ListItem(
                         headlineContent = { Text("Versi Aplikasi") },
-                        supportingContent = { Text("v1.0.0 (Release Build)", style = MaterialTheme.typography.bodySmall) },
+                        supportingContent = { Text("v1.1.0 (Release Build)", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                     )
 
@@ -354,7 +462,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showThemeDialog = false }) { Text("Tutup") } }
+            confirmButton = {
+                TextButton(onClick = { showThemeDialog = false }) { Text("Tutup") }
+            }
         )
     }
 
@@ -362,7 +472,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     if (showPaletteDialog) {
         AlertDialog(
             onDismissRequest = { showPaletteDialog = false },
-            title = { Text("Pilih Palet Warna Aksen") },
+            title = { Text("Pilih Palet Warna") },
             text = {
                 Column {
                     ColorPalette.values().forEach { pal ->
@@ -378,43 +488,46 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         ) {
                             RadioButton(selected = colorPalette == pal, onClick = null)
                             Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(pal.title, fontWeight = FontWeight.Bold)
-                                Text(pal.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                            Text(pal.title)
                         }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showPaletteDialog = false }) { Text("Tutup") } }
+            confirmButton = {
+                TextButton(onClick = { showPaletteDialog = false }) { Text("Tutup") }
+            }
         )
     }
 
-    // 3. Language Dialog (Placeholder)
-    if (showLanguageDialog) {
+    // 3. Playback Speed Dialog (Baru)
+    if (showSpeedDialog) {
+        val speeds = listOf(0.75f, 0.9f, 1.0f, 1.1f, 1.25f, 1.5f)
         AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text("Pilih Bahasa (Language)") },
+            onDismissRequest = { showSpeedDialog = false },
+            title = { Text("Kecepatan Putar Bawaan") },
             text = {
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                        RadioButton(selected = true, onClick = null)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Bahasa Indonesia (Aktif)")
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                        RadioButton(selected = false, onClick = null, enabled = false)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("English (Segera Hadir)", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                        RadioButton(selected = false, onClick = null, enabled = false)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("日本語 (Segera Hadir)", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    speeds.forEach { spd ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setDefaultSpeed(spd)
+                                    showSpeedDialog = false
+                                }
+                                .padding(vertical = 10.dp)
+                        ) {
+                            RadioButton(selected = defaultSpeed == spd, onClick = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(if (spd == 1.0f) "1.0x (Normal)" else "${spd}x")
+                        }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text("Tutup") } }
+            confirmButton = {
+                TextButton(onClick = { showSpeedDialog = false }) { Text("Tutup") }
+            }
         )
     }
 
@@ -423,71 +536,104 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         val options = listOf(4, 8, 16, 24, 32)
         AlertDialog(
             onDismissRequest = { showConnDialog = false },
-            title = { Text("Jumlah Koneksi Paralel") },
+            title = { Text("Pilih Jumlah Koneksi") },
             text = {
                 Column {
-                    options.forEach { count ->
+                    options.forEach { conn ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    viewModel.setParallelConnections(count)
+                                    viewModel.setParallelConnections(conn)
                                     showConnDialog = false
                                 }
                                 .padding(vertical = 10.dp)
                         ) {
-                            RadioButton(selected = parallelConn == count, onClick = null)
+                            RadioButton(selected = parallelConn == conn, onClick = null)
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text("$count Koneksi ${if (count == 16) "(Rekomendasi Default)" else ""}")
+                            Text("$conn Thread ${if (conn == 16) "(Rekomendasi)" else ""}")
                         }
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showConnDialog = false }) { Text("Tutup") } }
+            confirmButton = {
+                TextButton(onClick = { showConnDialog = false }) { Text("Tutup") }
+            }
         )
     }
 
-    // 5. Changelog Dialog
+    // 5. Language Dialog
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text("Pilih Bahasa") },
+            text = {
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showLanguageDialog = false }
+                            .padding(vertical = 10.dp)
+                    ) {
+                        RadioButton(selected = true, onClick = null)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Bahasa Indonesia (Default)")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) { Text("Tutup") }
+            }
+        )
+    }
+
+    // 6. Changelog Dialog
     if (showChangelogDialog) {
         AlertDialog(
             onDismissRequest = { showChangelogDialog = false },
-            title = { Text("Log Versi v1.0.0") },
+            title = { Text("Riwayat Pembaruan (Changelog)") },
             text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("• High-Speed Native Engine (16 koneksi paralel HTTP Range & HLS).", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("• Container standar ISO M4A & MP3 (100% playable & seekable di HiBy Music, VLC, Poweramp).", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("• Notifikasi Status Bar & Lockscreen dengan cover art resolusi tinggi.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("• Pemutar Musik Bawaan lengkap dengan Laci Antrean YouTube Music, Repeat 3-Mode, Shuffle, & Clickable Duration.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("• Persistensi resume playback audio terakhir saat aplikasi dibuka kembali.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("• Deteksi file cerdas & pencegahan unduhan duplikat.", style = MaterialTheme.typography.bodySmall)
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    Text("Versi 1.1.0 (Pembaruan Fitur Pemutar)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("• Grup Pengaturan Pemutar Audio lengkap (Fokus Audio Eksklusif, Jeda Saat Headset Dilepas, Lewati Jeda Hening, Layar Tetap Menyala, Kecepatan Putar).", style = MaterialTheme.typography.bodySmall)
+                    Text("• Penyimpanan permanen urutan daftar putar drag-and-drop.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Tombol toggle sembunyikan/tampilkan konsol live log dengan ikon dinamis (>_ / <>).", style = MaterialTheme.typography.bodySmall)
+                    Text("• Pemulihan otomatis lagu lama di penyimpanan saat aplikasi dibuka.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("Versi 1.0.0 (Rilis Awal)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                    Text("• Engine unduhan native multi-thread paralel (4-32 koneksi).", style = MaterialTheme.typography.bodySmall)
+                    Text("• Pemutar audio native dengan kontrol MediaSession notifikasi & lockscreen.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Penanaman cover art resolusi tinggi dan ID3 metadata otomatis.", style = MaterialTheme.typography.bodySmall)
                 }
             },
-            confirmButton = { TextButton(onClick = { showChangelogDialog = false }) { Text("Tutup") } }
+            confirmButton = {
+                TextButton(onClick = { showChangelogDialog = false }) { Text("Tutup") }
+            }
         )
     }
 
-    // 6. Readme Dialog
+    // 7. Readme Dialog
     if (showReadmeDialog) {
         AlertDialog(
             onDismissRequest = { showReadmeDialog = false },
-            title = { Text("Tentang JapaneseASMR Downloader") },
+            title = { Text("Panduan Penggunaan") },
             text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "Aplikasi Android Native modern, cepat, dan elegan untuk mengunduh, mengelola koleksi, dan memutar karya audio ASMR Jepang (Kode RJ) langsung dari smartphone Anda.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("Dibuat dengan ❤️ oleh SayMaven menggunakan Kotlin & Jetpack Compose.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    Text("1. Mengunduh Karya:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Masukkan kode RJ (misal: RJ337874) di tab Home, lalu tekan 'Unduh' untuk mengunduh langsung atau '+ Antrean' untuk menumpuk unduhan.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("2. Memutar Audio:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Buka tab Riwayat atau Pemutar, pilih lagu yang ingin didengarkan. Geser ikon = di daftar putar untuk mengatur urutan lagu.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("3. Audio Eksklusif & Headset:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Gunakan menu Pengaturan -> Pemutar Audio untuk mengatur fokus audio eksklusif dan auto-pause saat headset terputus.", style = MaterialTheme.typography.bodySmall)
                 }
             },
-            confirmButton = { TextButton(onClick = { showReadmeDialog = false }) { Text("Tutup") } }
+            confirmButton = {
+                TextButton(onClick = { showReadmeDialog = false }) { Text("Tutup") }
+            }
         )
     }
 }
@@ -496,13 +642,18 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 fun SettingsCategoryHeader(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+        modifier = Modifier.padding(vertical = 4.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )

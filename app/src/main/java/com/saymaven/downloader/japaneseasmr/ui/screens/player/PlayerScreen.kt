@@ -1,5 +1,7 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
+import android.app.Activity
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -24,28 +26,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
-import kotlinx.coroutines.launch
-import java.io.File
-import kotlin.math.roundToInt
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(viewModel: PlayerViewModel) {
     val context = LocalContext.current
-    val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
-
     val currentRjId by viewModel.currentRjId.collectAsState()
     val currentTitle by viewModel.currentTitle.collectAsState()
     val currentArtist by viewModel.currentArtist.collectAsState()
@@ -56,61 +50,52 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val repeatMode by viewModel.repeatMode.collectAsState()
     val shuffleMode by viewModel.shuffleMode.collectAsState()
     val playlist by viewModel.playlist.collectAsState()
+    val keepScreenOn by viewModel.keepScreenOn.collectAsState()
 
-    var showRemainingTime by remember { mutableStateOf(false) }
-    var isDraggingSlider by remember { mutableStateOf(false) }
+    val activity = context as? Activity
+    DisposableEffect(keepScreenOn) {
+        if (keepScreenOn) {
+            activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    var isSliderDragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableLongStateOf(0L) }
+    var showRemainingTime by remember { mutableStateOf(false) }
+    var showPlaylistSheet by remember { mutableStateOf(false) }
 
-    val displayPosition = if (isDraggingSlider) dragPosition else currentPosition
+    val effectivePosition = if (isSliderDragging) dragPosition else currentPosition
 
-    // Bottom Sheet state for YouTube Music style playlist drawer
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var showBottomSheet by remember { mutableStateOf(false) }
-
-    // Multi-track continuous fluid drag-and-drop state
-    var draggedRjid by remember { mutableStateOf<String?>(null) }
-    var dragOffsetY by remember { mutableFloatStateOf(0f) }
-
-    val itemHeightPx = with(density) { 68.dp.toPx() }
-
-    Box(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // ================= 1. HEADER & COVER ART =================
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // Top Work Info
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = if (currentRjId != null) currentTitle else "JapaneseASMR Player",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (currentRjId != null) "CV: $currentArtist" else "Pemutar Audio Asli",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Text(
+                text = "Sedang Memutar",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
 
-            // High-Res Artwork Cover (Square 260dp)
+            Spacer(modifier = Modifier.height(20.dp))
+
             Card(
-                shape = RoundedCornerShape(20.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
                 modifier = Modifier
-                    .size(260.dp)
-                    .clip(RoundedCornerShape(20.dp))
+                    .size(280.dp)
+                    .aspectRatio(1f)
             ) {
                 if (currentCoverUrl != null) {
                     AsyncImage(
@@ -127,341 +112,277 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Headphones,
-                            contentDescription = "Placeholder",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(72.dp)
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(96.dp)
                         )
                     }
                 }
             }
 
-            // Timeline & Durasi (Clickable Toggle Remaining vs Total Time)
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Slider(
-                    value = if (duration > 0) (displayPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f,
-                    onValueChange = { frac ->
-                        isDraggingSlider = true
-                        dragPosition = (frac * duration).toLong()
-                    },
-                    onValueChangeFinished = {
-                        viewModel.seekTo(dragPosition)
-                        isDraggingSlider = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
-                    )
-                )
+            Spacer(modifier = Modifier.height(24.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = formatDuration(displayPosition),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            // Metadata Title & Artist
+            Text(
+                text = currentTitle,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
 
-                    Text(
-                        text = if (showRemainingTime && duration > 0) {
-                            val remaining = (duration - displayPosition).coerceAtLeast(0L)
-                            "-${formatDuration(remaining)}"
-                        } else {
-                            formatDuration(duration)
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable { showRemainingTime = !showRemainingTime }
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Kontrol Pemutar Terpusat (Upper Utility Row: Repeat & Shuffle)
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Tombol Repeat 3-Mode (Off -> Repeat All -> Repeat One)
-                    IconButton(onClick = { viewModel.cycleRepeatMode() }) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = when (repeatMode) {
-                                    Player.REPEAT_MODE_ONE -> Icons.Default.RepeatOne
-                                    Player.REPEAT_MODE_ALL -> Icons.Default.Repeat
-                                    else -> Icons.Default.Repeat
-                                },
-                                contentDescription = "Mode Ulangi",
-                                tint = if (repeatMode != Player.REPEAT_MODE_OFF) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                },
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
+            Text(
+                text = "CV: $currentArtist",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
-                    // Tombol Shuffle (On / Off)
-                    IconButton(onClick = { viewModel.toggleShuffleMode() }) {
-                        Icon(
-                            imageVector = Icons.Default.Shuffle,
-                            contentDescription = "Mode Acak",
-                            tint = if (shuffleMode) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            },
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
+        // ================= 2. TIMELINE & CONTROLS =================
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Timeline Slider
+            Slider(
+                value = if (duration > 0) (effectivePosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f,
+                onValueChange = { frac ->
+                    isSliderDragging = true
+                    dragPosition = (frac * duration).toLong()
+                },
+                onValueChangeFinished = {
+                    viewModel.seekTo(dragPosition)
+                    isSliderDragging = false
+                },
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Baris Kontrol Utama: [Prev] • [Mundur 10s] • [Play/Pause Besar] • [Maju 10s] • [Next]
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { viewModel.playPrevious() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SkipPrevious,
-                            contentDescription = "Audio Sebelumnya",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.seekTo(currentPosition - 10000L) },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Replay10,
-                            contentDescription = "Mundur 10 Detik",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-
-                    FilledIconButton(
-                        onClick = { viewModel.togglePlayPause() },
-                        modifier = Modifier.size(64.dp),
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Jeda" else "Putar",
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.seekTo(currentPosition + 10000L) },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Forward10,
-                            contentDescription = "Maju 10 Detik",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.playNext() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SkipNext,
-                            contentDescription = "Audio Selanjutnya",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
-                }
-            }
-
-            // YouTube Music Style Bottom Bar Trigger ("BERIKUTNYA • DAFTAR PUTAR")
-            Card(
+            // Timeline Labels (Elapsed & Duration/Remaining)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .clickable { showBottomSheet = true },
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(horizontal = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = formatDuration(effectivePosition),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = if (showRemainingTime) "-${formatDuration((duration - effectivePosition).coerceAtLeast(0L))}" else formatDuration(duration),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { showRemainingTime = !showRemainingTime }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Main Playback Controls
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Shuffle Mode Button
+                IconButton(onClick = { viewModel.toggleShuffleMode() }) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (shuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
+
+                // Previous Track
+                FilledIconButton(
+                    onClick = { viewModel.playPrevious() },
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = "Sebelumnya",
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                // Play / Pause Main Button
+                FilledIconButton(
+                    onClick = { viewModel.togglePlayPause() },
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.size(72.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+
+                // Next Track
+                FilledIconButton(
+                    onClick = { viewModel.playNext() },
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Berikutnya",
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                // Repeat Mode Button
+                IconButton(onClick = { viewModel.cycleRepeatMode() }) {
+                    Icon(
+                        imageVector = when (repeatMode) {
+                            Player.REPEAT_MODE_ONE -> Icons.Default.RepeatOne
+                            Player.REPEAT_MODE_ALL -> Icons.Default.Repeat
+                            else -> Icons.Default.Repeat
+                        },
+                        contentDescription = "Repeat",
+                        tint = when (repeatMode) {
+                            Player.REPEAT_MODE_OFF -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            else -> MaterialTheme.colorScheme.primary
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Bottom Playlist Drawer Opener Button
+            Surface(
+                onClick = { showPlaylistSheet = true },
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            Icons.AutoMirrored.Filled.QueueMusic,
+                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "BERIKUTNYA • DAFTAR PUTAR (${playlist.size})",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "Daftar Putar Koleksi (${playlist.size})",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
                         )
                     }
+
                     Icon(
-                        Icons.Default.KeyboardArrowUp,
-                        contentDescription = "Buka Laci",
+                        imageVector = Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Buka Daftar Putar",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
+    }
 
-        // YouTube Music Style Modal Bottom Sheet Playlist Drawer
-        if (showBottomSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showBottomSheet = false },
-                sheetState = sheetState,
-                containerColor = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    // ================= 3. PLAYLIST BOTTOM SHEET WITH FLUID REORDERING =================
+    if (showPlaylistSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showPlaylistSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 24.dp)
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight(0.80f)
-                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    Text(
+                        text = "Daftar Putar Koleksi (${playlist.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    IconButton(
+                        onClick = { showPlaylistSheet = false },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Tutup",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (playlist.isEmpty()) {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(vertical = 40.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Daftar Putar Koleksi (${playlist.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            text = "Belum ada audio yang diunduh.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        IconButton(
-                            onClick = {
-                                scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                    showBottomSheet = false
-                                }
-                            },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Tutup",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
                     }
-
-                    HorizontalDivider()
-
-                    if (playlist.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Belum ada audio di koleksi. Unduh kode RJ terlebih dahulu.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(vertical = 10.dp)
-                        ) {
-                            itemsIndexed(playlist, key = { _, item -> item.rjid }) { index, item ->
-                                val fileExists = remember(item.localFilePath) { File(item.localFilePath).exists() }
-                                val isCurrentTrack = item.rjid == currentRjId
-                                val isDragged = draggedRjid == item.rjid
-
-                                PlaylistItemCard(
-                                    item = item,
-                                    isCurrentTrack = isCurrentTrack,
-                                    fileExists = fileExists,
-                                    isDragged = isDragged,
-                                    dragOffsetY = if (isDragged) dragOffsetY else 0f,
-                                    onDragHandleGesture = {
-                                        detectVerticalDragGestures(
-                                            onDragStart = {
-                                                draggedRjid = item.rjid
-                                                dragOffsetY = 0f
-                                            },
-                                            onVerticalDrag = { change, dragAmount ->
-                                                change.consume()
-                                                dragOffsetY += dragAmount
-
-                                                val currentIdx = playlist.indexOfFirst { it.rjid == draggedRjid }
-                                                if (currentIdx != -1) {
-                                                    val threshold = itemHeightPx * 0.45f
-                                                    if (dragOffsetY > threshold && currentIdx < playlist.size - 1) {
-                                                        viewModel.reorderPlaylist(currentIdx, currentIdx + 1)
-                                                        dragOffsetY -= itemHeightPx
-                                                    } else if (dragOffsetY < -threshold && currentIdx > 0) {
-                                                        viewModel.reorderPlaylist(currentIdx, currentIdx - 1)
-                                                        dragOffsetY += itemHeightPx
-                                                    }
-                                                }
-                                            },
-                                            onDragEnd = {
-                                                draggedRjid = null
-                                                dragOffsetY = 0f
-                                            },
-                                            onDragCancel = {
-                                                draggedRjid = null
-                                                dragOffsetY = 0f
-                                            }
-                                        )
-                                    },
-                                    onClick = {
-                                        if (fileExists) {
-                                            viewModel.playLocalTrack(item, playlist)
-                                            scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                                showBottomSheet = false
-                                            }
-                                        } else {
-                                            Toast.makeText(context, "File [${item.rjid}] tidak ditemukan di memori HP.", Toast.LENGTH_SHORT).show()
-                                        }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(
+                            items = playlist,
+                            key = { _, item -> item.rjid }
+                        ) { index, item ->
+                            val isCurrent = item.rjid == currentRjId
+                            PlaylistTrackCard(
+                                item = item,
+                                isCurrent = isCurrent,
+                                onClick = {
+                                    viewModel.playLocalTrack(item, playlist)
+                                },
+                                onReorder = { deltaSteps ->
+                                    val target = (index + deltaSteps).coerceIn(0, playlist.size - 1)
+                                    if (target != index) {
+                                        viewModel.reorderPlaylist(index, target)
                                     }
-                                )
-                            }
+                                }
+                            )
                         }
                     }
                 }
@@ -471,40 +392,40 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 }
 
 @Composable
-fun PlaylistItemCard(
+fun PlaylistTrackCard(
     item: HistoryEntity,
-    isCurrentTrack: Boolean,
-    fileExists: Boolean,
-    isDragged: Boolean,
-    dragOffsetY: Float,
-    onDragHandleGesture: suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit,
-    onClick: () -> Unit
+    isCurrent: Boolean,
+    onClick: () -> Unit,
+    onReorder: (deltaSteps: Int) -> Unit
 ) {
-    val scale by animateFloatAsState(if (isDragged) 1.04f else 1.0f, label = "scale")
+    var isDragging by remember { mutableStateOf(false) }
+    var dragOffsetAccumulator by remember { mutableFloatStateOf(0f) }
+    val stepThresholdPx = 140f
+
+    val scale by animateFloatAsState(targetValue = if (isDragging) 1.03f else 1.0f, label = "cardScale")
 
     Card(
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCurrent) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            }
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            .zIndex(if (isDragged) 20f else 1f)
-            .offset { IntOffset(0, dragOffsetY.roundToInt()) }
             .scale(scale)
             .shadow(
-                elevation = if (isDragged) 16.dp else 0.dp,
-                shape = RoundedCornerShape(12.dp)
+                elevation = if (isDragging) 10.dp else 0.dp,
+                shape = RoundedCornerShape(14.dp)
             )
-            .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = when {
-                isDragged -> MaterialTheme.colorScheme.secondaryContainer
-                !fileExists -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-                isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-            }
-        )
+            .clickable { onClick() }
     ) {
         Row(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
@@ -512,8 +433,8 @@ fun PlaylistItemCard(
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(54.dp, 40.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(8.dp))
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -522,65 +443,66 @@ fun PlaylistItemCard(
                 Text(
                     text = "[${item.rjid}] ${item.title}",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = when {
-                        !fileExists -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        isCurrentTrack -> MaterialTheme.colorScheme.onPrimaryContainer
-                        else -> MaterialTheme.colorScheme.onSurface
-                    }
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (fileExists) "CV: ${item.cv} • ${item.fileSize}" else "File belum diunduh / terhapus",
+                    text = "CV: ${item.cv}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (fileExists) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
-            if (!fileExists) {
+            if (isCurrent) {
                 Icon(
-                    Icons.Default.FileDownloadOff,
-                    contentDescription = "File Hilang",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
-                    modifier = Modifier.size(22.dp)
-                )
-            } else if (isCurrentTrack) {
-                Icon(
-                    Icons.Default.GraphicEq,
-                    contentDescription = "Playing",
+                    imageVector = Icons.Default.VolumeUp,
+                    contentDescription = "Sedang Diputar",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-            } else {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier
+                        .size(20.dp)
+                        .padding(end = 4.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(6.dp))
-
-            // Area Ikon Drag Handle (Geser terus-menerus ke atas/bawah tanpa jeda)
+            // Draggable Drag Handle
             Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .pointerInput(item.rjid, onDragHandleGesture),
-                contentAlignment = Alignment.Center
+                    .size(40.dp)
+                    .pointerInput(item.rjid) {
+                        detectVerticalDragGestures(
+                            onDragStart = {
+                                isDragging = true
+                                dragOffsetAccumulator = 0f
+                            },
+                            onDragEnd = {
+                                isDragging = false
+                                dragOffsetAccumulator = 0f
+                            },
+                            onDragCancel = {
+                                isDragging = false
+                                dragOffsetAccumulator = 0f
+                            },
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                dragOffsetAccumulator += dragAmount
+                                val steps = (dragOffsetAccumulator / stepThresholdPx).toInt()
+                                if (steps != 0) {
+                                    onReorder(steps)
+                                    dragOffsetAccumulator -= (steps * stepThresholdPx)
+                                }
+                            }
+                        )
+                    }
             ) {
                 Icon(
                     imageVector = Icons.Default.DragHandle,
-                    contentDescription = "Atur Urutan",
-                    tint = if (isDragged) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    },
+                    contentDescription = "Geser Urutan",
+                    tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -589,8 +511,14 @@ fun PlaylistItemCard(
 }
 
 private fun formatDuration(ms: Long): String {
-    val totalSec = ms / 1000
-    val min = totalSec / 60
-    val sec = totalSec % 60
-    return String.format("%02d:%02d", min, sec)
+    val totalSeconds = (ms / 1000).coerceAtLeast(0)
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+
+    return if (hours > 0) {
+        String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+    }
 }

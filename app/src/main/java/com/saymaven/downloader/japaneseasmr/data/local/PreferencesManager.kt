@@ -23,6 +23,14 @@ class PreferencesManager(private val context: Context) {
         val KEY_USE_DETAILED_FILENAME = booleanPreferencesKey("use_detailed_filename")
         val KEY_SHOW_CONSOLE = booleanPreferencesKey("show_console")
 
+        // Audio Player Settings
+        val KEY_EXCLUSIVE_AUDIO_FOCUS = booleanPreferencesKey("exclusive_audio_focus")
+        val KEY_PAUSE_ON_UNPLUG = booleanPreferencesKey("pause_on_unplug")
+        val KEY_SKIP_SILENCE = booleanPreferencesKey("skip_silence")
+        val KEY_KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val KEY_AUTO_RESUME = booleanPreferencesKey("auto_resume")
+        val KEY_DEFAULT_SPEED = floatPreferencesKey("default_speed")
+
         // Playback State Persistence
         val KEY_LAST_PLAYED_RJID = stringPreferencesKey("last_played_rjid")
         val KEY_LAST_POSITION_MS = longPreferencesKey("last_position_ms")
@@ -70,6 +78,31 @@ class PreferencesManager(private val context: Context) {
 
     val showConsoleFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_SHOW_CONSOLE] ?: true
+    }
+
+    // Audio Player Settings Flows
+    val exclusiveAudioFocusFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_EXCLUSIVE_AUDIO_FOCUS] ?: true
+    }
+
+    val pauseOnUnplugFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_PAUSE_ON_UNPLUG] ?: true
+    }
+
+    val skipSilenceFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_SKIP_SILENCE] ?: false
+    }
+
+    val keepScreenOnFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_KEEP_SCREEN_ON] ?: false
+    }
+
+    val autoResumeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_AUTO_RESUME] ?: true
+    }
+
+    val defaultSpeedFlow: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[KEY_DEFAULT_SPEED] ?: 1.0f
     }
 
     val lastPlayedRjidFlow: Flow<String?> = context.dataStore.data.map { preferences ->
@@ -133,6 +166,42 @@ class PreferencesManager(private val context: Context) {
     suspend fun setShowConsole(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_SHOW_CONSOLE] = enabled
+        }
+    }
+
+    suspend fun setExclusiveAudioFocus(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_EXCLUSIVE_AUDIO_FOCUS] = enabled
+        }
+    }
+
+    suspend fun setPauseOnUnplug(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_PAUSE_ON_UNPLUG] = enabled
+        }
+    }
+
+    suspend fun setSkipSilence(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_SKIP_SILENCE] = enabled
+        }
+    }
+
+    suspend fun setKeepScreenOn(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_KEEP_SCREEN_ON] = enabled
+        }
+    }
+
+    suspend fun setAutoResume(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_AUTO_RESUME] = enabled
+        }
+    }
+
+    suspend fun setDefaultSpeed(speed: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_DEFAULT_SPEED] = speed
         }
     }
 

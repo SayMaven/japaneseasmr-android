@@ -56,6 +56,43 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         false
     )
 
+    // Player Settings StateFlows
+    val exclusiveAudioFocus = preferencesManager.exclusiveAudioFocusFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        true
+    )
+
+    val pauseOnUnplug = preferencesManager.pauseOnUnplugFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        true
+    )
+
+    val skipSilence = preferencesManager.skipSilenceFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        false
+    )
+
+    val keepScreenOn = preferencesManager.keepScreenOnFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        false
+    )
+
+    val autoResume = preferencesManager.autoResumeFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        true
+    )
+
+    val defaultSpeed = preferencesManager.defaultSpeedFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        1.0f
+    )
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             preferencesManager.setThemeMode(mode)
@@ -95,6 +132,42 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setUseDetailedFilename(enabled: Boolean) {
         viewModelScope.launch {
             preferencesManager.setUseDetailedFilename(enabled)
+        }
+    }
+
+    fun setExclusiveAudioFocus(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setExclusiveAudioFocus(enabled)
+        }
+    }
+
+    fun setPauseOnUnplug(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setPauseOnUnplug(enabled)
+        }
+    }
+
+    fun setSkipSilence(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setSkipSilence(enabled)
+        }
+    }
+
+    fun setKeepScreenOn(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setKeepScreenOn(enabled)
+        }
+    }
+
+    fun setAutoResume(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setAutoResume(enabled)
+        }
+    }
+
+    fun setDefaultSpeed(speed: Float) {
+        viewModelScope.launch {
+            preferencesManager.setDefaultSpeed(speed)
         }
     }
 }

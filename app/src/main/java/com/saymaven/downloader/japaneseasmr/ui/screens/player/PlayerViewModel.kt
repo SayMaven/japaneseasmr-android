@@ -11,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -31,8 +32,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -46,6 +49,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _playlist = MutableStateFlow<List<HistoryEntity>>(emptyList())
     val playlist = _playlist.asStateFlow()
+
+    val keepScreenOn = prefs.keepScreenOnFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        false
+    )
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     val player: MediaController? get() = if (controllerFuture?.isDone == true) controllerFuture?.get() else null
@@ -84,6 +93,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         initMediaController()
         observeDatabasePlaylist()
         restorePlaybackState()
+        observeAudioSettings()
     }
 
     private fun observeDatabasePlaylist() {
@@ -106,6 +116,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     dbList
                 }
                 _playlist.value = sorted
+            }
+        }
+    }
+
+    private fun observeAudioSettings() {
+        viewModelScope.launch {
+            prefs.defaultSpeedFlow.collect { speed ->
+                player?.setPlaybackSpeed(speed)
             }
         }
     }
@@ -171,6 +189,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun restorePlaybackState() {
         viewModelScope.launch {
+            val autoResume = prefs.autoResumeFlow.first()
+            if (!autoResume) return@launch
+
             val lastRj = prefs.lastPlayedRjidFlow.first()
             if (!lastRj.isNullOrBlank() && _currentRjId.value == null) {
                 _currentRjId.value = lastRj
