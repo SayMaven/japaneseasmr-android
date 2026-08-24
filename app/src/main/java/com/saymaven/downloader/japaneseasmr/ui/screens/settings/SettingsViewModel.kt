@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
+import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -13,6 +14,15 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val preferencesManager = PreferencesManager(application)
+    val dacState = UsbDacManager.dacState
+
+    init {
+        viewModelScope.launch {
+            preferencesManager.exclusiveUsbDacFlow.collect { enabled ->
+                UsbDacManager.init(getApplication(), enabled)
+            }
+        }
+    }
 
     val themeMode = preferencesManager.themeModeFlow.stateIn(
         viewModelScope,
@@ -57,7 +67,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
 
     // Player Settings StateFlows
-    val exclusiveAudioFocus = preferencesManager.exclusiveAudioFocusFlow.stateIn(
+    val audioFocus = preferencesManager.audioFocusFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        true
+    )
+
+    val exclusiveUsbDac = preferencesManager.exclusiveUsbDacFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         true
@@ -135,9 +151,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun setExclusiveAudioFocus(enabled: Boolean) {
+    fun setAudioFocus(enabled: Boolean) {
         viewModelScope.launch {
-            preferencesManager.setExclusiveAudioFocus(enabled)
+            preferencesManager.setAudioFocus(enabled)
+        }
+    }
+
+    fun setExclusiveUsbDac(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setExclusiveUsbDac(enabled)
+            UsbDacManager.setExclusiveSetting(getApplication(), enabled)
         }
     }
 

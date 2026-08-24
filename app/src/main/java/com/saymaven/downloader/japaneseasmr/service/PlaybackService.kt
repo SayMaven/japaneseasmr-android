@@ -1,6 +1,7 @@
 package com.saymaven.downloader.japaneseasmr.service
 
 import android.content.Intent
+import android.os.Build
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
@@ -37,10 +38,34 @@ class PlaybackService : MediaSessionService() {
             val skipSilence = prefs.skipSilenceFlow.first()
             val defaultSpeed = prefs.defaultSpeedFlow.first()
             val pauseOnUnplug = prefs.pauseOnUnplugFlow.first()
+            val exclusiveUsb = prefs.exclusiveUsbDacFlow.first()
 
             player.skipSilenceEnabled = skipSilence
             player.setPlaybackSpeed(defaultSpeed)
             player.setHandleAudioBecomingNoisy(pauseOnUnplug)
+
+            UsbDacManager.init(this@PlaybackService, exclusiveUsb)
+        }
+
+        // Listen to USB DAC state and route preferred audio device
+        serviceScope.launch {
+            UsbDacManager.dacState.collect { dacInfo ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (dacInfo.isExclusiveActive && dacInfo.audioDeviceInfo != null) {
+                        try {
+                            player.setPreferredAudioDevice(dacInfo.audioDeviceInfo)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    } else {
+                        try {
+                            player.setPreferredAudioDevice(null)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
         }
 
         mediaSession = MediaSession.Builder(this, player).build()

@@ -5,13 +5,14 @@ import android.content.ComponentName
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
-import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -28,6 +29,7 @@ import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.service.PlaybackService
+import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,6 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.Locale
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -49,6 +52,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _playlist = MutableStateFlow<List<HistoryEntity>>(emptyList())
     val playlist = _playlist.asStateFlow()
+
+    val dacState = UsbDacManager.dacState
 
     val keepScreenOn = prefs.keepScreenOnFlow.stateIn(
         viewModelScope,
@@ -86,6 +91,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _shuffleMode = MutableStateFlow(sp.getBoolean("cached_shuffle", false))
     val shuffleMode = _shuffleMode.asStateFlow()
+
+    // Dynamic Audio Specs (- | - | - by default when no audio is playing)
+    private val _audioSpecs = MutableStateFlow("- | - | -")
+    val audioSpecs = _audioSpecs.asStateFlow()
 
     private var progressJob: Job? = null
 
@@ -249,6 +258,63 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         p.shuffleModeEnabled = _shuffleMode.value
     }
 
+    private fun calculateAudioSpecs(file: File) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                var sampleRate = 44100
+                var bitDepth = 16
+                var bitrateKbps = 0
+
+                val extractor = MediaExtractor()
+                try {
+                    extractor.setDataSource(file.absolutePath)
+                    for (i in 0 until extractor.trackCount) {
+                        val format = extractor.getTrackFormat(i)
+                        val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+                        if (mime.startsWith("audio/")) {
+                            if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                                sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                            }
+                            if (format.containsKey(MediaFormat.KEY_BIT_RATE)) {
+                                bitrateKbps = format.getInteger(MediaFormat.KEY_BIT_RATE) / 1000
+                            }
+                            if (format.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
+                                val pcm = format.getInteger(MediaFormat.KEY_PCM_ENCODING)
+                                bitDepth = if (pcm == 3) 8 else if (pcm == 4) 32 else 16
+                            }
+                            break
+                        }
+                    }
+                } catch (e: Exception) {
+                } finally {
+                    try { extractor.release() } catch (e: Exception) {}
+                }
+
+                if (bitrateKbps <= 0) {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(file.absolutePath)
+                        val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        val durMs = durStr?.toLongOrNull() ?: 0L
+                        if (durMs > 0) {
+                            bitrateKbps = ((file.length() * 8L) / durMs).toInt()
+                        }
+                    } catch (e: Exception) {
+                    } finally {
+                        try { retriever.release() } catch (e: Exception) {}
+                    }
+                }
+
+                if (bitrateKbps <= 0) bitrateKbps = 1064
+
+                val sampleRateKhz = String.format(Locale.US, "%.1fkHz", sampleRate / 1000.0)
+                _audioSpecs.value = "$sampleRateKhz | ${bitDepth}bits | ${bitrateKbps}kbps"
+            } catch (e: Exception) {
+                _audioSpecs.value = "44.1kHz | 16bits | 1064kbps"
+            }
+        }
+    }
+
     fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = _playlist.value) {
         viewModelScope.launch {
             val p = player ?: return@launch
@@ -269,6 +335,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             val targetPair = validItemsWithFiles.firstOrNull { it.first.rjid == history.rjid } ?: validItemsWithFiles.first()
             val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
+
+            calculateAudioSpecs(targetPair.second)
 
             val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, targetPair.first.coverUrl)
 
@@ -346,6 +414,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val p = player ?: return@launch
             val coverBytes = loadArtworkBytes(null, meta.coverUrl)
 
+            _audioSpecs.value = "44.1kHz | 16bits | 320kbps"
+
             val metaBuilder = MediaMetadata.Builder()
                 .setTitle("[${meta.rjid}] ${meta.title}")
                 .setArtist(meta.cv)
@@ -408,6 +478,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         } else if (p.repeatMode == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
             p.seekToDefaultPosition(p.mediaItemCount - 1)
         }
+        saveCurrentState()
+    }
+
+    fun replay10() {
+        val p = player ?: return
+        val newPos = (p.currentPosition - 10000L).coerceAtLeast(0L)
+        p.seekTo(newPos)
+        _currentPosition.value = newPos
+        saveCurrentState()
+    }
+
+    fun forward10() {
+        val p = player ?: return
+        val newPos = (p.currentPosition + 10000L).coerceAtMost(_duration.value.coerceAtLeast(0L))
+        p.seekTo(newPos)
+        _currentPosition.value = newPos
         saveCurrentState()
     }
 

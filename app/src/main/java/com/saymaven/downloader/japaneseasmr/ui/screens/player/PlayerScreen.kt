@@ -2,11 +2,10 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import android.app.Activity
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -22,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -30,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
@@ -51,6 +48,8 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val shuffleMode by viewModel.shuffleMode.collectAsState()
     val playlist by viewModel.playlist.collectAsState()
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
+    val dacState by viewModel.dacState.collectAsState()
+    val audioSpecs by viewModel.audioSpecs.collectAsState()
 
     val activity = context as? Activity
     DisposableEffect(keepScreenOn) {
@@ -72,29 +71,48 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // ================= 1. HEADER & COVER ART =================
+        // ================= 1. HEADER (TITLE & CV) & COVER ART =================
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Metadata Title (Top)
             Text(
-                text = "Sedang Memutar",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
+                text = currentTitle,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 12.dp)
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
+            // CV Text (Below Title)
+            Text(
+                text = "CV: $currentArtist",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Big Center Cover Art
             Card(
                 shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
                 modifier = Modifier
-                    .size(280.dp)
+                    .size(260.dp)
                     .aspectRatio(1f)
             ) {
                 if (currentCoverUrl != null) {
@@ -120,33 +138,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Metadata Title & Artist
-            Text(
-                text = currentTitle,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "CV: $currentArtist",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
 
-        // ================= 2. TIMELINE & CONTROLS =================
+        // ================= 2. TIMELINE, DAC/SPECS & CONTROLS =================
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -191,63 +185,42 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // DAC Status & Audio Specs (Below Timeline, Centered)
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Main Playback Controls
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (dacState.isExclusiveActive) {
+                    Text(
+                        text = "DAC Eksklusif: ${dacState.dacName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                }
+
+                Text(
+                    text = audioSpecs,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Control Row 1: Repeat (Left) & Shuffle (Right)
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Shuffle Mode Button
-                IconButton(onClick = { viewModel.toggleShuffleMode() }) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (shuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    )
-                }
-
-                // Previous Track
-                FilledIconButton(
-                    onClick = { viewModel.playPrevious() },
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Sebelumnya",
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                // Play / Pause Main Button
-                FilledIconButton(
-                    onClick = { viewModel.togglePlayPause() },
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.size(72.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(38.dp)
-                    )
-                }
-
-                // Next Track
-                FilledIconButton(
-                    onClick = { viewModel.playNext() },
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Berikutnya",
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
                 // Repeat Mode Button
                 IconButton(onClick = { viewModel.cycleRepeatMode() }) {
                     Icon(
@@ -258,16 +231,96 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         },
                         contentDescription = "Repeat",
                         tint = when (repeatMode) {
-                            Player.REPEAT_MODE_OFF -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            Player.REPEAT_MODE_OFF -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                             else -> MaterialTheme.colorScheme.primary
                         }
+                    )
+                }
+
+                // Shuffle Mode Button
+                IconButton(onClick = { viewModel.toggleShuffleMode() }) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (shuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Control Row 2: Prev, Replay10, Play/Pause, Forward10, Next
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Previous Track
+                IconButton(
+                    onClick = { viewModel.playPrevious() },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = "Sebelumnya",
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+
+                // Replay 10s
+                IconButton(
+                    onClick = { viewModel.replay10() },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Replay10,
+                        contentDescription = "Mundur 10 Detik",
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                // Play / Pause Main Button (Big Circle)
+                FilledIconButton(
+                    onClick = { viewModel.togglePlayPause() },
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.size(68.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                // Forward 10s
+                IconButton(
+                    onClick = { viewModel.forward10() },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Forward10,
+                        contentDescription = "Maju 10 Detik",
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                // Next Track
+                IconButton(
+                    onClick = { viewModel.playNext() },
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = "Berikutnya",
+                        modifier = Modifier.size(30.dp)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Bottom Playlist Drawer Opener Button
+            // Bottom Playlist Drawer Opener Button (Exact Screenshot 2 style)
             Surface(
                 onClick = { showPlaylistSheet = true },
                 shape = RoundedCornerShape(16.dp),
@@ -290,7 +343,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Daftar Putar Koleksi (${playlist.size})",
+                            text = "BERIKUTNYA • DAFTAR PUTAR (${playlist.size})",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -306,7 +359,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
         }
     }
 
-    // ================= 3. PLAYLIST BOTTOM SHEET WITH FLUID REORDERING =================
+    // ================= 3. PLAYLIST BOTTOM SHEET WITH RELIABLE REORDERING =================
     if (showPlaylistSheet) {
         ModalBottomSheet(
             onDismissRequest = { showPlaylistSheet = false },
@@ -327,7 +380,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Daftar Putar Koleksi (${playlist.size})",
+                        text = "BERIKUTNYA • DAFTAR PUTAR (${playlist.size})",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -373,11 +426,23 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             PlaylistTrackCard(
                                 item = item,
                                 isCurrent = isCurrent,
+                                isFirst = index == 0,
+                                isLast = index == playlist.size - 1,
                                 onClick = {
                                     viewModel.playLocalTrack(item, playlist)
                                 },
-                                onReorder = { deltaSteps ->
-                                    val target = (index + deltaSteps).coerceIn(0, playlist.size - 1)
+                                onMoveUp = {
+                                    if (index > 0) {
+                                        viewModel.reorderPlaylist(index, index - 1)
+                                    }
+                                },
+                                onMoveDown = {
+                                    if (index < playlist.size - 1) {
+                                        viewModel.reorderPlaylist(index, index + 1)
+                                    }
+                                },
+                                onReorderSteps = { steps ->
+                                    val target = (index + steps).coerceIn(0, playlist.size - 1)
                                     if (target != index) {
                                         viewModel.reorderPlaylist(index, target)
                                     }
@@ -395,12 +460,16 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 fun PlaylistTrackCard(
     item: HistoryEntity,
     isCurrent: Boolean,
+    isFirst: Boolean,
+    isLast: Boolean,
     onClick: () -> Unit,
-    onReorder: (deltaSteps: Int) -> Unit
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onReorderSteps: (Int) -> Unit
 ) {
     var isDragging by remember { mutableStateOf(false) }
     var dragOffsetAccumulator by remember { mutableFloatStateOf(0f) }
-    val stepThresholdPx = 140f
+    val stepThresholdPx = 100f
 
     val scale by animateFloatAsState(targetValue = if (isDragging) 1.03f else 1.0f, label = "cardScale")
 
@@ -417,7 +486,7 @@ fun PlaylistTrackCard(
             .fillMaxWidth()
             .scale(scale)
             .shadow(
-                elevation = if (isDragging) 10.dp else 0.dp,
+                elevation = if (isDragging) 8.dp else 0.dp,
                 shape = RoundedCornerShape(14.dp)
             )
             .clickable { onClick() }
@@ -468,13 +537,44 @@ fun PlaylistTrackCard(
                 )
             }
 
-            // Draggable Drag Handle
+            // Up / Down Quick Reordering Buttons
+            Column(
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                IconButton(
+                    onClick = onMoveUp,
+                    enabled = !isFirst,
+                    modifier = Modifier.size(22.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Pindah Ke Atas",
+                        tint = if (!isFirst) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
+                    onClick = onMoveDown,
+                    enabled = !isLast,
+                    modifier = Modifier.size(22.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Pindah Ke Bawah",
+                        tint = if (!isLast) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // Hold & Drag Handle
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .pointerInput(item.rjid) {
-                        detectVerticalDragGestures(
+                        detectDragGesturesAfterLongPress(
                             onDragStart = {
                                 isDragging = true
                                 dragOffsetAccumulator = 0f
@@ -487,12 +587,12 @@ fun PlaylistTrackCard(
                                 isDragging = false
                                 dragOffsetAccumulator = 0f
                             },
-                            onVerticalDrag = { change, dragAmount ->
+                            onDrag = { change, dragAmount ->
                                 change.consume()
-                                dragOffsetAccumulator += dragAmount
+                                dragOffsetAccumulator += dragAmount.y
                                 val steps = (dragOffsetAccumulator / stepThresholdPx).toInt()
                                 if (steps != 0) {
-                                    onReorder(steps)
+                                    onReorderSteps(steps)
                                     dragOffsetAccumulator -= (steps * stepThresholdPx)
                                 }
                             }
@@ -501,8 +601,8 @@ fun PlaylistTrackCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.DragHandle,
-                    contentDescription = "Geser Urutan",
-                    tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    contentDescription = "Tahan & Geser",
+                    tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.size(24.dp)
                 )
             }

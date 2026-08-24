@@ -24,7 +24,8 @@ class PreferencesManager(private val context: Context) {
         val KEY_SHOW_CONSOLE = booleanPreferencesKey("show_console")
 
         // Audio Player Settings
-        val KEY_EXCLUSIVE_AUDIO_FOCUS = booleanPreferencesKey("exclusive_audio_focus")
+        val KEY_AUDIO_FOCUS = booleanPreferencesKey("audio_focus")
+        val KEY_EXCLUSIVE_USB_DAC = booleanPreferencesKey("exclusive_usb_dac")
         val KEY_PAUSE_ON_UNPLUG = booleanPreferencesKey("pause_on_unplug")
         val KEY_SKIP_SILENCE = booleanPreferencesKey("skip_silence")
         val KEY_KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
@@ -81,8 +82,12 @@ class PreferencesManager(private val context: Context) {
     }
 
     // Audio Player Settings Flows
-    val exclusiveAudioFocusFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[KEY_EXCLUSIVE_AUDIO_FOCUS] ?: true
+    val audioFocusFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_AUDIO_FOCUS] ?: true
+    }
+
+    val exclusiveUsbDacFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_EXCLUSIVE_USB_DAC] ?: true
     }
 
     val pauseOnUnplugFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -169,9 +174,15 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
-    suspend fun setExclusiveAudioFocus(enabled: Boolean) {
+    suspend fun setAudioFocus(enabled: Boolean) {
         context.dataStore.edit { preferences ->
-            preferences[KEY_EXCLUSIVE_AUDIO_FOCUS] = enabled
+            preferences[KEY_AUDIO_FOCUS] = enabled
+        }
+    }
+
+    suspend fun setExclusiveUsbDac(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_EXCLUSIVE_USB_DAC] = enabled
         }
     }
 

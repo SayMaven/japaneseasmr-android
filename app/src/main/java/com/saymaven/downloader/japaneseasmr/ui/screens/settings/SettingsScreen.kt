@@ -35,7 +35,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val useDetailedFilename by viewModel.useDetailedFilename.collectAsState()
 
     // Player Settings
-    val exclusiveAudioFocus by viewModel.exclusiveAudioFocus.collectAsState()
+    val audioFocus by viewModel.audioFocus.collectAsState()
+    val exclusiveUsbDac by viewModel.exclusiveUsbDac.collectAsState()
+    val dacState by viewModel.dacState.collectAsState()
     val pauseOnUnplug by viewModel.pauseOnUnplug.collectAsState()
     val skipSilence by viewModel.skipSilence.collectAsState()
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
@@ -140,7 +142,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                     ListItem(
                         headlineContent = { Text("Deteksi Otomatis Clipboard") },
-                        supportingContent = { Text("Otomatis isi kode RJ baru saat disalin", style = MaterialTheme.typography.bodySmall) },
+                        supportingContent = { Text("Otomatis isi kode RJ saat disalin", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = {
                             Switch(
@@ -153,7 +155,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
         }
 
-        // ================= KATEGORI 2: PEMUTAR AUDIO (BARU) =================
+        // ================= KATEGORI 2: PEMUTAR AUDIO =================
         item {
             SettingsCategoryHeader(title = "Pemutar Audio", icon = Icons.Default.Headphones)
         }
@@ -164,23 +166,58 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
             ) {
                 Column {
+                    // 1. Mode Eksklusif USB DAC
                     ListItem(
-                        headlineContent = { Text("Fokus Audio Eksklusif") },
-                        supportingContent = { Text("Jeda penuh saat ada audio/notifikasi lain agar fokus tidak terpecah", style = MaterialTheme.typography.bodySmall) },
-                        leadingContent = { Icon(Icons.Default.VolumeOff, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        headlineContent = { Text("Mode Eksklusif USB DAC") },
+                        supportingContent = {
+                            Text(
+                                text = if (dacState.isExclusiveActive) {
+                                    "Aktif: Terhubung ke ${dacState.dacName} (Direct Hardware Access)"
+                                } else if (dacState.isConnected) {
+                                    "Terdeteksi: ${dacState.dacName}"
+                                } else {
+                                    "Akses direct hardware USB DAC saat terhubung"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (dacState.isExclusiveActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Usb,
+                                contentDescription = null,
+                                tint = if (dacState.isExclusiveActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
                         trailingContent = {
                             Switch(
-                                checked = exclusiveAudioFocus,
-                                onCheckedChange = { viewModel.setExclusiveAudioFocus(it) }
+                                checked = exclusiveUsbDac,
+                                onCheckedChange = { viewModel.setExclusiveUsbDac(it) }
                             )
                         }
                     )
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
+                    // 2. Mode Fokus Audio
+                    ListItem(
+                        headlineContent = { Text("Mode Fokus") },
+                        supportingContent = { Text("Jeda audio saat aplikasi lain bersuara", style = MaterialTheme.typography.bodySmall) },
+                        leadingContent = { Icon(Icons.Default.VolumeMute, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Switch(
+                                checked = audioFocus,
+                                onCheckedChange = { viewModel.setAudioFocus(it) }
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // 3. Jeda Saat Headset Dilepas
                     ListItem(
                         headlineContent = { Text("Jeda Saat Headset Terputus") },
-                        supportingContent = { Text("Otomatis pause saat earphone kabel atau TWS Bluetooth terputus", style = MaterialTheme.typography.bodySmall) },
+                        supportingContent = { Text("Jeda otomatis saat earphone atau DAC dicabut", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.HeadsetOff, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = {
                             Switch(
@@ -192,9 +229,10 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
+                    // 4. Lewati Jeda Hening
                     ListItem(
-                        headlineContent = { Text("Lewati Jeda Hening (Skip Silence)") },
-                        supportingContent = { Text("Otomatis mempercepat bagian hening tanpa merusak tempo dialog", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text("Lewati Jeda Hening") },
+                        supportingContent = { Text("Lewati bagian audio tanpa suara", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = {
                             Switch(
@@ -206,9 +244,10 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
+                    // 5. Layar Tetap Menyala
                     ListItem(
                         headlineContent = { Text("Layar Tetap Menyala") },
-                        supportingContent = { Text("Mencegah layar HP mati/terkunci saat berada di tab pemutar", style = MaterialTheme.typography.bodySmall) },
+                        supportingContent = { Text("Jaga layar aktif di tab pemutar", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.StayCurrentPortrait, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = {
                             Switch(
@@ -220,9 +259,10 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
+                    // 6. Lanjutkan Pemutaran Otomatis
                     ListItem(
-                        headlineContent = { Text("Lanjutkan Pemutaran Otomatis") },
-                        supportingContent = { Text("Memuat track dan posisi detik terakhir saat aplikasi dibuka", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text("Lanjutkan Pemutaran") },
+                        supportingContent = { Text("Muat posisi terakhir saat aplikasi dibuka", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.Restore, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = {
                             Switch(
@@ -234,10 +274,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
+                    // 7. Kecepatan Putar Bawaan
                     ListItem(
                         modifier = Modifier.clickable { showSpeedDialog = true },
-                        headlineContent = { Text("Kecepatan Putar Bawaan") },
-                        supportingContent = { Text("Kecepatan awal saat memutar audio karya", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text("Kecepatan Putar") },
+                        supportingContent = { Text("Kecepatan awal pemutaran", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.SlowMotionVideo, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = {
                             Text(
@@ -264,8 +305,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             ) {
                 ListItem(
                     modifier = Modifier.clickable { showConnDialog = true },
-                    headlineContent = { Text("Koneksi Paralel Multi-Thread") },
-                    supportingContent = { Text("$parallelConn thread simultan (HLS & Range MP3)", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text("Koneksi Paralel") },
+                    supportingContent = { Text("$parallelConn thread simultan (HLS & MP3)", style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Text(
@@ -309,8 +350,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                     ListItem(
-                        headlineContent = { Text("Warna Dinamis (Material You)") },
-                        supportingContent = { Text("Menyesuaikan warna aksen wallpaper HP (Android 12+)", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text("Warna Dinamis") },
+                        supportingContent = { Text("Warna aksen dari wallpaper HP", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.ColorLens, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = {
                             Switch(
@@ -325,7 +366,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                         ListItem(
                             modifier = Modifier.clickable { showPaletteDialog = true },
-                            headlineContent = { Text("Palet Warna Aksen") },
+                            headlineContent = { Text("Palet Warna") },
                             supportingContent = { Text(colorPalette.title, style = MaterialTheme.typography.bodySmall) },
                             leadingContent = { Icon(Icons.Default.Brush, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                         )
@@ -335,7 +376,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                     ListItem(
                         modifier = Modifier.clickable { showLanguageDialog = true },
-                        headlineContent = { Text("Bahasa (Language)") },
+                        headlineContent = { Text("Bahasa") },
                         supportingContent = { Text("Bahasa Indonesia", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                     )
@@ -345,7 +386,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
         // ================= KATEGORI 5: TENTANG =================
         item {
-            SettingsCategoryHeader(title = "Tentang Aplikasi", icon = Icons.Default.Info)
+            SettingsCategoryHeader(title = "Tentang", icon = Icons.Default.Info)
         }
 
         item {
@@ -359,8 +400,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/SayMaven"))
                             context.startActivity(intent)
                         },
-                        headlineContent = { Text("Pengembang (Developer)") },
-                        supportingContent = { Text("SayMaven (Ketuk untuk buka profil GitHub)", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text("Pengembang") },
+                        supportingContent = { Text("SayMaven (GitHub)", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = { Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp)) }
                     )
@@ -377,7 +418,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                     ListItem(
                         headlineContent = { Text("Versi Aplikasi") },
-                        supportingContent = { Text("v1.1.0 (Release Build)", style = MaterialTheme.typography.bodySmall) },
+                        supportingContent = { Text("v1.1.0", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                     )
 
@@ -386,7 +427,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     ListItem(
                         modifier = Modifier.clickable { showChangelogDialog = true },
                         headlineContent = { Text("Log Versi (Changelog)") },
-                        supportingContent = { Text("Lihat riwayat pembaruan & fitur baru", style = MaterialTheme.typography.bodySmall) },
+                        supportingContent = { Text("Riwayat pembaruan & fitur baru", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.HistoryEdu, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                     )
 
@@ -394,8 +435,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                     ListItem(
                         modifier = Modifier.clickable { showReadmeDialog = true },
-                        headlineContent = { Text("Baca Panduan & Fitur (README)") },
-                        supportingContent = { Text("Ringkasan fitur lengkap & panduan penggunaan", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text("Panduan Penggunaan (README)") },
+                        supportingContent = { Text("Ringkasan fitur & panduan", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                     )
 
@@ -407,7 +448,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             context.startActivity(intent)
                         },
                         headlineContent = { Text("Laporkan Isu / Bug") },
-                        supportingContent = { Text("Buka GitHub Issues untuk saran & pelaporan bug", style = MaterialTheme.typography.bodySmall) },
+                        supportingContent = { Text("GitHub Issues", style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.BugReport, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = { Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(20.dp)) }
                     )
@@ -499,12 +540,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         )
     }
 
-    // 3. Playback Speed Dialog (Baru)
+    // 3. Playback Speed Dialog
     if (showSpeedDialog) {
         val speeds = listOf(0.75f, 0.9f, 1.0f, 1.1f, 1.25f, 1.5f)
         AlertDialog(
             onDismissRequest = { showSpeedDialog = false },
-            title = { Text("Kecepatan Putar Bawaan") },
+            title = { Text("Kecepatan Putar") },
             text = {
                 Column {
                     speeds.forEach { spd ->
@@ -596,16 +637,14 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text("Riwayat Pembaruan (Changelog)") },
             text = {
                 Column(modifier = Modifier.padding(top = 8.dp)) {
-                    Text("Versi 1.1.0 (Pembaruan Fitur Pemutar)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("• Grup Pengaturan Pemutar Audio lengkap (Fokus Audio Eksklusif, Jeda Saat Headset Dilepas, Lewati Jeda Hening, Layar Tetap Menyala, Kecepatan Putar).", style = MaterialTheme.typography.bodySmall)
-                    Text("• Penyimpanan permanen urutan daftar putar drag-and-drop.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Tombol toggle sembunyikan/tampilkan konsol live log dengan ikon dinamis (>_ / <>).", style = MaterialTheme.typography.bodySmall)
-                    Text("• Pemulihan otomatis lagu lama di penyimpanan saat aplikasi dibuka.", style = MaterialTheme.typography.bodySmall)
+                    Text("Versi 1.1.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("• Mode Eksklusif USB DAC dengan direct USB hardware claim & dialog izin USB host Android.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Tampilan spesifikasi audio real-time (kHz, bits, kbps).", style = MaterialTheme.typography.bodySmall)
+                    Text("• Mode Fokus, Jeda Headset, Lewati Hening, dan Layar Tetap Menyala.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Urutan playlist persisten across restart.", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("Versi 1.0.0 (Rilis Awal)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                    Text("• Engine unduhan native multi-thread paralel (4-32 koneksi).", style = MaterialTheme.typography.bodySmall)
-                    Text("• Pemutar audio native dengan kontrol MediaSession notifikasi & lockscreen.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Penanaman cover art resolusi tinggi dan ID3 metadata otomatis.", style = MaterialTheme.typography.bodySmall)
+                    Text("Versi 1.0.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                    Text("• Engine unduhan multi-thread & pemutar audio native.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
@@ -622,13 +661,10 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             text = {
                 Column(modifier = Modifier.padding(top = 8.dp)) {
                     Text("1. Mengunduh Karya:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Masukkan kode RJ (misal: RJ337874) di tab Home, lalu tekan 'Unduh' untuk mengunduh langsung atau '+ Antrean' untuk menumpuk unduhan.", style = MaterialTheme.typography.bodySmall)
+                    Text("Masukkan kode RJ di tab Home, lalu tekan Unduh atau + Antrean.", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("2. Memutar Audio:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Buka tab Riwayat atau Pemutar, pilih lagu yang ingin didengarkan. Geser ikon = di daftar putar untuk mengatur urutan lagu.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("3. Audio Eksklusif & Headset:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Gunakan menu Pengaturan -> Pemutar Audio untuk mengatur fokus audio eksklusif dan auto-pause saat headset terputus.", style = MaterialTheme.typography.bodySmall)
+                    Text("2. DAC Eksklusif:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Colokkan USB DAC untuk mengaktifkan direct hardware access.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
