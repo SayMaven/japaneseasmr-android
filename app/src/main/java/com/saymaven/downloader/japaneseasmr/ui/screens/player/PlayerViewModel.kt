@@ -93,6 +93,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _shuffleMode = MutableStateFlow(if (isAutoResumeActive) sp.getBoolean("cached_shuffle", false) else false)
     val shuffleMode = _shuffleMode.asStateFlow()
 
+    private val _showRemainingTime = MutableStateFlow(if (isAutoResumeActive) sp.getBoolean("cached_show_remaining", false) else false)
+    val showRemainingTime = _showRemainingTime.asStateFlow()
+
     private val _audioSpecs = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_specs", "- | - | -") ?: "- | - | -" else "- | - | -")
     val audioSpecs = _audioSpecs.asStateFlow()
 
@@ -249,6 +252,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         commitPlaylistReorder()
     }
 
+    fun toggleShowRemainingTime() {
+        val next = !_showRemainingTime.value
+        _showRemainingTime.value = next
+        saveCurrentState()
+    }
+
     private fun initMediaController() {
         val sessionToken = SessionToken(
             getApplication(),
@@ -318,12 +327,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _currentCoverUrl.value = null
                 _currentPosition.value = 0L
                 _duration.value = 0L
+                _showRemainingTime.value = false
                 _audioSpecs.value = "- | - | -"
                 return@launch
             }
 
             val lastRj = prefs.lastPlayedRjidFlow.first()
             val lastPos = prefs.lastPositionMsFlow.first()
+            val savedRemaining = prefs.showRemainingTimeFlow.first()
+            _showRemainingTime.value = savedRemaining
 
             if (!lastRj.isNullOrBlank()) {
                 val history = historyDao.getHistoryById(lastRj)
@@ -737,6 +749,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 .putString("cached_specs", _audioSpecs.value)
                 .putInt("cached_repeat", _repeatMode.value)
                 .putBoolean("cached_shuffle", _shuffleMode.value)
+                .putBoolean("cached_show_remaining", _showRemainingTime.value)
                 .commit()
         }
     }
@@ -750,7 +763,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     rjid = _currentRjId.value,
                     positionMs = _currentPosition.value,
                     repeatMode = _repeatMode.value,
-                    shuffleMode = _shuffleMode.value
+                    shuffleMode = _shuffleMode.value,
+                    showRemainingTime = _showRemainingTime.value
                 )
             }
         }

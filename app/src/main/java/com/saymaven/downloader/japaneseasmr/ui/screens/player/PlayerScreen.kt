@@ -55,6 +55,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val duration by viewModel.duration.collectAsState()
     val repeatMode by viewModel.repeatMode.collectAsState()
     val shuffleMode by viewModel.shuffleMode.collectAsState()
+    val showRemainingTime by viewModel.showRemainingTime.collectAsState()
     val playlist by viewModel.playlist.collectAsState()
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
     val dacState by viewModel.dacState.collectAsState()
@@ -72,7 +73,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
     var isSliderDragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableLongStateOf(0L) }
-    var showRemainingTime by remember { mutableStateOf(false) }
     var showBottomSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -247,7 +247,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     text = if (showRemainingTime) "-${formatDuration((duration - effectivePosition).coerceAtLeast(0L))}" else formatDuration(duration),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable { showRemainingTime = !showRemainingTime }
+                    modifier = Modifier.clickable { viewModel.toggleShowRemainingTime() }
                 )
             }
 

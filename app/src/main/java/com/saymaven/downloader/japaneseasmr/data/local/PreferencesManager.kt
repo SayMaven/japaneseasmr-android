@@ -9,7 +9,7 @@ import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_settings")
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
 class PreferencesManager(private val context: Context) {
 
@@ -39,6 +39,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_LAST_POSITION_MS = longPreferencesKey("last_position_ms")
         val KEY_REPEAT_MODE = intPreferencesKey("repeat_mode")
         val KEY_SHUFFLE_MODE = booleanPreferencesKey("shuffle_mode")
+        val KEY_SHOW_REMAINING_TIME = booleanPreferencesKey("show_remaining_time")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
@@ -128,6 +129,10 @@ class PreferencesManager(private val context: Context) {
 
     val shuffleModeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_SHUFFLE_MODE] ?: false
+    }
+
+    val showRemainingTimeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_SHOW_REMAINING_TIME] ?: false
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
@@ -221,6 +226,7 @@ class PreferencesManager(private val context: Context) {
                 .remove("cached_pos")
                 .remove("cached_duration")
                 .remove("cached_specs")
+                .remove("cached_show_remaining")
                 .apply()
         }
         context.dataStore.edit { preferences ->
@@ -228,6 +234,7 @@ class PreferencesManager(private val context: Context) {
             if (!enabled) {
                 preferences.remove(KEY_LAST_PLAYED_RJID)
                 preferences.remove(KEY_LAST_POSITION_MS)
+                preferences.remove(KEY_SHOW_REMAINING_TIME)
             }
         }
     }
@@ -238,7 +245,17 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
-    suspend fun savePlaybackState(rjid: String?, positionMs: Long, repeatMode: Int, shuffleMode: Boolean) {
+    suspend fun setShowRemainingTime(enabled: Boolean) {
+        val autoResume = fastSp.getBoolean("setting_auto_resume", true)
+        if (autoResume) {
+            fastSp.edit().putBoolean("cached_show_remaining", enabled).apply()
+            context.dataStore.edit { preferences ->
+                preferences[KEY_SHOW_REMAINING_TIME] = enabled
+            }
+        }
+    }
+
+    suspend fun savePlaybackState(rjid: String?, positionMs: Long, repeatMode: Int, shuffleMode: Boolean, showRemainingTime: Boolean = false) {
         val autoResume = fastSp.getBoolean("setting_auto_resume", true)
         if (autoResume) {
             context.dataStore.edit { preferences ->
@@ -246,6 +263,7 @@ class PreferencesManager(private val context: Context) {
                 preferences[KEY_LAST_POSITION_MS] = positionMs
                 preferences[KEY_REPEAT_MODE] = repeatMode
                 preferences[KEY_SHUFFLE_MODE] = shuffleMode
+                preferences[KEY_SHOW_REMAINING_TIME] = showRemainingTime
             }
         }
     }
