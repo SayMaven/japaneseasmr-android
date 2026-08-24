@@ -102,6 +102,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         resolveAndPreloadInitialCover()
         initMediaController()
         observeDatabasePlaylist()
+        observeSyncTicks()
         restorePlaybackState()
         observeAudioSettings()
         StorageSyncManager.syncStorageWithDatabase(application)
@@ -142,6 +143,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             historyDao.getAllHistory().collect { dbList ->
                 filterAndSetPlaylist(dbList)
+            }
+        }
+    }
+
+    private fun observeSyncTicks() {
+        viewModelScope.launch {
+            StorageSyncManager.syncTick.collect { tick ->
+                if (tick > 0L) {
+                    refreshPlaylist()
+                }
             }
         }
     }

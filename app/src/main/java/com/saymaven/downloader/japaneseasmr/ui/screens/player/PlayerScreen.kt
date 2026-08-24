@@ -2,7 +2,6 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import android.app.Activity
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -76,6 +75,13 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     var showRemainingTime by remember { mutableStateOf(false) }
     var showBottomSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Instan refresh playlist setiap kali Bottom Sheet dibuka
+    LaunchedEffect(showBottomSheet) {
+        if (showBottomSheet) {
+            viewModel.refreshPlaylist()
+        }
+    }
 
     val effectivePosition = if (isSliderDragging) dragPosition else currentPosition
 
