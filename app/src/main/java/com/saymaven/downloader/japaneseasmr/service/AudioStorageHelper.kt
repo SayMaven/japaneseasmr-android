@@ -132,4 +132,61 @@ object AudioStorageHelper {
 
         return null
     }
+
+    /**
+     * Mengonversi SAF Content URI menjadi path file absolut penyimpanan fisik Android.
+     */
+    fun resolvePhysicalPathFromUri(context: Context, uriString: String?): String? {
+        if (uriString.isNullOrBlank()) return null
+        if (uriString.startsWith("/") || uriString.startsWith("file://")) {
+            return uriString.removePrefix("file://")
+        }
+        if (uriString.startsWith("content://")) {
+            try {
+                val uri = android.net.Uri.parse(uriString)
+                val docId = android.provider.DocumentsContract.getTreeDocumentId(uri)
+                if (docId != null) {
+                    val split = docId.split(":")
+                    if (split.size >= 2) {
+                        val type = split[0]
+                        val relPath = split[1]
+                        if ("primary".equals(type, ignoreCase = true)) {
+                            val primaryStorage = android.os.Environment.getExternalStorageDirectory().absolutePath
+                            return "$primaryStorage/$relPath"
+                        } else {
+                            return "/storage/$type/$relPath"
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                try {
+                    val decoded = java.net.URLDecoder.decode(uriString, "UTF-8")
+                    val primaryIdx = decoded.indexOf("primary:")
+                    if (primaryIdx != -1) {
+                        val sub = decoded.substring(primaryIdx + "primary:".length)
+                        val primaryStorage = android.os.Environment.getExternalStorageDirectory().absolutePath
+                        return "$primaryStorage/$sub"
+                    }
+                } catch (ignored: Exception) {}
+            }
+        }
+        return uriString
+    }
+
+    /**
+     * Memformat path penyimpanan agar ringkas dan nyaman dibaca (contoh: "Download/JapaneseASMR").
+     */
+    fun formatPathForDisplay(rawPath: String?): String {
+        if (rawPath.isNullOrBlank()) return "Download/JapaneseASMR"
+        var clean = rawPath
+        if (clean.startsWith("/storage/emulated/0/")) {
+            clean = clean.removePrefix("/storage/emulated/0/")
+        } else if (clean.startsWith("/sdcard/")) {
+            clean = clean.removePrefix("/sdcard/")
+        } else if (clean.startsWith("/storage/")) {
+            val parts = clean.removePrefix("/storage/").split("/", limit = 2)
+            clean = if (parts.size == 2) "SD Card/${parts[1]}" else clean
+        }
+        return clean.trimStart('/')
+    }
 }

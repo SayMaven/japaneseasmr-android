@@ -145,12 +145,6 @@ class DownloadService : Service() {
     }
 
     private suspend fun processQueue() {
-        val items = _queueState.value.toList()
-        if (items.isEmpty()) {
-            _isDownloading.value = false
-            return
-        }
-
         val database = AsmrDatabase.getDatabase(this)
         val historyDao = database.historyDao()
         val prefs = PreferencesManager(this)
@@ -169,35 +163,49 @@ class DownloadService : Service() {
 
         _isDownloading.value = true
         log("===================================================")
-        log("[i] Memulai proses unduhan untuk ${items.size} antrean...")
+        log("[i] Memulai proses pemrosesan antrean unduhan...")
 
         val tempDir = File(cacheDir, "download_temp").apply { mkdirs() }
 
-        for (i in items.indices) {
-            val item = items[i]
-            log("[*] Memproses [${i + 1}/${items.size}]: ${item.rjid}")
+        while (true) {
+            // Ambil item pending berikutnya secara dinamis dari live queueState
+            val currentQueue = _queueState.value
+            val nextItem = currentQueue.firstOrNull { it.status == DownloadStatus.PENDING }
+            if (nextItem == null) {
+                // Tidak ada lagi antrean yang berstatus PENDING
+                break
+            }
+
+            val itemRjid = nextItem.rjid
+            val totalInQueue = _queueState.value.size
+            val finishedCount = _queueState.value.count {
+                it.status == DownloadStatus.COMPLETED || it.status == DownloadStatus.FAILED || it.status == DownloadStatus.CANCELLED
+            }
+            val currentNum = finishedCount + 1
+
+            log("[*] Memproses [$currentNum/$totalInQueue]: $itemRjid")
 
             // === 1. CEK FILE SUDAH ADA DI PENYIMPANAN (SKIP OTOMATIS) ===
-            val existingFile = AudioStorageHelper.findExistingAudioFile(downloadDir, item.rjid)
+            val existingFile = AudioStorageHelper.findExistingAudioFile(downloadDir, itemRjid)
             if (existingFile != null && existingFile.length() > 0) {
                 val fileSizeStr = AudioDownloader.formatFileSize(existingFile.length())
                 val dateStr = AudioStorageHelper.formatDateForDisplay(existingFile.lastModified())
 
-                log("  [i] File audio [${item.rjid}] sudah ada di penyimpanan (${existingFile.name}).")
+                log("  [i] File audio [$itemRjid] sudah ada di penyimpanan (${existingFile.name}).")
                 log("  [i] Melewati proses unduhan...")
 
                 // Pastikan tersimpan di Room database
-                val existingHistory = historyDao.getHistoryById(item.rjid)
+                val existingHistory = historyDao.getHistoryById(itemRjid)
                 if (existingHistory == null) {
                     historyDao.insertHistory(
                         HistoryEntity(
-                            rjid = item.rjid,
-                            title = item.title.ifBlank { existingFile.nameWithoutExtension },
-                            cv = item.cv,
-                            circle = item.circle,
-                            genre = item.genre,
-                            ageRating = item.ageRating,
-                            coverUrl = item.coverUrl,
+                            rjid = itemRjid,
+                            title = nextItem.title.ifBlank { existingFile.nameWithoutExtension },
+                            cv = nextItem.cv,
+                            circle = nextItem.circle,
+                            genre = nextItem.genre,
+                            ageRating = nextItem.ageRating,
+                            coverUrl = nextItem.coverUrl,
                             localFilePath = existingFile.absolutePath,
                             downloadDate = dateStr,
                             fileSize = fileSizeStr
@@ -205,7 +213,7 @@ class DownloadService : Service() {
                     )
                 }
 
-                updateItem(i) {
+                updateItem(itemRjid) {
                     it.copy(
                         status = DownloadStatus.COMPLETED,
                         statusText = "Sudah ada di penyimpanan (Dilewati)",
@@ -219,7 +227,7 @@ class DownloadService : Service() {
                 continue
             }
 
-            updateItem(i) {
+            updateItem(itemRjid) {
                 it.copy(
                     status = DownloadStatus.DOWNLOADING,
                     statusText = "Mengambil metadata karya..."
@@ -228,10 +236,10 @@ class DownloadService : Service() {
 
             // 2. Scrape Metadata
             val meta = try {
-                DLsiteScraper.fetchMetadata(item.rjid)
+                DLsiteScraper.fetchMetadata(itemRjid)
             } catch (e: Exception) {
-                log("[!] Gagal mengambil metadata ${item.rjid}: ${e.message}")
-                updateItem(i) {
+                log("[!] Gagal mengambil metadata $itemRjid: ${e.message}")
+                updateItem(itemRjid) {
                     it.copy(
                         status = DownloadStatus.FAILED,
                         statusText = "Gagal mengambil metadata",
@@ -241,10 +249,10 @@ class DownloadService : Service() {
                 continue
             }
 
-            val tracks = TrackDiscoveryService.discoverAllTracks(item.rjid)
+            val tracks = TrackDiscoveryService.discoverAllTracks(itemRjid)
             log("  [i] Ditemukan ${tracks.size} track (${tracks.joinToString { it.name }})")
 
-            updateItem(i) {
+            updateItem(itemRjid) {
                 it.copy(
                     title = meta.title,
                     cv = meta.cv,
@@ -258,7 +266,7 @@ class DownloadService : Service() {
 
             // 3. Download Cover
             log("  [1/3] Mengunduh cover image...")
-            val coverFile = File(tempDir, "${item.rjid}_cover.jpg")
+            val coverFile = File(tempDir, "${itemRjid}_cover.jpg")
             AudioDownloader.downloadImage(meta.coverUrl, coverFile)
 
             // 4. Download Tracks
@@ -270,9 +278,9 @@ class DownloadService : Service() {
             for (tIdx in tracks.indices) {
                 val track = tracks[tIdx]
                 val trackExt = if (track.url.endsWith(".m3u8", ignoreCase = true)) "m4a" else "mp3"
-                val trackFile = File(tempDir, "${item.rjid}_t${tIdx + 1}.$trackExt")
+                val trackFile = File(tempDir, "${itemRjid}_t${tIdx + 1}.$trackExt")
 
-                updateItem(i) {
+                updateItem(itemRjid) {
                     it.copy(
                         status = DownloadStatus.DOWNLOADING,
                         statusText = "Mengunduh ${track.name} [${tIdx + 1}/${tracks.size}]"
@@ -288,7 +296,7 @@ class DownloadService : Service() {
                     parallelConnections = parallelConn,
                     onProgress = { pct, speed, eta, downStr, totStr ->
                         val overallPct = (tIdx.toFloat() + pct) / tracks.size.toFloat()
-                        updateItem(i) {
+                        updateItem(itemRjid) {
                             it.copy(
                                 progress = overallPct,
                                 speed = speed,
@@ -298,8 +306,9 @@ class DownloadService : Service() {
                                 statusText = "Mengunduh ${track.name} [${tIdx + 1}/${tracks.size}] (${(pct * 100).toInt()}%)"
                             )
                         }
+                        val liveTotal = _queueState.value.size
                         updateNotification(
-                            "[${i + 1}/${items.size}] ${meta.title} (${(overallPct * 100).toInt()}%)",
+                            "[$currentNum/$liveTotal] ${meta.title} (${(overallPct * 100).toInt()}%)",
                             (overallPct * 100).toInt(),
                             false
                         )
@@ -319,20 +328,20 @@ class DownloadService : Service() {
             }
 
             if (isFailed || downloadedTracks.isEmpty()) {
-                updateItem(i) {
+                updateItem(itemRjid) {
                     it.copy(
                         status = DownloadStatus.FAILED,
                         statusText = "Gagal mengunduh audio",
                         error = "Gagal mengunduh track audio"
                     )
                 }
-                log("[ERROR] Gagal memproses ${item.rjid}")
+                log("[ERROR] Gagal memproses $itemRjid")
                 continue
             }
 
             // 5. Finalizing & Metadata Tagging
             log("  [3/3] Menyematkan metadata & cover art...")
-            updateItem(i) {
+            updateItem(itemRjid) {
                 it.copy(
                     status = DownloadStatus.PROCESSING,
                     statusText = "Menyematkan metadata & cover art..."
@@ -340,9 +349,9 @@ class DownloadService : Service() {
             }
 
             val filename = if (useDetailedFilename) {
-                "[${item.rjid}] ${sanitizeFilename(meta.title)}.$fileExtension"
+                "[$itemRjid] ${sanitizeFilename(meta.title)}.$fileExtension"
             } else {
-                "${item.rjid}.$fileExtension"
+                "$itemRjid.$fileExtension"
             }
 
             val finalOutputFile = File(downloadDir, filename)
@@ -373,7 +382,7 @@ class DownloadService : Service() {
 
             historyDao.insertHistory(
                 HistoryEntity(
-                    rjid = item.rjid,
+                    rjid = itemRjid,
                     title = meta.title,
                     cv = meta.cv,
                     circle = meta.circle,
@@ -386,7 +395,7 @@ class DownloadService : Service() {
                 )
             )
 
-            updateItem(i) {
+            updateItem(itemRjid) {
                 it.copy(
                     status = DownloadStatus.COMPLETED,
                     statusText = "Selesai diunduh",
@@ -408,9 +417,10 @@ class DownloadService : Service() {
         _isDownloading.value = false
     }
 
-    private fun updateItem(index: Int, transform: (DownloadQueueItem) -> DownloadQueueItem) {
+    private fun updateItem(rjid: String, transform: (DownloadQueueItem) -> DownloadQueueItem) {
         val current = _queueState.value.toMutableList()
-        if (index in current.indices) {
+        val index = current.indexOfFirst { it.rjid.equals(rjid, ignoreCase = true) }
+        if (index != -1) {
             current[index] = transform(current[index])
             _queueState.value = current
         }

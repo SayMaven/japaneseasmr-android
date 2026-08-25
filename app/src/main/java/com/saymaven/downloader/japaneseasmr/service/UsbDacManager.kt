@@ -7,13 +7,14 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
-import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbManager
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
 import android.widget.Toast
+import com.saymaven.downloader.japaneseasmr.service.usb.UsbAudioEngine
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 data class UsbDacInfo(
@@ -31,9 +32,15 @@ object UsbDacManager {
     private val _dacState = MutableStateFlow(UsbDacInfo())
     val dacState = _dacState.asStateFlow()
 
+    val hardwareVolume: StateFlow<Float> = UsbAudioEngine.hardwareVolume
+    val isHardwareVolumeSupported: StateFlow<Boolean> = UsbAudioEngine.isHardwareVolumeSupported
+    val showVolumeHud: StateFlow<Boolean> = UsbAudioEngine.showVolumeHud
+
+    fun triggerVolumeHud() = UsbAudioEngine.triggerVolumeHud()
+    fun dismissVolumeHud() = UsbAudioEngine.dismissVolumeHud()
+
     private var isInitialized = false
-    private var isExclusiveEnabledSetting = true
-    private var activeUsbConnection: UsbDeviceConnection? = null
+    private var isExclusiveEnabledSetting = false
 
     // Permission debouncing flags to prevent duplicate popups
     private var hasRequestedPermission = false
@@ -90,6 +97,7 @@ object UsbDacManager {
                     hasRequestedPermission = false
                     userDeniedPermission = false
                     lastDeviceIdentifier = null
+                    UsbAudioEngine.release()
                 }
                 checkCurrentDevices(c)
             }
@@ -113,20 +121,26 @@ object UsbDacManager {
     fun setExclusiveSetting(context: Context, enabled: Boolean) {
         isExclusiveEnabledSetting = enabled
         if (!enabled) {
-            activeUsbConnection?.close()
-            activeUsbConnection = null
+            UsbAudioEngine.release()
         }
         checkCurrentDevices(context)
     }
 
+    fun setHardwareVolume(percent: Float) {
+        UsbAudioEngine.setHardwareVolume(percent)
+    }
+
+    fun stepHardwareVolume(up: Boolean) {
+        UsbAudioEngine.stepHardwareVolume(up)
+    }
+
+    fun isExclusiveActivelyRunning(): Boolean {
+        return _dacState.value.isExclusiveActive && UsbAudioEngine.isClaimedAndActive.value
+    }
+
     private fun claimUsbDevice(context: Context, device: UsbDevice) {
-        val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
-        try {
-            activeUsbConnection?.close()
-            activeUsbConnection = usbManager.openDevice(device)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        if (!isExclusiveEnabledSetting) return
+        UsbAudioEngine.claimAndInitialize(context, device)
     }
 
     fun checkCurrentDevices(context: Context) {
@@ -144,7 +158,8 @@ object UsbDacManager {
                 var isAudio = dev.deviceClass == UsbConstants.USB_CLASS_AUDIO
                 if (!isAudio) {
                     for (i in 0 until dev.interfaceCount) {
-                        if (dev.getInterface(i).interfaceClass == UsbConstants.USB_CLASS_AUDIO) {
+                        val intf = dev.getInterface(i)
+                        if (intf.interfaceClass == UsbConstants.USB_CLASS_AUDIO) {
                             isAudio = true
                             break
                         }
@@ -176,6 +191,7 @@ object UsbDacManager {
         }
 
         val wasConnected = _dacState.value.isConnected
+        val wasExclusiveActive = _dacState.value.isExclusiveActive
         val isConnectedNow = foundDacName.isNotBlank() || targetAudioDeviceInfo != null
         val currentDevId = targetUsbDevice?.deviceName ?: foundDacName
 
@@ -184,8 +200,6 @@ object UsbDacManager {
             hasRequestedPermission = false
             userDeniedPermission = false
         }
-
-        val exclusiveActive = isConnectedNow && isExclusiveEnabledSetting
 
         // Single trigger for Android OS USB Permission Prompt
         if (isConnectedNow && isExclusiveEnabledSetting && targetUsbDevice != null) {
@@ -206,7 +220,12 @@ object UsbDacManager {
                 )
                 usbManager.requestPermission(targetUsbDevice, permissionIntent)
             }
+        } else if (!isConnectedNow || !isExclusiveEnabledSetting) {
+            UsbAudioEngine.release()
         }
+
+        val isActuallyClaimed = UsbAudioEngine.isClaimedAndActive.value
+        val exclusiveActive = isConnectedNow && isExclusiveEnabledSetting && isActuallyClaimed
 
         val newState = UsbDacInfo(
             isConnected = isConnectedNow,
@@ -218,15 +237,14 @@ object UsbDacManager {
 
         _dacState.value = newState
 
-        if (!wasConnected && isConnectedNow && exclusiveActive) {
+        if (!wasExclusiveActive && exclusiveActive) {
             Toast.makeText(
                 context,
                 "Mode Eksklusif Aktif: Terhubung ke ${newState.dacName}",
                 Toast.LENGTH_LONG
             ).show()
         } else if (wasConnected && !isConnectedNow) {
-            activeUsbConnection?.close()
-            activeUsbConnection = null
+            UsbAudioEngine.release()
             hasRequestedPermission = false
             userDeniedPermission = false
             Toast.makeText(
@@ -237,3 +255,4 @@ object UsbDacManager {
         }
     }
 }
+

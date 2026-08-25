@@ -1,9 +1,11 @@
 package com.saymaven.downloader.japaneseasmr.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
@@ -22,7 +26,9 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
+import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import com.saymaven.downloader.japaneseasmr.ui.components.BottomNavBar
+import com.saymaven.downloader.japaneseasmr.ui.components.FloatingVolumeHud
 import com.saymaven.downloader.japaneseasmr.ui.components.NavTab
 import com.saymaven.downloader.japaneseasmr.ui.screens.history.HistoryScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.history.HistoryViewModel
@@ -57,7 +63,12 @@ class MainActivity : ComponentActivity() {
             val dynamicColor by settingsViewModel.dynamicColor.collectAsState()
             val colorPalette by settingsViewModel.colorPalette.collectAsState()
 
-            var currentTab by remember { mutableStateOf(NavTab.QUEUE) }
+            val navPrefs = remember { getSharedPreferences("app_nav_state", Context.MODE_PRIVATE) }
+            val savedTabName = remember { navPrefs.getString("last_tab", NavTab.PLAYER.name) ?: NavTab.PLAYER.name }
+            val initialTab = remember {
+                try { NavTab.valueOf(savedTabName) } catch (e: Exception) { NavTab.PLAYER }
+            }
+            var currentTab by rememberSaveable { mutableStateOf(initialTab) }
 
             JapaneseASMRTheme(
                 themeMode = themeMode,
@@ -68,7 +79,10 @@ class MainActivity : ComponentActivity() {
                     bottomBar = {
                         BottomNavBar(
                             currentTab = currentTab,
-                            onTabSelected = { currentTab = it }
+                            onTabSelected = { tab ->
+                                currentTab = tab
+                                navPrefs.edit().putString("last_tab", tab.name).apply()
+                            }
                         )
                     }
                 ) { innerPadding ->
@@ -79,18 +93,18 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                             .padding(innerPadding)
                     ) {
-                        // Tab 0: Home / Queue
+                        // Tab 0: Home / Player (Pemutar)
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .zIndex(if (currentTab == NavTab.QUEUE) 1f else 0f)
+                                .zIndex(if (currentTab == NavTab.PLAYER) 1f else 0f)
                                 .graphicsLayer {
-                                    val active = (currentTab == NavTab.QUEUE)
+                                    val active = (currentTab == NavTab.PLAYER)
                                     alpha = if (active) 1f else 0f
                                     translationX = if (active) 0f else 99999f
                                 }
                         ) {
-                            QueueScreen(viewModel = queueViewModel)
+                            PlayerScreen(viewModel = playerViewModel)
                         }
 
                         // Tab 1: Riwayat / History
@@ -109,6 +123,7 @@ class MainActivity : ComponentActivity() {
                                 onPlayTrack = { historyEntity ->
                                     playerViewModel.playLocalTrack(historyEntity)
                                     currentTab = NavTab.PLAYER
+                                    navPrefs.edit().putString("last_tab", NavTab.PLAYER.name).apply()
                                 },
                                 onRedownload = { historyEntity ->
                                     val item = DownloadQueueItem(
@@ -130,22 +145,23 @@ class MainActivity : ComponentActivity() {
                                         Toast.makeText(this@MainActivity, "[${historyEntity.rjid}] ditambahkan ke antrean unduh.", Toast.LENGTH_SHORT).show()
                                     }
                                     currentTab = NavTab.QUEUE
+                                    navPrefs.edit().putString("last_tab", NavTab.QUEUE.name).apply()
                                 }
                             )
                         }
 
-                        // Tab 2: Pemutar / Player
+                        // Tab 2: Unduhan / Queue
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .zIndex(if (currentTab == NavTab.PLAYER) 1f else 0f)
+                                .zIndex(if (currentTab == NavTab.QUEUE) 1f else 0f)
                                 .graphicsLayer {
-                                    val active = (currentTab == NavTab.PLAYER)
+                                    val active = (currentTab == NavTab.QUEUE)
                                     alpha = if (active) 1f else 0f
                                     translationX = if (active) 0f else 99999f
                                 }
                         ) {
-                            PlayerScreen(viewModel = playerViewModel)
+                            QueueScreen(viewModel = queueViewModel)
                         }
 
                         // Tab 3: Pengaturan / Settings
@@ -161,6 +177,13 @@ class MainActivity : ComponentActivity() {
                         ) {
                             SettingsScreen(viewModel = settingsViewModel)
                         }
+
+                        // Floating Hardware Volume HUD (Appears when Volume Up/Down is pressed in Exclusive Mode)
+                        FloatingVolumeHud(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .zIndex(100f)
+                        )
                     }
                 }
             }
@@ -171,6 +194,31 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         StorageSyncManager.syncStorageWithDatabase(this)
         playerViewModel.refreshPlaylist()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (UsbDacManager.isExclusiveActivelyRunning()) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    UsbDacManager.stepHardwareVolume(up = true)
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    UsbDacManager.stepHardwareVolume(up = false)
+                    return true
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (UsbDacManager.isExclusiveActivelyRunning()) {
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                return true
+            }
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     private fun checkAndRequestPermissions() {

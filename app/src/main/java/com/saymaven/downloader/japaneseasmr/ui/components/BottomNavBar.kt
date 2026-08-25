@@ -1,9 +1,9 @@
 package com.saymaven.downloader.japaneseasmr.ui.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -14,9 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class NavTab(val title: String, val icon: ImageVector) {
-    QUEUE("Home", Icons.Default.Home),
+    PLAYER("Home", Icons.Default.Home),
+    QUEUE("Unduhan", Icons.Default.Download),
     HISTORY("Riwayat", Icons.Default.History),
-    PLAYER("Pemutar", Icons.Default.PlayCircle),
     SETTINGS("Pengaturan", Icons.Default.Settings)
 }
 

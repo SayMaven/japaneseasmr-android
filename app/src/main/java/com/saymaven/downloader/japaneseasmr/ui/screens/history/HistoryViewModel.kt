@@ -12,15 +12,7 @@ import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -31,6 +23,18 @@ enum class HistorySortOrder {
     TITLE_ASC, // Nama A - Z
     TITLE_DESC // Nama Z - A
 }
+
+data class HistoryUiItem(
+    val entity: HistoryEntity,
+    val rjid: String,
+    val title: String,
+    val cv: String,
+    val circle: String,
+    val coverUrl: String?,
+    val downloadDate: String,
+    val fileSize: String,
+    val isPresent: Boolean
+)
 
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -51,7 +55,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         preloadHistoryCovers()
     }
 
-    val historyList = combine(_searchQuery, _sortOrder) { query, order ->
+    val historyUiList: StateFlow<List<HistoryUiItem>> = combine(_searchQuery, _sortOrder) { query, order ->
         Pair(query, order)
     }.flatMapLatest { (query, order) ->
         val flow = if (query.isBlank()) {
@@ -60,23 +64,41 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
             dao.searchHistory(query)
         }
         flow.map { list ->
+            val customDirStr = prefs.downloadDirFlow.first()
+            val downloadDir = if (!customDirStr.isNullOrBlank()) {
+                val f = File(customDirStr)
+                if (f.canWrite()) f else DownloadService.getDefaultDownloadDirectory()
+            } else {
+                DownloadService.getDefaultDownloadDirectory()
+            }
+
             val resolved = list.map { item ->
                 val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)
                 val normalizedDate = AudioStorageHelper.normalizeDateString(item.downloadDate, item.localFilePath)
-                if (localCover != null && localCover.exists()) {
-                    item.copy(coverUrl = localCover.absolutePath, downloadDate = normalizedDate)
-                } else {
-                    item.copy(downloadDate = normalizedDate)
-                }
+                val cover = if (localCover != null && localCover.exists()) localCover.absolutePath else item.coverUrl
+
+                val isPresent = isFilePresentInternal(item, downloadDir)
+
+                HistoryUiItem(
+                    entity = item.copy(coverUrl = cover, downloadDate = normalizedDate),
+                    rjid = item.rjid,
+                    title = item.title,
+                    cv = item.cv,
+                    circle = item.circle,
+                    coverUrl = cover,
+                    downloadDate = normalizedDate,
+                    fileSize = item.fileSize,
+                    isPresent = isPresent
+                )
             }
 
-            // Pengurutan berbasis Timestamp Milidetik Nyata (Bukan sorting string alfabetis)
+            // Pengurutan berbasis Timestamp Milidetik Nyata
             when (order) {
                 HistorySortOrder.DATE_DESC -> resolved.sortedByDescending {
-                    AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath)
+                    AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.entity.localFilePath)
                 }
                 HistorySortOrder.DATE_ASC -> resolved.sortedBy {
-                    AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath)
+                    AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.entity.localFilePath)
                 }
                 HistorySortOrder.TITLE_ASC -> resolved.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
                 HistorySortOrder.TITLE_DESC -> resolved.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.title })
@@ -84,10 +106,30 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         }.flowOn(Dispatchers.IO)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val historyList: StateFlow<List<HistoryEntity>> = historyUiList.map { list ->
+        list.map { it.entity }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val hasMissingFiles: StateFlow<Boolean> = historyUiList.map { list ->
+        list.any { !it.isPresent }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    private fun isFilePresentInternal(item: HistoryEntity, downloadDir: File): Boolean {
+        val key = "${item.rjid}_${item.localFilePath}"
+        return filePresenceCache.getOrPut(key) {
+            val path = item.localFilePath
+            if (!path.isNullOrBlank()) {
+                val direct = File(path)
+                if (direct.exists() && direct.length() > 0) return@getOrPut true
+            }
+            AudioStorageHelper.findExistingAudioFile(downloadDir, item.rjid) != null
+        }
+    }
+
     private fun preloadHistoryCovers() {
         viewModelScope.launch(Dispatchers.IO) {
             dao.getAllHistory().collect { list ->
-                list.take(50).forEach { item ->
+                list.take(40).forEach { item ->
                     val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)
                     val url = localCover?.absolutePath ?: item.coverUrl
                     if (!url.isNullOrBlank()) {
@@ -99,9 +141,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                                 .crossfade(false)
                                 .build()
                             Coil.imageLoader(getApplication()).enqueue(req)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
+                        } catch (ignored: Exception) {}
                     }
                 }
             }

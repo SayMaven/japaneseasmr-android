@@ -54,6 +54,8 @@ JapaneseASMR Downloader is a full-featured, open-source Android application engi
 
 ### Integrated Native Audio Player
 * **Android MediaSession Integration**: Foreground audio playback service with rich notification controls and lock screen artwork display.
+* **True USB DAC Bit-Perfect Exclusive Takeover**: Direct USB Audio Class (UAC1 / UAC2) interface claiming with full Android kernel driver detach, isolating audio exclusively to the connected DAC.
+* **DAC Hardware Volume Control & Key Interception**: Direct control of USB DAC hardware mixer / chip attenuator via USB Control Transfers (`SET_CUR` / `GET_RANGE`), dedicated player volume bar, and hardware volume key interception.
 * **Dedicated Audio Player Settings**: Configurable auto-resume playback, keep screen on, USB DAC exclusive bit-perfect mode, and custom download directory.
 * **Replay 10s & Forward 10s Controls**: Quick jump controls for navigating audio dialogue and chapters effortlessly.
 * **Persistent Timeline Mode**: Toggling between total elapsed duration and remaining time (`-mm:ss`) persists across app restarts.

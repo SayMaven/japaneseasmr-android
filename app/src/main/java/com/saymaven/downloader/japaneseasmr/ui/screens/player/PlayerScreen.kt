@@ -2,6 +2,7 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import android.app.Activity
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -16,6 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeMute
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +45,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -60,7 +65,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val playlist by viewModel.playlist.collectAsState()
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
     val dacState by viewModel.dacState.collectAsState()
+    val hardwareVolume by viewModel.hardwareVolume.collectAsState()
     val audioSpecs by viewModel.audioSpecs.collectAsState()
+    val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsState()
 
     val activity = context as? Activity
     DisposableEffect(keepScreenOn) {
@@ -76,6 +83,10 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     var dragPosition by remember { mutableLongStateOf(0L) }
     var showBottomSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var showSleepTimerSheet by remember { mutableStateOf(false) }
+    val sleepTimerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var draftTimerMinutes by remember { mutableIntStateOf(15) }
 
     // Instan refresh playlist setiap kali Bottom Sheet dibuka
     LaunchedEffect(showBottomSheet) {
@@ -280,11 +291,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Control Row 1: Repeat (Left) & Shuffle (Right)
+            // Control Row 1: Repeat (Left), Sleep Timer (Center) & Shuffle (Right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -302,6 +313,38 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             else -> MaterialTheme.colorScheme.primary
                         }
                     )
+                }
+
+                // Sleep Timer Button
+                Surface(
+                    onClick = { showSleepTimerSheet = true },
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bedtime,
+                            contentDescription = "Sleep Timer",
+                            tint = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        if (sleepTimerRemainingMs != null) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            val totalSecs = (sleepTimerRemainingMs!! / 1000).coerceAtLeast(0)
+                            val m = totalSecs / 60
+                            val s = totalSecs % 60
+                            Text(
+                                text = String.format("%02d:%02d", m, s),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 }
 
                 // Shuffle Mode Button
@@ -546,6 +589,222 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    if (showSleepTimerSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSleepTimerSheet = false },
+            sheetState = sleepTimerSheetState,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .navigationBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Bedtime,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(26.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Pengatur Waktu Tidur",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (sleepTimerRemainingMs != null) {
+                        TextButton(
+                            onClick = {
+                                viewModel.stopSleepTimer()
+                                Toast.makeText(context, "Sleep Timer dimatikan", Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Text("Matikan", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = if (sleepTimerRemainingMs != null) {
+                        val totalSecs = (sleepTimerRemainingMs!! / 1000).coerceAtLeast(0)
+                        val m = totalSecs / 60
+                        val s = totalSecs % 60
+                        "Timer aktif: ${String.format("%02d:%02d", m, s)} tersisa sebelum audio berhenti otomatis."
+                    } else {
+                        "Pilih durasi tidur untuk menghentikan pemutaran audio secara otomatis."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Stepper + / - (Kelipatan 5 Menit)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        FilledTonalIconButton(
+                            onClick = {
+                                if (sleepTimerRemainingMs != null) {
+                                    val newM = viewModel.adjustSleepTimerMinutes(-5)
+                                    draftTimerMinutes = newM
+                                } else {
+                                    draftTimerMinutes = (draftTimerMinutes - 5).coerceAtLeast(5)
+                                }
+                            },
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(Icons.Default.Remove, contentDescription = "Kurang 5 Menit")
+                        }
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val displayMinutes = if (sleepTimerRemainingMs != null) {
+                                ((sleepTimerRemainingMs!! + 59999) / 60000).toInt()
+                            } else {
+                                draftTimerMinutes
+                            }
+                            Text(
+                                text = "$displayMinutes Menit",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Kelipatan 5 menit",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        FilledTonalIconButton(
+                            onClick = {
+                                if (sleepTimerRemainingMs != null) {
+                                    val newM = viewModel.adjustSleepTimerMinutes(5)
+                                    draftTimerMinutes = newM
+                                } else {
+                                    draftTimerMinutes = (draftTimerMinutes + 5).coerceAtMost(360)
+                                }
+                            },
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Tambah 5 Menit")
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = "Pilihan Cepat:",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Presets Grid: 5m, 10m, 15m, 30m, 1 jam (60m), 2 jam (120m)
+                val presets = listOf(
+                    5 to "5 Menit",
+                    10 to "10 Menit",
+                    15 to "15 Menit",
+                    30 to "30 Menit",
+                    60 to "1 Jam",
+                    120 to "2 Jam"
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    presets.take(3).forEach { (mins, label) ->
+                        OutlinedButton(
+                            onClick = {
+                                draftTimerMinutes = mins
+                                viewModel.startSleepTimer(mins)
+                                showSleepTimerSheet = false
+                                Toast.makeText(context, "Sleep Timer disetel: $label", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(label, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    presets.drop(3).forEach { (mins, label) ->
+                        OutlinedButton(
+                            onClick = {
+                                draftTimerMinutes = mins
+                                viewModel.startSleepTimer(mins)
+                                showSleepTimerSheet = false
+                                Toast.makeText(context, "Sleep Timer disetel: $label", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(label, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Start / Update Timer Button
+                Button(
+                    onClick = {
+                        viewModel.startSleepTimer(draftTimerMinutes)
+                        showSleepTimerSheet = false
+                        Toast.makeText(context, "Sleep Timer disetel: $draftTimerMinutes menit", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(
+                        text = if (sleepTimerRemainingMs != null) "Perbarui Timer ($draftTimerMinutes Menit)" else "Mulai Sleep Timer ($draftTimerMinutes Menit)",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

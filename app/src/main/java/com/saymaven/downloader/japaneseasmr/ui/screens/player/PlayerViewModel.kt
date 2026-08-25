@@ -52,6 +52,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val playlist = _playlist.asStateFlow()
 
     val dacState = UsbDacManager.dacState
+    val hardwareVolume = UsbDacManager.hardwareVolume
+
+    fun setHardwareVolume(percent: Float) {
+        UsbDacManager.setHardwareVolume(percent)
+    }
 
     val keepScreenOn = prefs.keepScreenOnFlow.stateIn(
         viewModelScope,
@@ -99,7 +104,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _audioSpecs = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_specs", "- | - | -") ?: "- | - | -" else "- | - | -")
     val audioSpecs = _audioSpecs.asStateFlow()
 
+    // Sleep Timer state
+    private val _sleepTimerRemainingMs = MutableStateFlow<Long?>(null)
+    val sleepTimerRemainingMs = _sleepTimerRemainingMs.asStateFlow()
+
     private var progressJob: Job? = null
+    private var sleepTimerJob: Job? = null
 
     init {
         resolveAndPreloadInitialCover()
@@ -412,8 +422,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun setupPlayerListener(p: Player) {
         p.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                updatePlayingState(p)
+            }
+
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _isPlaying.value = isPlaying
                 if (isPlaying) {
                     startProgressTracking()
                 } else {
@@ -442,9 +455,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     saveCurrentState()
                 }
+                updatePlayingState(p)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                updatePlayingState(p)
                 if (playbackState == Player.STATE_READY) {
                     if (p.duration > 0L) {
                         _duration.value = p.duration.coerceAtLeast(0L)
@@ -468,6 +483,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         p.repeatMode = _repeatMode.value
         p.shuffleModeEnabled = _shuffleMode.value
+        updatePlayingState(p)
+    }
+
+    private fun updatePlayingState(p: Player) {
+        val playing = p.playWhenReady && p.playbackState != Player.STATE_ENDED && p.playbackState != Player.STATE_IDLE
+        if (_isPlaying.value != playing) {
+            _isPlaying.value = playing
+            if (playing) {
+                startProgressTracking()
+            } else {
+                stopProgressTracking()
+            }
+            saveCurrentState()
+        }
     }
 
     private fun calculateAudioSpecs(file: File) {
@@ -789,7 +818,50 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         saveCurrentState()
     }
 
+    fun startSleepTimer(minutes: Int) {
+        sleepTimerJob?.cancel()
+        if (minutes <= 0) {
+            _sleepTimerRemainingMs.value = null
+            return
+        }
+
+        var remaining = minutes * 60 * 1000L
+        _sleepTimerRemainingMs.value = remaining
+
+        sleepTimerJob = viewModelScope.launch {
+            while (remaining > 0L) {
+                delay(1000L)
+                // Hanya hitung mundur ketika audio sedang aktif diputar
+                if (_isPlaying.value) {
+                    remaining -= 1000L
+                    _sleepTimerRemainingMs.value = remaining.coerceAtLeast(0L)
+                }
+            }
+            // Timer habis: pause audio
+            player?.pause()
+            _sleepTimerRemainingMs.value = null
+        }
+    }
+
+    fun adjustSleepTimerMinutes(deltaMinutes: Int, currentDraftMinutes: Int = 15): Int {
+        val currentRemaining = _sleepTimerRemainingMs.value
+        return if (currentRemaining != null && currentRemaining > 0L) {
+            val currentMins = ((currentRemaining + 59999) / 60000).toInt()
+            val newMins = (currentMins + deltaMinutes).coerceAtLeast(1)
+            startSleepTimer(newMins)
+            newMins
+        } else {
+            (currentDraftMinutes + deltaMinutes).coerceAtLeast(5)
+        }
+    }
+
+    fun stopSleepTimer() {
+        sleepTimerJob?.cancel()
+        _sleepTimerRemainingMs.value = null
+    }
+
     override fun onCleared() {
+        sleepTimerJob?.cancel()
         saveCurrentState()
         controllerFuture?.let { MediaController.releaseFuture(it) }
         super.onCleared()

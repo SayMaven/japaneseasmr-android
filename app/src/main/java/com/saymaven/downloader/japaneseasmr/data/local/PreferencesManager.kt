@@ -106,7 +106,7 @@ class PreferencesManager(private val context: Context) {
 
     // Audio Player Settings Flows
     val exclusiveUsbDacFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[KEY_EXCLUSIVE_USB_DAC] ?: true
+        preferences[KEY_EXCLUSIVE_USB_DAC] ?: false
     }
 
     val exclusiveAudioFocusFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->

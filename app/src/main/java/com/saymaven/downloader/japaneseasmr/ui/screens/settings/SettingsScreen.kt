@@ -31,7 +31,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.saymaven.downloader.japaneseasmr.BuildConfig
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
@@ -74,7 +76,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 context.contentResolver.takePersistableUriPermission(uri, takeFlags)
             } catch (e: Exception) {
             }
-            viewModel.setDownloadDir(uri.toString())
+            val resolved = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, uri.toString()) ?: uri.toString()
+            viewModel.setDownloadDir(resolved)
             Toast.makeText(context, "Folder unduhan berhasil diubah!", Toast.LENGTH_SHORT).show()
         }
     }
@@ -205,10 +208,14 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 ListItem(
                     headlineContent = { Text("Folder Unduhan", fontWeight = FontWeight.SemiBold) },
                     supportingContent = {
+                        val physicalPath = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, downloadDir)
+                            ?: DownloadService.getDefaultDownloadDirectory().absolutePath
+                        val cleanDisplayPath = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.formatPathForDisplay(physicalPath)
                         Text(
-                            downloadDir ?: DownloadService.getDefaultDownloadDirectory().absolutePath,
+                            cleanDisplayPath,
                             style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
                     leadingContent = { Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -376,7 +383,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                 ListItem(
                     headlineContent = { Text("Versi Aplikasi", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("v1.1.0 (Build 2026.08)", style = MaterialTheme.typography.bodySmall) },
+                    supportingContent = { Text("v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                 )
 
@@ -393,7 +400,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                 ListItem(
                     headlineContent = { Text("Panduan Penggunaan", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Ringkasan fitur & panduan pemutar audio", style = MaterialTheme.typography.bodySmall) },
+                    supportingContent = { Text("Cara penggunaan & tips fitur", style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable { showGuideDialog = true }
                 )
@@ -530,6 +537,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text("Catatan Rilis (Changelog)") },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("Versi 1.2.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("• Sleep Timer (Pengatur Waktu Tidur) terpadu dengan preset & kelipatan 5 menit.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Sinkronisasi hitung mundur timer otomatis terhenti saat audio di-pause.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Optimasi performa scroll riwayat & koleksi hingga 120 FPS tanpa frame drop.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Floating Hardware Volume HUD melayang ultra-ramping & solid.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Prioritas Output USB DAC dengan routing audio jernih.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Antrean unduh dinamis & berkelanjutan otomatis hingga tuntas.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Tampilan path folder penyimpanan ringkas & sinkron.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text("Versi 1.1.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text("• Fitur Drag & Drop Reorder interaktif & halus di daftar putar koleksi.", style = MaterialTheme.typography.bodySmall)
                     Text("• Filter otomatis file hilang di daftar putar koleksi.", style = MaterialTheme.typography.bodySmall)

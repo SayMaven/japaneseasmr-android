@@ -2,12 +2,18 @@ package com.saymaven.downloader.japaneseasmr.service
 
 import android.content.Intent
 import android.os.Build
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
+import com.saymaven.downloader.japaneseasmr.service.usb.UsbAudioSink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -19,6 +25,7 @@ class PlaybackService : MediaSessionService() {
     private lateinit var player: ExoPlayer
     private val serviceScope = CoroutineScope(Dispatchers.Main)
 
+    @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
 
@@ -29,7 +36,21 @@ class PlaybackService : MediaSessionService() {
             .setUsage(C.USAGE_MEDIA)
             .build()
 
-        player = ExoPlayer.Builder(this)
+        val renderersFactory = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(
+                context: android.content.Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink {
+                val defaultSink = DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .build()
+                return UsbAudioSink(defaultSink)
+            }
+        }
+
+        player = ExoPlayer.Builder(this, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .build()
@@ -47,11 +68,18 @@ class PlaybackService : MediaSessionService() {
             UsbDacManager.init(this@PlaybackService, exclusiveUsb)
         }
 
+        // Synchronize hardware volume with player volume
+        serviceScope.launch {
+            UsbDacManager.hardwareVolume.collect { vol ->
+                player.volume = vol
+            }
+        }
+
         // Listen to USB DAC state and route preferred audio device
         serviceScope.launch {
             UsbDacManager.dacState.collect { dacInfo ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    if (dacInfo.isExclusiveActive && dacInfo.audioDeviceInfo != null) {
+                    if (dacInfo.audioDeviceInfo != null) {
                         try {
                             player.setPreferredAudioDevice(dacInfo.audioDeviceInfo)
                         } catch (e: Exception) {
