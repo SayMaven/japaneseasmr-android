@@ -9,7 +9,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.2.0-blue?style=for-the-badge" alt="Versi v1.2.0" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.2.1-blue?style=for-the-badge" alt="Versi v1.2.1" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/Lisensi-GPL%20v3.0-10b981?style=for-the-badge" alt="Lisensi GPL v3.0" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Bahasa-Kotlin-7c3aed?style=for-the-badge" alt="Bahasa" />
@@ -17,7 +17,7 @@
   </p>
 
   <p>
-    <a href="#apa-yang-baru-di-v120">Pembaruan</a> •
+    <a href="#apa-yang-baru-di-v121">Pembaruan</a> •
     <a href="#fitur-utama">Fitur Utama</a> •
     <a href="#tangkapan-layar">Tangkapan Layar</a> •
     <a href="#unduh-aplikasi">Unduh</a> •
@@ -35,17 +35,14 @@ JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) len
 
 ---
 
-## Apa yang Baru di v1.2.0
+## Apa yang Baru di v1.2.1
 
-* **Sleep Timer Cerdas**: Pengatur waktu tidur terintegrasi (preset 5, 10, 15, 30, 60, 120 menit dan penyesuaian kelipatan +/- 5 menit) yang otomatis menjeda hitung mundur saat audio dihentikan sementara (pause).
-* **Floating Mini Player**: Bar mini interaktif di atas bar navigasi pada tab Unduhan, Riwayat, dan Pengaturan untuk kontrol pemutaran instan dan ekspansi ke pemutar penuh dengan satu ketukan.
-* **Scroll Riwayat 120 FPS**: Bebas dari pemindaian I/O disk blocking pada UI thread dengan model data terkomputasi awal dan stable keys untuk scroll daftar koleksi yang sangat mulus.
-* **Akses Daftar Putar 0ms**: Akses instan drawer daftar putar dengan fitur drag-and-drop reorder tanpa penundaan pemindaian database.
-* **Dialog Kecepatan Putar Modern**: Slider horizontal mulus tanpa titik-titik (0.25x – 2.0x) dilengkapi grid tombol pintas preset 2x3 yang proporsional.
-* **Antrean Unduhan Berkelanjutan Dinamis**: Penambahan item unduhan baru saat proses download sedang berjalan akan diproses secara otomatis hingga tuntas tanpa perlu memulai ulang.
-* **Floating Hardware Volume HUD Solid**: Bar indikator volume perangkat keras DAC melayang yang ultra-ramping dan 100% solid.
-* **Retensi Tab Deterministik**: Aplikasi selalu memulai di tab Home saat dibuka dari kondisi mati (cold start), dan tetap mempertahankan tab terakhir saat diminimize.
-* **Penyederhanaan UI Pengaturan**: Format path penyimpanan yang ringkas dan sinkron (`Download/JapaneseASMR`) serta penamaan opsi jalur unduhan yang ramah pengguna.
+* **Auto-Sync Penyimpanan Instan (Aman 120 FPS)**: Pemindaian latar belakang non-blocking dengan perlindungan debounce untuk mendeteksi perubahan berkas fisik secara instan tanpa lag.
+* **Pemindaian Subfolder Rekursif**: Otomatis mendeteksi seluruh berkas audio yang berada di dalam folder-folder bersarang pada direktori unduhan.
+* **Auto-Fetch Metadata & Cover Offline**: Otomatis mengekstrak ID3 tag lokal dan mengambil data karya DLsite, serta menyimpan cover art secara permanen untuk pemutaran offline.
+* **Kategori Subfolder di Daftar Putar Koleksi**: Bar chip filter folder dinamis (`Semua`, `Utama`, dan subfolder penyimpanan) beserta dialog cepat `+ Folder`.
+* **Pindahkan Audio Antar Folder**: Fitur pemindahan berkas audio fisik antar direktori penyimpanan langsung dari daftar putar.
+* **Pencegahan Penutupan Sheet Playlist**: Perbaikan penutupan tidak sengaja pada bottom sheet saat melakukan scroll cepat dari bawah ke atas.
 
 ---
 
@@ -147,7 +144,7 @@ cd japaneseasmr-android
 
 Berkas APK hasil kompilasi akan tersimpan di:
 ```
-app/build/outputs/apk/debug/JapaneseASMR-v1.2.0-debug.apk
+app/build/outputs/apk/debug/JapaneseASMR-v1.2.1-debug.apk
 ```
 
 ---

@@ -60,35 +60,34 @@ object AudioStorageHelper {
         return if (ts > 0L) formatDateForDisplay(ts) else (dateStr ?: formatDateForDisplay(System.currentTimeMillis()))
     }
 
+    val AUDIO_EXTENSIONS = setOf("m4a", "mp3", "aac", "flac", "wav", "ogg")
+
     /**
-     * Mencari file audio yang cocok untuk kode RJ di folder unduhan.
+     * Mencari file audio yang cocok untuk kode RJ di folder unduhan (termasuk subfolder).
      */
     fun findExistingAudioFile(downloadDir: File?, rjid: String): File? {
         if (downloadDir == null || !downloadDir.exists() || !downloadDir.isDirectory) return null
         val cleanId = rjid.uppercase().trim()
-        val files = downloadDir.listFiles() ?: return null
 
-        val audioExtensions = setOf("m4a", "mp3", "aac")
+        try {
+            // 1. Cek Exact Match & Prefix Match secara rekursif hingga kedalaman 5 subfolder
+            return downloadDir.walkTopDown().maxDepth(5).firstOrNull { f ->
+                if (!f.isFile || f.length() == 0L) return@firstOrNull false
+                val ext = f.extension.lowercase()
+                if (!AUDIO_EXTENSIONS.contains(ext)) return@firstOrNull false
 
-        // 1. Cek Exact Match: RJxxxxxx.m4a / .mp3 / .aac
-        val exact = files.firstOrNull { f ->
-            if (!f.isFile || f.length() == 0L) return@firstOrNull false
-            val ext = f.extension.lowercase()
-            audioExtensions.contains(ext) && f.nameWithoutExtension.equals(cleanId, ignoreCase = true)
+                val name = f.name.uppercase()
+                f.nameWithoutExtension.equals(cleanId, ignoreCase = true) ||
+                    name.startsWith("[$cleanId]") ||
+                    name.startsWith("$cleanId ") ||
+                    name.startsWith("${cleanId}_") ||
+                    name.startsWith("$cleanId-") ||
+                    name.contains(cleanId)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
         }
-        if (exact != null) return exact
-
-        // 2. Cek Prefix Match: [RJxxxxxx] ... atau RJxxxxxx ...
-        val prefixed = files.firstOrNull { f ->
-            if (!f.isFile || f.length() == 0L) return@firstOrNull false
-            val ext = f.extension.lowercase()
-            if (!audioExtensions.contains(ext)) return@firstOrNull false
-
-            val name = f.name.uppercase()
-            name.startsWith("[$cleanId]") || name.startsWith("$cleanId ") || name.startsWith("${cleanId}_") || name.startsWith("$cleanId-")
-        }
-
-        return prefixed
     }
 
     /**
@@ -100,6 +99,80 @@ object AudioStorageHelper {
             if (direct.exists() && direct.length() > 0) return direct
         }
         return findExistingAudioFile(downloadDir, rjid)
+    }
+
+    /**
+     * Mendeteksi seluruh subfolder fisik yang ada di dalam direktori unduhan saat ini.
+     */
+    fun getExistingSubfolders(downloadDir: File?): List<String> {
+        if (downloadDir == null || !downloadDir.exists() || !downloadDir.isDirectory) return emptyList()
+        return try {
+            downloadDir.listFiles { file ->
+                file.isDirectory && !file.name.startsWith(".") && file.canRead()
+            }?.map { it.name }?.sorted() ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Mendapatkan nama folder tempat file audio berada ("Utama" untuk root atau nama subfolder).
+     */
+    fun getRelativeFolderName(downloadDir: File?, audioFile: File): String {
+        if (downloadDir == null || !downloadDir.exists()) return "Utama"
+        return try {
+            val parent = audioFile.parentFile ?: return "Utama"
+            if (parent.canonicalPath == downloadDir.canonicalPath) {
+                "Utama"
+            } else {
+                val rel = parent.relativeToOrNull(downloadDir)?.path?.replace('\\', '/') ?: parent.name
+                if (rel.isBlank()) "Utama" else rel
+            }
+        } catch (e: Exception) {
+            "Utama"
+        }
+    }
+
+    /**
+     * Membuat subfolder baru secara fisik di dalam direktori unduhan.
+     */
+    fun createSubfolder(downloadDir: File?, folderName: String): File? {
+        if (downloadDir == null || !downloadDir.exists() || folderName.isBlank()) return null
+        val cleanName = folderName.trim().replace("/", "").replace("\\", "")
+        val target = File(downloadDir, cleanName)
+        return if (target.exists() || target.mkdirs()) target else null
+    }
+
+    /**
+     * Memindahkan file audio ke folder tujuan ("Utama" untuk root atau nama subfolder) secara fisik di memori HP.
+     */
+    fun moveAudioFile(sourceFile: File, targetSubfolderName: String, downloadDir: File?): File? {
+        if (!sourceFile.exists() || downloadDir == null || !downloadDir.exists()) return null
+        return try {
+            val targetDir = if (targetSubfolderName.equals("Utama", ignoreCase = true) || targetSubfolderName.equals("Semua", ignoreCase = true)) {
+                downloadDir
+            } else {
+                File(downloadDir, targetSubfolderName).apply { if (!exists()) mkdirs() }
+            }
+
+            val targetFile = File(targetDir, sourceFile.name)
+            if (sourceFile.canonicalPath == targetFile.canonicalPath) {
+                return sourceFile
+            }
+
+            val success = sourceFile.renameTo(targetFile)
+            if (success && targetFile.exists()) {
+                targetFile
+            } else {
+                // Fallback copy & delete if rename across mount fails
+                sourceFile.copyTo(targetFile, overwrite = true)
+                sourceFile.delete()
+                targetFile
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 
     /**

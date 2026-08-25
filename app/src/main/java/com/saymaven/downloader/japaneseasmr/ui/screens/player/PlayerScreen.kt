@@ -11,10 +11,14 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
@@ -26,8 +30,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +43,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.media3.common.Player
@@ -63,6 +72,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val shuffleMode by viewModel.shuffleMode.collectAsState()
     val showRemainingTime by viewModel.showRemainingTime.collectAsState()
     val playlist by viewModel.playlist.collectAsState()
+    val availableFolders by viewModel.availableFolders.collectAsState()
+    val selectedFolder by viewModel.selectedFolder.collectAsState()
+    val filteredPlaylist by viewModel.filteredPlaylist.collectAsState()
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
     val dacState by viewModel.dacState.collectAsState()
     val hardwareVolume by viewModel.hardwareVolume.collectAsState()
@@ -83,6 +95,24 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     var dragPosition by remember { mutableLongStateOf(0L) }
     var showBottomSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var showNewFolderDialog by remember { mutableStateOf(false) }
+    var newFolderNameInput by remember { mutableStateOf("") }
+    var itemToMove by remember { mutableStateOf<HistoryEntity?>(null) }
+    var showMoveDialog by remember { mutableStateOf(false) }
+
+    // NestedScrollConnection to prevent upward fast-fling from accidentally closing ModalBottomSheet
+    val sheetNestedScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                return Offset.Zero
+            }
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                // Consume remaining vertical velocity to prevent bottom sheet dismiss
+                return available
+            }
+        }
+    }
 
     var showSleepTimerSheet by remember { mutableStateOf(false) }
     val sleepTimerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -473,18 +503,19 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.75f)
+                    .fillMaxHeight(0.80f)
                     .padding(horizontal = 16.dp)
+                    .nestedScroll(sheetNestedScroll)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Daftar Putar Koleksi (${playlist.size})",
+                        text = "Daftar Putar Koleksi (${filteredPlaylist.size})",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -506,9 +537,42 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     }
                 }
 
+                // Subfolder Selector Row
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(availableFolders) { folder ->
+                        val isSelected = (folder == selectedFolder)
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { viewModel.selectFolder(folder) },
+                            label = { Text(folder, style = MaterialTheme.typography.labelMedium) },
+                            leadingIcon = if (isSelected) {
+                                { Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else {
+                                { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            }
+                        )
+                    }
+                    item {
+                        AssistChip(
+                            onClick = {
+                                newFolderNameInput = ""
+                                showNewFolderDialog = true
+                            },
+                            label = { Text("+ Folder", style = MaterialTheme.typography.labelMedium) },
+                            leadingIcon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-                if (playlist.isEmpty()) {
+                if (filteredPlaylist.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -516,7 +580,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Belum ada audio di koleksi. Unduh kode RJ terlebih dahulu.",
+                            text = if (selectedFolder == "Semua") "Belum ada audio di koleksi. Unduh kode RJ terlebih dahulu." else "Folder '$selectedFolder' masih kosong.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -526,11 +590,12 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         state = listState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
+                            .weight(1f)
+                            .nestedScroll(sheetNestedScroll),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(top = 10.dp, bottom = 52.dp)
                     ) {
-                        itemsIndexed(playlist, key = { _, item -> item.rjid }) { _, item ->
+                        itemsIndexed(filteredPlaylist, key = { _, item -> item.rjid }) { _, item ->
                             val isCurrentTrack = (item.rjid == currentRjId)
                             val isDragged = (draggedRjid == item.rjid)
 
@@ -542,7 +607,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 isDragged = isDragged,
                                 dragOffsetY = if (isDragged) dragAccumulatedY else 0f,
                                 onDragStart = { rjid ->
-                                    val currentIdx = playlist.indexOfFirst { it.rjid == rjid }
+                                    val currentIdx = filteredPlaylist.indexOfFirst { it.rjid == rjid }
                                     if (currentIdx != -1) {
                                         draggedRjid = rjid
                                         dragAccumulatedY = 0f
@@ -552,12 +617,12 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                     dragAccumulatedY += dragAmount
 
                                     val targetRjid = draggedRjid ?: return@PlaylistItemCard
-                                    val curIdx = playlist.indexOfFirst { it.rjid == targetRjid }
+                                    val curIdx = filteredPlaylist.indexOfFirst { it.rjid == targetRjid }
                                     if (curIdx == -1) return@PlaylistItemCard
 
                                     val threshold = slotHeightPx * 0.48f
 
-                                    if (dragAccumulatedY > threshold && curIdx < playlist.size - 1) {
+                                    if (dragAccumulatedY > threshold && curIdx < filteredPlaylist.size - 1) {
                                         viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
                                         dragAccumulatedY -= slotHeightPx
                                     } else if (dragAccumulatedY < -threshold && curIdx > 0) {
@@ -571,10 +636,14 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                     dragAccumulatedY = 0f
                                 },
                                 onClick = {
-                                    viewModel.playLocalTrack(item, playlist)
+                                    viewModel.playLocalTrack(item, filteredPlaylist)
                                     scope.launch { sheetState.hide() }.invokeOnCompletion {
                                         showBottomSheet = false
                                     }
+                                },
+                                onMoveClick = {
+                                    itemToMove = item
+                                    showMoveDialog = true
                                 }
                             )
                         }
@@ -582,6 +651,91 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 }
             }
         }
+    }
+
+    if (showNewFolderDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewFolderDialog = false },
+            title = { Text("Buat Folder Baru") },
+            text = {
+                Column {
+                    Text("Masukkan nama folder untuk mengelompokkan koleksi audio:", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = newFolderNameInput,
+                        onValueChange = { newFolderNameInput = it },
+                        placeholder = { Text("Contoh: Bangdream, Hololive, dll") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newFolderNameInput.isNotBlank()) {
+                        viewModel.createNewFolder(newFolderNameInput.trim())
+                        showNewFolderDialog = false
+                    }
+                }) {
+                    Text("Buat")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewFolderDialog = false }) { Text("Batal") }
+            }
+        )
+    }
+
+    if (showMoveDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showMoveDialog = false
+                itemToMove = null
+            },
+            title = { Text("Pindahkan Audio ke Folder") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    val targetFolders = availableFolders.filter { it != "Semua" }
+                    Text("Pilih folder tujuan untuk [${itemToMove?.rjid}] ${itemToMove?.title}:", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    targetFolders.forEach { folder ->
+                        Surface(
+                            onClick = {
+                                val target = itemToMove
+                                if (target != null) {
+                                    viewModel.moveTrackToFolder(target, folder)
+                                }
+                                showMoveDialog = false
+                                itemToMove = null
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(folder, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = {
+                    showMoveDialog = false
+                    itemToMove = null
+                }) {
+                    Text("Tutup")
+                }
+            }
+        )
     }
 
     if (showSleepTimerSheet) {
@@ -812,7 +966,8 @@ fun PlaylistItemCard(
     onDragStart: (String) -> Unit,
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onMoveClick: () -> Unit
 ) {
     val context = LocalContext.current
     val currentOnDragStart by rememberUpdatedState(onDragStart)
@@ -916,12 +1071,25 @@ fun PlaylistItemCard(
                 )
             }
 
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Tombol Pindah Folder
+            IconButton(
+                onClick = onMoveClick,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DriveFileMove,
+                    contentDescription = "Pindah Folder",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
 
             // Dedicated Drag Handle Touch Target (pointerInput with rememberUpdatedState)
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
                     .pointerInput(Unit) {
                         detectVerticalDragGestures(

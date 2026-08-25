@@ -9,7 +9,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.2.0-blue?style=for-the-badge" alt="Version v1.2.0" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.2.1-blue?style=for-the-badge" alt="Version v1.2.1" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 License" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Language-Kotlin-7c3aed?style=for-the-badge" alt="Language" />
@@ -17,7 +17,7 @@
   </p>
 
   <p>
-    <a href="#whats-new-in-v120">What's New</a> •
+    <a href="#whats-new-in-v121">What's New</a> •
     <a href="#features">Features</a> •
     <a href="#screenshots">Screenshots</a> •
     <a href="#download">Download</a> •
@@ -35,17 +35,14 @@ JapaneseASMR Downloader is a full-featured, open-source Android application engi
 
 ---
 
-## What's New in v1.2.0
+## What's New in v1.2.1
 
-* **Smart Sleep Timer**: Integrated countdown timer (5, 10, 15, 30, 60, 120 min and +/- 5 min stepper) that automatically pauses its countdown when playback is paused.
-* **Floating Mini Player**: Tab-aware interactive mini-bar over Unduhan, Riwayat, and Pengaturan tabs for instant playback control and one-tap expansion.
-* **120 FPS History Library**: Zero main-thread disk I/O with precomputed models and stable keys for buttery-smooth 120 FPS list scrolling.
-* **0ms Instant Playlist Drawer**: Pre-cached reactive list with drag-and-drop reordering and instantaneous bottom sheet opening.
-* **Modern Speed Dialog**: Continuous smooth slider (0.25x – 2.0x) with zero tick dots and a balanced 2x3 quick preset grid.
-* **Dynamic Continuous Download Queue**: Automatically processes dynamically added queue items without requiring manual restarts.
-* **Solid Floating Volume HUD**: Ultra-slim 100% solid floating volume bar with direct hardware DAC volume feedback.
-* **Deterministic Tab Retention**: Cold starts always begin at Home, while minimizing and reopening the app preserves the exact active tab.
-* **Streamlined Settings & Path Formatting**: Clean, human-readable directory display (`Download/JapaneseASMR`) and intuitive multithread download labels.
+* **Instant Storage Auto-Sync (120 FPS Safe)**: Completely non-blocking background IO synchronization with debounce protection to detect storage modifications instantly.
+* **Recursive Subfolder Scanning**: Automatically discovers all audio tracks located in nested subfolders within your custom download directory.
+* **Automatic Metadata & Cover Artwork Fetching**: Automatically extracts local ID3 tags and queries remote DLsite metadata, caching cover images locally for complete offline playback.
+* **Folder Categorization in Playlist Drawer**: Real-time folder filter chips row (`Semua`, `Utama`, and subfolders) with a quick `+ Folder` creation dialog.
+* **Interactive Audio Folder Moving**: Move tracks between directories on storage directly through the playlist drawer.
+* **Playlist Fling Dismissal Prevention**: Fixed accidental bottom sheet dismissal during fast upward list scrolling.
 
 ---
 
@@ -148,7 +145,7 @@ cd japaneseasmr-android
 
 The compiled APK will be located at:
 ```
-app/build/outputs/apk/debug/JapaneseASMR-v1.2.0-debug.apk
+app/build/outputs/apk/debug/JapaneseASMR-v1.2.1-debug.apk
 ```
 
 ---

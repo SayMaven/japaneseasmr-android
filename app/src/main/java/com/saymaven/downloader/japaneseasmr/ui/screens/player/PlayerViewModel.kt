@@ -30,7 +30,9 @@ import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,6 +52,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Playlist: HANYA berisi audio yang benar-benar ada filenya di HP (0 missing tracks)
     private val _playlist = MutableStateFlow<List<HistoryEntity>>(emptyList())
     val playlist = _playlist.asStateFlow()
+
+    // Folder Filter & Organization States
+    private val _availableFolders = MutableStateFlow<List<String>>(listOf("Semua", "Utama"))
+    val availableFolders = _availableFolders.asStateFlow()
+
+    private val _selectedFolder = MutableStateFlow<String>("Semua")
+    val selectedFolder = _selectedFolder.asStateFlow()
+
+    fun selectFolder(folder: String) {
+        _selectedFolder.value = folder
+    }
+
+    val filteredPlaylist = combine(_playlist, _selectedFolder, prefs.downloadDirFlow) { list, folder, rawDirStr ->
+        if (folder == "Semua") {
+            list
+        } else {
+            val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), rawDirStr) ?: rawDirStr
+            val downloadDir = if (!resolvedPath.isNullOrBlank()) File(resolvedPath) else DownloadService.getDefaultDownloadDirectory()
+            list.filter { item ->
+                val itemFolder = AudioStorageHelper.getRelativeFolderName(downloadDir, File(item.localFilePath))
+                itemFolder.equals(folder, ignoreCase = true)
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val dacState = UsbDacManager.dacState
     val hardwareVolume = UsbDacManager.hardwareVolume
@@ -179,9 +205,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun filterAndSetPlaylist(dbList: List<HistoryEntity>) {
         val customDirStr = prefs.downloadDirFlow.first()
-        val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
+        val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), customDirStr) ?: customDirStr
+        val downloadDir = if (!resolvedPath.isNullOrBlank()) File(resolvedPath) else DownloadService.getDefaultDownloadDirectory()
 
-        // Filter HANYA audio yang file fisiknya benar-benar ada di HP
+        // Pindai subfolder fisik yang ada di direktori unduhan
+        val subfolders = AudioStorageHelper.getExistingSubfolders(downloadDir)
+        val allFolders = (listOf("Semua", "Utama") + subfolders).distinct()
+        _availableFolders.value = allFolders
+
+        // Filter HANYA audio yang file fisiknya benar-benar ada di HP (termasuk di subfolder)
         val validItems = withContext(Dispatchers.IO) {
             dbList.mapNotNull { item ->
                 val direct = if (!item.localFilePath.isNullOrBlank()) File(item.localFilePath) else null
@@ -209,8 +241,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             savedOrderStr.split(",")
                 .mapIndexed { idx, rjid -> rjid.trim() to idx }
                 .toMap()
-        } else if (_playlist.value.isNotEmpty()) {
-            _playlist.value.mapIndexed { idx, item -> item.rjid to idx }.toMap()
         } else {
             emptyMap()
         }
@@ -218,12 +248,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val sorted = if (orderMap.isNotEmpty()) {
             validItems.sortedBy { orderMap[it.rjid] ?: Int.MAX_VALUE }
         } else {
-            validItems
+            // Urutan default: Berdasarkan waktu ditambahkan (terbaru di atas)
+            validItems.sortedByDescending { AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath) }
         }
         _playlist.value = sorted
 
         sorted.take(20).forEach { item ->
             preloadCoverArtInMemory(item.coverUrl)
+        }
+    }
+
+    fun createNewFolder(folderName: String) {
+        if (folderName.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val customDirStr = prefs.downloadDirFlow.first()
+            val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), customDirStr) ?: customDirStr
+            val downloadDir = if (!resolvedPath.isNullOrBlank()) File(resolvedPath) else DownloadService.getDefaultDownloadDirectory()
+            val created = AudioStorageHelper.createSubfolder(downloadDir, folderName)
+            if (created != null) {
+                val subfolders = AudioStorageHelper.getExistingSubfolders(downloadDir)
+                _availableFolders.value = (listOf("Semua", "Utama") + subfolders).distinct()
+                _selectedFolder.value = folderName.trim()
+                refreshPlaylist()
+            }
+        }
+    }
+
+    fun moveTrackToFolder(track: HistoryEntity, targetFolder: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val customDirStr = prefs.downloadDirFlow.first()
+            val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), customDirStr) ?: customDirStr
+            val downloadDir = if (!resolvedPath.isNullOrBlank()) File(resolvedPath) else DownloadService.getDefaultDownloadDirectory()
+            val sourceFile = File(track.localFilePath)
+            val moved = AudioStorageHelper.moveAudioFile(sourceFile, targetFolder, downloadDir)
+            if (moved != null && moved.exists()) {
+                historyDao.insertHistory(track.copy(localFilePath = moved.absolutePath))
+                refreshPlaylist()
+                StorageSyncManager.syncStorageWithDatabase(getApplication(), force = true)
+            }
         }
     }
 

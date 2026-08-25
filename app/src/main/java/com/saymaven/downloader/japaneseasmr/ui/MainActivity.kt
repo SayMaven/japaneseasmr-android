@@ -261,4 +261,9 @@ class MainActivity : ComponentActivity() {
             requestPermissionLauncher.launch(permissions.toTypedArray())
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        StorageSyncManager.syncStorageWithDatabase(this)
+    }
 }

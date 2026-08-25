@@ -692,25 +692,22 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text("Catatan Rilis (Changelog)") },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("Versi 1.2.1 (Terbaru)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("• Auto-Sync Penyimpanan Instan (120 FPS): Pemindaian latar belakang bebas lag.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Pemindaian Subfolder Rekursif: Deteksi otomatis subfolder penyimpanan.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Auto-Fetch Metadata & Cover: Otomatis melengkapi info karya & cover offline.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Kategori Subfolder Koleksi: Filter folder otomatis & tombol buat folder baru.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Fitur Pindah Folder: Pindahkan berkas antar subfolder secara instan.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Perbaikan Scroll Playlist: Pencegahan penutupan tidak sengaja saat scroll cepat.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text("Versi 1.2.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("• Sleep Timer (Pengatur Waktu Tidur) cerdas: otomatis jeda saat audio di-pause.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Smart Sleep Timer: Countdown otomatis jeda saat audio di-pause.", style = MaterialTheme.typography.bodySmall)
                     Text("• Floating Mini Player interaktif di tab Unduhan, Riwayat, & Pengaturan.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Pop-Up Kecepatan Putar Default baru dengan slider halus tanpa titik & preset 2x3.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Pop-Up Kecepatan Putar Default baru dengan slider mulus & preset 2x3.", style = MaterialTheme.typography.bodySmall)
                     Text("• Optimasi performa scroll Riwayat hingga 120 FPS tanpa frame drop.", style = MaterialTheme.typography.bodySmall)
                     Text("• Buka daftar putar (playlist) instan 0ms tanpa delay pemindaian.", style = MaterialTheme.typography.bodySmall)
                     Text("• Floating Hardware Volume HUD ultra-ramping dan solid.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Prioritas Output USB DAC dengan routing audio eksklusif jernih.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Antrean unduh dinamis berkelanjutan otomatis tanpa perlu mulai ulang.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Retensi tab stabil saat aplikasi diminimize & cold start selalu di tab Home.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Penamaan opsi Jalur Unduhan (Multithread) to-the-point dan ramah pengguna.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Tampilan path folder penyimpanan ringkas & sinkron.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("Versi 1.1.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("• Fitur Drag & Drop Reorder interaktif & halus di daftar putar koleksi.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Filter otomatis file hilang di daftar putar koleksi.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Auto-Sync Penyimpanan Realtime saat audio masuk/berpindah.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Mode Eksklusif USB DAC dengan direct USB hardware claim.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Mode Format Waktu Persisten & 36 Palet Warna Kustom.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Retensi tab stabil saat aplikasi diminimize & cold start selalu di Home.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
@@ -725,11 +722,20 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text("Panduan Penggunaan") },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text("1. Mengunduh Karya:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Masukkan kode RJ di tab Unduhan, lalu tekan Unduh atau + Antrean.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("2. Memutar Koleksi:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Buka tab Riwayat lalu tekan karya yang sudah selesai diunduh untuk mulai mendengarkan di tab Home.", style = MaterialTheme.typography.bodySmall)
+                    Text("1. Mengunduh Karya (Tab Unduhan):", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Masukkan kode RJ (misal RJ123456) di kolom input, lalu tekan Unduh atau + Antrean untuk proses otomatis berkelanjutan.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("2. Memutar & Mengelola Koleksi (Tab Home & Riwayat):", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Tekan karya di tab Riwayat untuk mulai mendengarkan di tab Home. Di tab Home, tekan ikon playlist untuk melihat koleksi, menyaring subfolder, mengatur urutan (drag & drop), atau memindahkan audio antar folder.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("3. Floating Mini Player:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Saat audio diputar dan Anda membuka tab Unduhan, Riwayat, atau Pengaturan, Mini Player akan melayang di atas navigasi bawah untuk kontrol cepat.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("4. Pengatur Waktu Tidur (Sleep Timer):", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Di layar pemutar (Home), tekan ikon bulan untuk menyetel timer. Hitung mundur akan otomatis dijeda saat audio dihentikan sementara.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("5. Pengaturan Audio & USB DAC:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Gunakan tab Pengaturan untuk mengatur jalur unduhan (multithread), kecepatan putar default, folder penyimpanan, serta mode bit-perfect USB DAC eksklusif.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {

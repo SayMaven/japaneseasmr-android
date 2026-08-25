@@ -65,9 +65,10 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         }
         flow.map { list ->
             val customDirStr = prefs.downloadDirFlow.first()
-            val downloadDir = if (!customDirStr.isNullOrBlank()) {
-                val f = File(customDirStr)
-                if (f.canWrite()) f else DownloadService.getDefaultDownloadDirectory()
+            val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), customDirStr) ?: customDirStr
+            val downloadDir = if (!resolvedPath.isNullOrBlank()) {
+                val f = File(resolvedPath)
+                if (f.exists() && f.isDirectory) f else DownloadService.getDefaultDownloadDirectory()
             } else {
                 DownloadService.getDefaultDownloadDirectory()
             }
