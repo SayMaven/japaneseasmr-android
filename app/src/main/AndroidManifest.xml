@@ -34,6 +34,7 @@
             android:exported="true"
             android:icon="@drawable/app_icon"
             android:roundIcon="@drawable/app_icon"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.App.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

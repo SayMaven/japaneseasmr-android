@@ -88,13 +88,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val sleepTimerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var draftTimerMinutes by remember { mutableIntStateOf(15) }
 
-    // Instan refresh playlist setiap kali Bottom Sheet dibuka
-    LaunchedEffect(showBottomSheet) {
-        if (showBottomSheet) {
-            viewModel.refreshPlaylist()
-        }
-    }
-
     val effectivePosition = if (isSliderDragging) dragPosition else currentPosition
 
     // Standard High-Performance Drag-to-Reorder States using unique draggedRjid
@@ -542,9 +535,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             val isDragged = (draggedRjid == item.rjid)
 
                             PlaylistItemCard(
-                                modifier = Modifier.animateItemPlacement(
-                                    animationSpec = spring(stiffness = 800f)
-                                ),
+                                modifier = Modifier.fillMaxWidth(),
                                 item = item,
                                 isCurrentTrack = isCurrentTrack,
                                 isPlaying = (isCurrentTrack && isPlaying),

@@ -64,6 +64,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     var showThemeDialog by remember { mutableStateOf(false) }
     var showThreadDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
+    var draftSpeed by remember(defaultSpeed) { mutableFloatStateOf(defaultSpeed) }
     var showChangelogDialog by remember { mutableStateOf(false) }
     var showGuideDialog by remember { mutableStateOf(false) }
 
@@ -175,7 +176,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Lanjutkan Pemutaran (Auto-Resume)", fontWeight = FontWeight.SemiBold) },
+                    headlineContent = { Text("Lanjutkan Pemutaran", fontWeight = FontWeight.SemiBold) },
                     supportingContent = { Text("Ingat posisi track, durasi, repeat, shuffle & status waktu saat buka ulang app", style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Restore, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
@@ -190,9 +191,20 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                 ListItem(
                     headlineContent = { Text("Kecepatan Putar Default", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("${defaultSpeed}x Normal", style = MaterialTheme.typography.bodySmall) },
+                    supportingContent = {
+                        val label = when (defaultSpeed) {
+                            1.0f -> "1.0x (Normal)"
+                            0.25f -> "0.25x (Paling Lambat)"
+                            2.0f -> "2.0x (Paling Cepat)"
+                            else -> String.format(java.util.Locale.US, "%.2fx", defaultSpeed)
+                        }
+                        Text(label, style = MaterialTheme.typography.bodySmall)
+                    },
                     leadingContent = { Icon(Icons.Default.Speed, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier.clickable { showSpeedDialog = true }
+                    modifier = Modifier.clickable {
+                        draftSpeed = defaultSpeed
+                        showSpeedDialog = true
+                    }
                 )
             }
         }
@@ -229,8 +241,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Koneksi Paralel", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("$parallelConn thread simultan (HLS & MP3)", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text("Jalur Unduhan", fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text("$parallelConn jalur simultan", style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable { showThreadDialog = true }
                 )
@@ -470,44 +482,182 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     }
 
     if (showSpeedDialog) {
-        val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
         AlertDialog(
             onDismissRequest = { showSpeedDialog = false },
-            title = { Text("Kecepatan Putar Default") },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Speed,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Kecepatan Putar Default")
+                }
+            },
             text = {
-                Column {
-                    speeds.forEach { speed ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Hero Speed Card
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setDefaultSpeed(speed)
-                                    showSpeedDialog = false
-                                }
-                                .padding(vertical = 8.dp)
+                                .padding(vertical = 14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            RadioButton(selected = defaultSpeed == speed, onClick = null)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("${speed}x ${if (speed == 1.0f) "(Normal)" else ""}")
+                            Text(
+                                text = String.format(java.util.Locale.US, "%.2fx", draftSpeed),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            val statusText = when {
+                                draftSpeed == 1.0f -> "Kecepatan Normal"
+                                draftSpeed < 1.0f -> "Lebih Lambat"
+                                else -> "Lebih Cepat"
+                            }
+                            Text(
+                                text = statusText,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // Smooth Slider murni tanpa titik-titik (steps = 0)
+                    Slider(
+                        value = draftSpeed,
+                        onValueChange = { draftSpeed = (kotlin.math.round(it * 20f) / 20f).coerceIn(0.25f, 2.0f) },
+                        valueRange = 0.25f..2.0f,
+                        steps = 0,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("0.25x (Min)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("1.00x (Normal)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("2.00x (Maks)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    Text(
+                        text = "Pilihan Cepat",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 2 Baris Tombol Preset Proporsional (100% Pas & Terlihat)
+                    val presetsRow1 = listOf(0.5f, 0.75f, 1.0f)
+                    val presetsRow2 = listOf(1.25f, 1.5f, 2.0f)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        presetsRow1.forEach { preset ->
+                            val isSelected = (draftSpeed == preset)
+                            Surface(
+                                onClick = { draftSpeed = preset },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "${preset}x",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        presetsRow2.forEach { preset ->
+                            val isSelected = (draftSpeed == preset)
+                            Surface(
+                                onClick = { draftSpeed = preset },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "${preset}x",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showSpeedDialog = false }) { Text("Tutup") }
+                Button(onClick = {
+                    viewModel.setDefaultSpeed(draftSpeed)
+                    showSpeedDialog = false
+                }) {
+                    Text("Simpan")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSpeedDialog = false }) {
+                    Text("Batal")
+                }
             }
         )
     }
 
     if (showThreadDialog) {
-        val options = listOf(4, 8, 16, 24, 32)
+        val options = listOf(
+            4 to "4 Jalur (Hemat Kuota)",
+            8 to "8 Jalur (Standar)",
+            16 to "16 Jalur (Rekomendasi)",
+            24 to "24 Jalur (Cepat)",
+            32 to "32 Jalur (Maksimum)"
+        )
         AlertDialog(
             onDismissRequest = { showThreadDialog = false },
-            title = { Text("Jumlah Koneksi Paralel") },
+            title = { Text("Jalur Unduhan") },
             text = {
                 Column {
-                    options.forEach { opt ->
+                    Text(
+                        text = "Membagi file unduhan menjadi beberapa bagian agar lebih cepat.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    options.forEach { (opt, label) ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -520,7 +670,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         ) {
                             RadioButton(selected = parallelConn == opt, onClick = null)
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text("$opt Koneksi ${if (opt == 16) "(Rekomendasi)" else ""}")
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (opt == 16) FontWeight.Bold else FontWeight.Normal,
+                                color = if (opt == 16) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
                 }
@@ -538,14 +693,18 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text("Versi 1.2.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("• Sleep Timer (Pengatur Waktu Tidur) terpadu dengan preset & kelipatan 5 menit.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Sinkronisasi hitung mundur timer otomatis terhenti saat audio di-pause.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Optimasi performa scroll riwayat & koleksi hingga 120 FPS tanpa frame drop.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Floating Hardware Volume HUD melayang ultra-ramping & solid.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Prioritas Output USB DAC dengan routing audio jernih.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Antrean unduh dinamis & berkelanjutan otomatis hingga tuntas.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Sleep Timer (Pengatur Waktu Tidur) cerdas: otomatis jeda saat audio di-pause.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Floating Mini Player interaktif di tab Unduhan, Riwayat, & Pengaturan.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Pop-Up Kecepatan Putar Default baru dengan slider halus tanpa titik & preset 2x3.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Optimasi performa scroll Riwayat hingga 120 FPS tanpa frame drop.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Buka daftar putar (playlist) instan 0ms tanpa delay pemindaian.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Floating Hardware Volume HUD ultra-ramping dan solid.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Prioritas Output USB DAC dengan routing audio eksklusif jernih.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Antrean unduh dinamis berkelanjutan otomatis tanpa perlu mulai ulang.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Retensi tab stabil saat aplikasi diminimize & cold start selalu di tab Home.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Penamaan opsi Jalur Unduhan (Multithread) to-the-point dan ramah pengguna.", style = MaterialTheme.typography.bodySmall)
                     Text("• Tampilan path folder penyimpanan ringkas & sinkron.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text("Versi 1.1.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text("• Fitur Drag & Drop Reorder interaktif & halus di daftar putar koleksi.", style = MaterialTheme.typography.bodySmall)
                     Text("• Filter otomatis file hilang di daftar putar koleksi.", style = MaterialTheme.typography.bodySmall)
@@ -567,10 +726,10 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text("1. Mengunduh Karya:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Masukkan kode RJ di tab Home, lalu tekan Unduh atau + Antrean.", style = MaterialTheme.typography.bodySmall)
+                    Text("Masukkan kode RJ di tab Unduhan, lalu tekan Unduh atau + Antrean.", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("2. Memutar Koleksi:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Buka tab Riwayat lalu tekan karya yang sudah selesai diunduh.", style = MaterialTheme.typography.bodySmall)
+                    Text("Buka tab Riwayat lalu tekan karya yang sudah selesai diunduh untuk mulai mendengarkan di tab Home.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {

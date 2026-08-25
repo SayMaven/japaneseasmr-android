@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class NavTab(val title: String, val icon: ImageVector) {
-    PLAYER("Home", Icons.Default.Home),
+    HOME("Home", Icons.Default.Home),
     QUEUE("Unduhan", Icons.Default.Download),
     HISTORY("Riwayat", Icons.Default.History),
     SETTINGS("Pengaturan", Icons.Default.Settings)
