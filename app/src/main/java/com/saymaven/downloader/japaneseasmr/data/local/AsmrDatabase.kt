@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 
-@Database(entities = [HistoryEntity::class], version = 2, exportSchema = false)
+@Database(entities = [HistoryEntity::class], version = 3, exportSchema = false)
 abstract class AsmrDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
 
@@ -23,6 +23,13 @@ abstract class AsmrDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE history_table ADD COLUMN translatedTitle TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE history_table ADD COLUMN translatedChaptersJson TEXT DEFAULT NULL")
+            }
+        }
+
         fun getDatabase(context: Context): AsmrDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -30,7 +37,7 @@ abstract class AsmrDatabase : RoomDatabase() {
                     AsmrDatabase::class.java,
                     "japaneseasmr_database.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

@@ -26,6 +26,8 @@ class PreferencesManager(private val context: Context) {
         val KEY_SHOW_CONSOLE = booleanPreferencesKey("show_console")
         val KEY_PREFERRED_AUDIO_FORMAT = stringPreferencesKey("preferred_audio_format")
         val KEY_CREATE_CUE_SHEET = booleanPreferencesKey("create_cue_sheet")
+        val KEY_TRANSLATION_LANGUAGE = stringPreferencesKey("translation_language")
+        val KEY_IS_TRANSLATION_ACTIVE = booleanPreferencesKey("is_translation_active")
 
         // Audio Player Settings
         val KEY_EXCLUSIVE_USB_DAC = booleanPreferencesKey("exclusive_usb_dac")
