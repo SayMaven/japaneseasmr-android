@@ -86,6 +86,10 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val isLoadingChapters by viewModel.isLoadingChapters.collectAsState()
     val activeChapterIndex by viewModel.activeChapterIndex.collectAsState()
     val activeChapter by viewModel.activeChapter.collectAsState()
+    val isTranslationActive by viewModel.isTranslationActive.collectAsState()
+    val isTranslating by viewModel.isTranslating.collectAsState()
+    val translatedTitle by viewModel.translatedTitle.collectAsState()
+    val translatedChapters by viewModel.translatedChapters.collectAsState()
 
     val activity = context as? Activity
     DisposableEffect(keepScreenOn) {
@@ -185,8 +189,13 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             Spacer(modifier = Modifier.height(8.dp))
 
             // Metadata Title (Top)
+            val displayTitle = if (isTranslationActive && !translatedTitle.isNullOrBlank()) {
+                val rjPrefix = if (!currentRjId.isNullOrBlank()) "[${currentRjId}] " else ""
+                "$rjPrefix$translatedTitle"
+            } else currentTitle
+
             Text(
-                text = currentTitle,
+                text = displayTitle,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -194,6 +203,19 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 12.dp)
             )
+
+            if (isTranslationActive && !translatedTitle.isNullOrBlank() && displayTitle != currentTitle) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = currentTitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -233,8 +255,12 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         } else {
+                            val activeChapTitle = if (isTranslationActive && activeChapterIndex in translatedChapters.indices) {
+                                translatedChapters[activeChapterIndex].title
+                            } else activeChapter?.title ?: "Daftar Bab (${chapters.size})"
+
                             Text(
-                                text = activeChapter?.title ?: "Daftar Bab (${chapters.size})",
+                                text = activeChapTitle,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -451,6 +477,34 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                }
+
+                // Translate Button (Terjemahkan Judul & Bab)
+                Surface(
+                    onClick = { viewModel.toggleTranslation() },
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isTranslationActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                ) {
+                    Box(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isTranslating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Translate,
+                                contentDescription = "Terjemahkan Judul & Bab",
+                                tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
@@ -1076,6 +1130,26 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         )
                     }
 
+                    // Tombol Terjemahkan Bab (di sebelah kiri tombol refresh)
+                    IconButton(
+                        onClick = { viewModel.toggleTranslation() },
+                        enabled = !isTranslating
+                    ) {
+                        if (isTranslating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Translate,
+                                contentDescription = "Terjemahkan Bab",
+                                tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+
                     // Refresh / Sync Online Button
                     IconButton(
                         onClick = {
@@ -1210,14 +1284,29 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
                                     // Title & Time Range
                                     Column(modifier = Modifier.weight(1f)) {
+                                        val translatedChapterTitle = if (isTranslationActive && idx in translatedChapters.indices) {
+                                            translatedChapters[idx].title
+                                        } else null
+
                                         Text(
-                                            text = chapter.title,
+                                            text = translatedChapterTitle ?: chapter.title,
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                                             color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
+
+                                        if (isTranslationActive && !translatedChapterTitle.isNullOrBlank() && translatedChapterTitle != chapter.title) {
+                                            Text(
+                                                text = chapter.title,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+
                                         if (chapter.endMs > chapter.startMs) {
                                             val durSec = (chapter.endMs - chapter.startMs) / 1000
                                             val m = durSec / 60

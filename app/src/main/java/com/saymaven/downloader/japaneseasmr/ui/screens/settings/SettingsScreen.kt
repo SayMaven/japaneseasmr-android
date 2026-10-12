@@ -61,11 +61,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
     val autoResume by viewModel.autoResume.collectAsState()
     val defaultSpeed by viewModel.defaultSpeed.collectAsState()
+    val translationLanguage by viewModel.translationLanguage.collectAsState()
 
     var showThemeDialog by remember { mutableStateOf(false) }
     var showThreadDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
     var draftSpeed by remember(defaultSpeed) { mutableFloatStateOf(defaultSpeed) }
+    var showTranslationLangDialog by remember { mutableStateOf(false) }
     var showChangelogDialog by remember { mutableStateOf(false) }
     var showGuideDialog by remember { mutableStateOf(false) }
 
@@ -206,6 +208,21 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         draftSpeed = defaultSpeed
                         showSpeedDialog = true
                     }
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                ListItem(
+                    headlineContent = { Text("Bahasa Terjemahan (ASMR Translator)", fontWeight = FontWeight.SemiBold) },
+                    supportingContent = {
+                        val langLabel = when (translationLanguage) {
+                            "en" -> "English (Inggris)"
+                            else -> "Bahasa Indonesia (Indonesia)"
+                        }
+                        Text(langLabel, style = MaterialTheme.typography.bodySmall)
+                    },
+                    leadingContent = { Icon(Icons.Default.Translate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    modifier = Modifier.clickable { showTranslationLangDialog = true }
                 )
             }
         }
@@ -650,6 +667,71 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             dismissButton = {
                 TextButton(onClick = { showSpeedDialog = false }) {
                     Text("Batal")
+                }
+            }
+        )
+    }
+
+    if (showTranslationLangDialog) {
+        val langOptions = listOf(
+            "id" to "Bahasa Indonesia (Indonesia)",
+            "en" to "English (Inggris)"
+        )
+        AlertDialog(
+            onDismissRequest = { showTranslationLangDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Translate,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Pilih Bahasa Terjemahan")
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Bahasa target untuk menerjemahkan judul karya dan daftar bab ASMR.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    langOptions.forEach { (code, label) ->
+                        val isSelected = (translationLanguage == code)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setTranslationLanguage(code)
+                                    showTranslationLangDialog = false
+                                }
+                                .padding(vertical = 10.dp)
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    viewModel.setTranslationLanguage(code)
+                                    showTranslationLangDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTranslationLangDialog = false }) {
+                    Text("Tutup")
                 }
             }
         )

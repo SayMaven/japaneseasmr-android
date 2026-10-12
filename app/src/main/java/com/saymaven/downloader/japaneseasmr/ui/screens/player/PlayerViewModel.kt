@@ -29,6 +29,7 @@ import com.saymaven.downloader.japaneseasmr.service.ChapterDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.service.PlaybackService
 import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
+import com.saymaven.downloader.japaneseasmr.service.TranslationService
 import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -143,6 +144,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _isLoadingChapters = MutableStateFlow(false)
     val isLoadingChapters = _isLoadingChapters.asStateFlow()
 
+    // Translation States
+    private val _isTranslationActive = MutableStateFlow(false)
+    val isTranslationActive = _isTranslationActive.asStateFlow()
+
+    private val _isTranslating = MutableStateFlow(false)
+    val isTranslating = _isTranslating.asStateFlow()
+
+    private val _translatedTitle = MutableStateFlow<String?>(null)
+    val translatedTitle = _translatedTitle.asStateFlow()
+
+    private val _translatedChapters = MutableStateFlow<List<ChapterItem>>(emptyList())
+    val translatedChapters = _translatedChapters.asStateFlow()
+
     val activeChapterIndex = combine(_currentPosition, _currentChapters) { pos, chapters ->
         if (chapters.isEmpty()) -1
         else chapters.indexOfLast { pos >= it.startMs }
@@ -162,6 +176,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         observeSyncTicks()
         restorePlaybackState()
         observeAudioSettings()
+        observeTranslationPreference()
         StorageSyncManager.syncStorageWithDatabase(application)
         if (!_currentRjId.value.isNullOrBlank()) {
             loadChaptersForCurrentTrack(_currentRjId.value)
@@ -318,6 +333,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun observeTranslationPreference() {
+        viewModelScope.launch {
+            prefs.isTranslationActiveFlow.collect { active ->
+                _isTranslationActive.value = active
+                if (active && !_currentRjId.value.isNullOrBlank()) {
+                    loadOrFetchTranslations(_currentRjId.value)
+                }
+            }
+        }
+        viewModelScope.launch {
+            prefs.translationLanguageFlow.collect { _ ->
+                if (_isTranslationActive.value && !_currentRjId.value.isNullOrBlank()) {
+                    loadOrFetchTranslations(_currentRjId.value, forceOnline = true)
+                }
+            }
+        }
+    }
+
     // Ultra-Fast In-Memory Reorder (0 disk I/O, 0 IPC calls during drag)
     fun reorderPlaylistInMemory(fromIndex: Int, toIndex: Int) {
         val current = _playlist.value.toMutableList()
@@ -453,6 +486,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     _repeatMode.value = prefs.repeatModeFlow.first()
                     _shuffleMode.value = prefs.shuffleModeFlow.first()
+                    if (_isTranslationActive.value) {
+                        loadOrFetchTranslations(history.rjid)
+                    }
 
                     val p = player
                     if (p != null && p.mediaItemCount == 0) {
@@ -528,6 +564,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _currentRjId.value = mediaItem.mediaId
                     if (prevRj != mediaItem.mediaId) {
                         loadChaptersForCurrentTrack(mediaItem.mediaId)
+                        if (_isTranslationActive.value) {
+                            loadOrFetchTranslations(mediaItem.mediaId)
+                        } else {
+                            _translatedTitle.value = null
+                            _translatedChapters.value = emptyList()
+                        }
                     }
                     mediaItem.mediaMetadata.let { meta ->
                         _currentTitle.value = meta.title?.toString() ?: ""
@@ -705,6 +747,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _currentCoverUrl.value = finalCover
             preloadCoverArtInMemory(finalCover)
             loadChaptersForCurrentTrack(targetPair.first.rjid)
+            if (_isTranslationActive.value) {
+                loadOrFetchTranslations(targetPair.first.rjid)
+            } else {
+                _translatedTitle.value = null
+                _translatedChapters.value = emptyList()
+            }
 
             p.setMediaItems(mediaItems, targetIndex, startPositionMs)
             p.prepare()
@@ -902,6 +950,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                 historyDao.updateChapters(targetRjid, ChapterItem.toJsonArray(valid))
                             }
                         }
+                        checkTranslateChaptersIfNeeded(targetRjid, valid)
                         return@launch
                     }
                 }
@@ -929,6 +978,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     withContext(Dispatchers.IO) {
                         historyDao.updateChapters(targetRjid, ChapterItem.toJsonArray(localChapters))
                     }
+                    checkTranslateChaptersIfNeeded(targetRjid, localChapters)
                     return@launch
                 }
 
@@ -949,10 +999,126 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     _currentChapters.value = emptyList()
                 }
+
+                checkTranslateChaptersIfNeeded(targetRjid, _currentChapters.value)
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 _isLoadingChapters.value = false
+            }
+        }
+    }
+
+    fun toggleTranslation() {
+        val next = !_isTranslationActive.value
+        _isTranslationActive.value = next
+        viewModelScope.launch {
+            prefs.setTranslationActive(next)
+            if (next && !_currentRjId.value.isNullOrBlank()) {
+                loadOrFetchTranslations(_currentRjId.value)
+            } else if (!next) {
+                _translatedTitle.value = null
+                _translatedChapters.value = emptyList()
+            }
+        }
+    }
+
+    fun loadOrFetchTranslations(targetRjid: String? = _currentRjId.value, forceOnline: Boolean = false) {
+        if (targetRjid.isNullOrBlank()) {
+            _translatedTitle.value = null
+            _translatedChapters.value = emptyList()
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val targetLang = prefs.translationLanguageFlow.first()
+                val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
+
+                // 1. Cek cache DB jika tidak forceOnline
+                if (!forceOnline && history != null && !history.translatedTitle.isNullOrBlank()) {
+                    _translatedTitle.value = history.translatedTitle
+                    if (!history.translatedChaptersJson.isNullOrBlank()) {
+                        val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
+                        _translatedChapters.value = parsed
+                    }
+                    return@launch
+                }
+
+                _isTranslating.value = true
+
+                // Terjemahkan Judul Karya
+                val rawTitle = (history?.title ?: _currentTitle.value)
+                    .replace("\\[$targetRjid\\]".toRegex(RegexOption.IGNORE_CASE), "")
+                    .trim()
+
+                val translatedTitleRes = withContext(Dispatchers.IO) {
+                    TranslationService.translateText(rawTitle, targetLang)
+                }
+                _translatedTitle.value = translatedTitleRes
+
+                // Terjemahkan Daftar Bab jika sudah ada
+                val currentChaps = _currentChapters.value
+                val translatedChapsList = mutableListOf<ChapterItem>()
+                if (currentChaps.isNotEmpty()) {
+                    val titles = currentChaps.map { it.title }
+                    val translatedBatch = withContext(Dispatchers.IO) {
+                        TranslationService.translateBatch(titles, targetLang)
+                    }
+                    for (i in currentChaps.indices) {
+                        val orig = currentChaps[i]
+                        val trans = if (i < translatedBatch.size) translatedBatch[i] else orig.title
+                        translatedChapsList.add(orig.copy(title = trans))
+                    }
+                    _translatedChapters.value = translatedChapsList
+                }
+
+                val chapsJson = if (translatedChapsList.isNotEmpty()) {
+                    ChapterItem.toJsonArray(translatedChapsList)
+                } else history?.translatedChaptersJson
+
+                withContext(Dispatchers.IO) {
+                    historyDao.updateTranslations(targetRjid, translatedTitleRes, chapsJson)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isTranslating.value = false
+            }
+        }
+    }
+
+    private fun checkTranslateChaptersIfNeeded(targetRjid: String, chapters: List<ChapterItem>) {
+        if (!_isTranslationActive.value || chapters.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
+                if (!history?.translatedChaptersJson.isNullOrBlank()) {
+                    val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
+                    if (parsed.size == chapters.size) {
+                        _translatedChapters.value = parsed
+                        return@launch
+                    }
+                }
+                val targetLang = prefs.translationLanguageFlow.first()
+                val titles = chapters.map { it.title }
+                val translatedBatch = withContext(Dispatchers.IO) {
+                    TranslationService.translateBatch(titles, targetLang)
+                }
+                val translatedChapsList = chapters.mapIndexed { idx, orig ->
+                    val trans = if (idx < translatedBatch.size) translatedBatch[idx] else orig.title
+                    orig.copy(title = trans)
+                }
+                _translatedChapters.value = translatedChapsList
+                withContext(Dispatchers.IO) {
+                    historyDao.updateTranslations(
+                        targetRjid,
+                        _translatedTitle.value ?: history?.translatedTitle,
+                        ChapterItem.toJsonArray(translatedChapsList)
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }

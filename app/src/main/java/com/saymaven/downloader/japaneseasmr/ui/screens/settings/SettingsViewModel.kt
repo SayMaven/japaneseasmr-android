@@ -78,6 +78,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         false
     )
 
+    val translationLanguage = preferencesManager.translationLanguageFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        "id"
+    )
+
     // Player Settings StateFlows
     val audioFocus = preferencesManager.audioFocusFlow.stateIn(
         viewModelScope,
@@ -172,6 +178,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setCreateCueSheet(enabled: Boolean) {
         viewModelScope.launch {
             preferencesManager.setCreateCueSheet(enabled)
+        }
+    }
+
+    fun setTranslationLanguage(lang: String) {
+        viewModelScope.launch {
+            preferencesManager.setTranslationLanguage(lang)
         }
     }
 
