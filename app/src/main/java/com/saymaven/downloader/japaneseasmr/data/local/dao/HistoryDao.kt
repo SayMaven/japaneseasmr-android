@@ -31,6 +31,9 @@ interface HistoryDao {
     @Query("DELETE FROM history_table WHERE rjid = :rjid")
     suspend fun deleteById(rjid: String)
 
+    @Query("UPDATE history_table SET chaptersJson = :chaptersJson WHERE rjid = :rjid")
+    suspend fun updateChapters(rjid: String, chaptersJson: String?)
+
     @Query("DELETE FROM history_table")
     suspend fun clearAll()
 }

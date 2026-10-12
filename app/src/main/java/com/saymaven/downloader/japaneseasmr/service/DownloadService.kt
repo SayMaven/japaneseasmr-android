@@ -12,6 +12,7 @@ import com.saymaven.downloader.japaneseasmr.JapaneseAsmrApp
 import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
+import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadStatus
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
@@ -197,6 +198,10 @@ class DownloadService : Service() {
                 // Pastikan tersimpan di Room database
                 val existingHistory = historyDao.getHistoryById(itemRjid)
                 if (existingHistory == null) {
+                    val cueFile = File(existingFile.parentFile, "${existingFile.nameWithoutExtension}.cue")
+                    val existingChapters = if (cueFile.exists()) ChapterDiscoveryService.parseCueFile(cueFile) else emptyList()
+                    val chJson = if (existingChapters.isNotEmpty()) ChapterItem.toJsonArray(existingChapters) else null
+
                     historyDao.insertHistory(
                         HistoryEntity(
                             rjid = itemRjid,
@@ -208,7 +213,8 @@ class DownloadService : Service() {
                             coverUrl = nextItem.coverUrl,
                             localFilePath = existingFile.absolutePath,
                             downloadDate = dateStr,
-                            fileSize = fileSizeStr
+                            fileSize = fileSizeStr,
+                            chaptersJson = chJson
                         )
                     )
                 }
@@ -249,7 +255,7 @@ class DownloadService : Service() {
                 continue
             }
 
-            val tracks = TrackDiscoveryService.discoverAllTracks(itemRjid)
+            val tracks = TrackDiscoveryService.discoverAllTracks(itemRjid, "auto")
             log("  [i] Ditemukan ${tracks.size} track (${tracks.joinToString { it.name }})")
 
             updateItem(itemRjid) {
@@ -272,12 +278,25 @@ class DownloadService : Service() {
             // 4. Download Tracks
             val downloadedTracks = mutableListOf<File>()
             var isFailed = false
-            val isHls = tracks.any { it.url.endsWith(".m3u8", ignoreCase = true) }
-            val fileExtension = if (isHls) "m4a" else "mp3"
+            val sourceExtension = when {
+                tracks.any { it.url.contains(".m3u8", ignoreCase = true) } -> "m4a"
+                tracks.firstOrNull()?.url?.contains(".wav", ignoreCase = true) == true -> "wav"
+                tracks.firstOrNull()?.url?.contains(".flac", ignoreCase = true) == true -> "flac"
+                tracks.firstOrNull()?.url?.contains(".m4a", ignoreCase = true) == true -> "m4a"
+                else -> "mp3"
+            }
+
+            val fileExtension = sourceExtension
 
             for (tIdx in tracks.indices) {
                 val track = tracks[tIdx]
-                val trackExt = if (track.url.endsWith(".m3u8", ignoreCase = true)) "m4a" else "mp3"
+                val trackExt = when {
+                    track.url.contains(".m3u8", ignoreCase = true) -> "m4a"
+                    track.url.contains(".wav", ignoreCase = true) -> "wav"
+                    track.url.contains(".flac", ignoreCase = true) -> "flac"
+                    track.url.contains(".m4a", ignoreCase = true) -> "m4a"
+                    else -> "mp3"
+                }
                 val trackFile = File(tempDir, "${itemRjid}_t${tIdx + 1}.$trackExt")
 
                 updateItem(itemRjid) {
@@ -294,6 +313,7 @@ class DownloadService : Service() {
                     destFile = trackFile,
                     tempDir = tempDir,
                     parallelConnections = parallelConn,
+                    referer = track.referer,
                     onProgress = { pct, speed, eta, downStr, totStr ->
                         val overallPct = (tIdx.toFloat() + pct) / tracks.size.toFloat()
                         updateItem(itemRjid) {
@@ -340,11 +360,11 @@ class DownloadService : Service() {
             }
 
             // 5. Finalizing & Metadata Tagging
-            log("  [3/3] Menyematkan metadata & cover art...")
+            log("  [3/3] Menggabungkan audio, menyematkan metadata & cover art...")
             updateItem(itemRjid) {
                 it.copy(
                     status = DownloadStatus.PROCESSING,
-                    statusText = "Menyematkan metadata & cover art..."
+                    statusText = "Menggabungkan audio & menyematkan metadata..."
                 )
             }
 
@@ -354,21 +374,23 @@ class DownloadService : Service() {
                 "$itemRjid.$fileExtension"
             }
 
-            val finalOutputFile = File(downloadDir, filename)
+            val preferredOutputFile = File(downloadDir, filename)
+            val finalAudioFile = preferredOutputFile
+
             if (downloadedTracks.size == 1) {
-                downloadedTracks[0].copyTo(finalOutputFile, overwrite = true)
+                downloadedTracks[0].copyTo(preferredOutputFile, overwrite = true)
             } else {
-                finalOutputFile.outputStream().use { out ->
-                    for (tFile in downloadedTracks) {
-                        tFile.inputStream().use { input ->
-                            input.copyTo(out)
-                        }
-                    }
+                log("  [+] Menggabungkan ${downloadedTracks.size} track audio (Fast Remux)...")
+                val allM4a = downloadedTracks.all { it.extension.equals("m4a", ignoreCase = true) }
+                if (allM4a) {
+                    AudioMerger.mergeM4aFiles(downloadedTracks, preferredOutputFile) { log("    $it") }
+                } else {
+                    AudioMerger.mergeMp3Files(downloadedTracks, preferredOutputFile) { log("    $it") }
                 }
             }
 
             AudioTagger.tagAudioFile(
-                audioFile = finalOutputFile,
+                audioFile = finalAudioFile,
                 coverFile = coverFile,
                 title = meta.title,
                 artist = meta.cv,
@@ -377,8 +399,34 @@ class DownloadService : Service() {
                 comment = "Downloaded with JapaneseASMR by SayMaven (https://github.com/SayMaven)"
             )
 
-            val fileSizeStr = AudioDownloader.formatFileSize(finalOutputFile.length())
+            val fileSizeStr = AudioDownloader.formatFileSize(finalAudioFile.length())
             val dateStr = AudioStorageHelper.formatDateForDisplay(System.currentTimeMillis())
+
+            // 6. Ekstraksi Bab (Chapters) & CUE Sheet
+            val trackNames = tracks.map { it.name }
+            val generatedChapters = ChapterDiscoveryService.generateChapters(
+                trackFiles = downloadedTracks,
+                trackNames = trackNames,
+                rjId = itemRjid
+            )
+
+            val actualIsM4a = finalAudioFile.extension.equals("m4a", ignoreCase = true)
+            val shouldCreateCue = prefs.createCueSheetFlow.first()
+            val chaptersJsonStr = if (generatedChapters.isNotEmpty()) {
+                log("  [i] Berhasil memetakan ${generatedChapters.size} bab cerita!")
+                if (!actualIsM4a && shouldCreateCue) {
+                    ChapterDiscoveryService.writeCueSheet(
+                        audioFile = finalAudioFile,
+                        chapters = generatedChapters,
+                        workTitle = meta.title,
+                        performer = meta.cv
+                    )
+                    log("  [+] Berkas CUE Sheet berhasil dibuat: ${finalAudioFile.nameWithoutExtension}.cue")
+                } else {
+                    log("  [i] Penanda bab disematkan langsung ke database player (CUE Sheet dilewati)")
+                }
+                ChapterItem.toJsonArray(generatedChapters)
+            } else null
 
             historyDao.insertHistory(
                 HistoryEntity(
@@ -389,9 +437,10 @@ class DownloadService : Service() {
                     genre = meta.genre,
                     ageRating = meta.ageRating,
                     coverUrl = meta.coverUrl,
-                    localFilePath = finalOutputFile.absolutePath,
+                    localFilePath = finalAudioFile.absolutePath,
                     downloadDate = dateStr,
-                    fileSize = fileSizeStr
+                    fileSize = fileSizeStr,
+                    chaptersJson = chaptersJsonStr
                 )
             )
 
@@ -406,7 +455,7 @@ class DownloadService : Service() {
                 )
             }
 
-            log("[SUCCESS] Selesai: ${finalOutputFile.absolutePath} ($fileSizeStr)")
+            log("[SUCCESS] Selesai: ${finalAudioFile.absolutePath} ($fileSizeStr)")
 
             downloadedTracks.forEach { it.delete() }
             coverFile.delete()

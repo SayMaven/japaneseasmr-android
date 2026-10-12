@@ -14,5 +14,6 @@ data class HistoryEntity(
     val coverUrl: String,
     val localFilePath: String,
     val downloadDate: String,
-    val fileSize: String
+    val fileSize: String,
+    val chaptersJson: String? = null
 )

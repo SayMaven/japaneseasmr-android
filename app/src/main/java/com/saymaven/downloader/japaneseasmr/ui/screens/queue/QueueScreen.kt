@@ -128,7 +128,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { viewModel.onInputChanged(it) },
-                        label = { Text("Kode RJ (misal: RJ337874)") },
+                        label = { Text("Kode RJ atau Tautan (misal: RJ337874)") },
                         placeholder = { Text("RJ337874") },
                         trailingIcon = {
                             IconButton(onClick = { viewModel.pasteFromClipboard(context) }) {

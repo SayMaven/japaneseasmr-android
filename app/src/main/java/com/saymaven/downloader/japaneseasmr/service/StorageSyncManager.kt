@@ -112,6 +112,10 @@ object StorageSyncManager {
                         val fallbackCoverUrl = "https://img.dlsite.jp/modpub/images2/work/doujin/${prefix}0000/${rjid}_img_main.jpg"
                         val coverUrl = localCover?.absolutePath ?: fallbackCoverUrl
 
+                        val cueFile = File(f.parentFile, "${f.nameWithoutExtension}.cue")
+                        val existingChaps = if (cueFile.exists()) ChapterDiscoveryService.parseCueFile(cueFile) else emptyList()
+                        val chJson = if (existingChaps.isNotEmpty()) com.saymaven.downloader.japaneseasmr.data.model.ChapterItem.toJsonArray(existingChaps) else null
+
                         val newEntity = HistoryEntity(
                             rjid = rjid,
                             title = title,
@@ -122,7 +126,8 @@ object StorageSyncManager {
                             coverUrl = coverUrl,
                             localFilePath = f.absolutePath,
                             downloadDate = formattedDate,
-                            fileSize = AudioDownloader.formatFileSize(f.length())
+                            fileSize = AudioDownloader.formatFileSize(f.length()),
+                            chaptersJson = chJson
                         )
                         dao.insertHistory(newEntity)
 
@@ -209,13 +214,26 @@ object StorageSyncManager {
                 }
             }
 
+            var resolvedChaptersJson = entity.chaptersJson
+            if (resolvedChaptersJson.isNullOrBlank()) {
+                val audioF = File(entity.localFilePath)
+                val cueF = File(audioF.parentFile, "${audioF.nameWithoutExtension}.cue")
+                if (cueF.exists()) {
+                    val chaps = ChapterDiscoveryService.parseCueFile(cueF)
+                    if (chaps.isNotEmpty()) {
+                        resolvedChaptersJson = com.saymaven.downloader.japaneseasmr.data.model.ChapterItem.toJsonArray(chaps)
+                    }
+                }
+            }
+
             val finalEntity = entity.copy(
                 title = if (meta.title.isNotBlank() && meta.title != rjid) meta.title else entity.title,
                 circle = if (meta.circle.isNotBlank() && meta.circle != "-") meta.circle else entity.circle,
                 cv = if (meta.cv.isNotBlank() && meta.cv != "-") meta.cv else entity.cv,
                 genre = if (meta.genre.isNotBlank() && meta.genre != "-") meta.genre else entity.genre,
                 ageRating = if (meta.ageRating.isNotBlank() && meta.ageRating != "-") meta.ageRating else entity.ageRating,
-                coverUrl = resolvedCoverPath
+                coverUrl = resolvedCoverPath,
+                chaptersJson = resolvedChaptersJson
             )
             dao.insertHistory(finalEntity)
             _syncTick.value = System.currentTimeMillis()

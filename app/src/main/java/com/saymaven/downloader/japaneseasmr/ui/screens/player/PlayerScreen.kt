@@ -47,9 +47,11 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.media3.common.Player
+import androidx.compose.foundation.BorderStroke
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
+import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -80,6 +82,10 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val hardwareVolume by viewModel.hardwareVolume.collectAsState()
     val audioSpecs by viewModel.audioSpecs.collectAsState()
     val sleepTimerRemainingMs by viewModel.sleepTimerRemainingMs.collectAsState()
+    val chapters by viewModel.currentChapters.collectAsState()
+    val isLoadingChapters by viewModel.isLoadingChapters.collectAsState()
+    val activeChapterIndex by viewModel.activeChapterIndex.collectAsState()
+    val activeChapter by viewModel.activeChapter.collectAsState()
 
     val activity = context as? Activity
     DisposableEffect(keepScreenOn) {
@@ -95,6 +101,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     var dragPosition by remember { mutableLongStateOf(0L) }
     var showBottomSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var showChapterSheet by remember { mutableStateOf(false) }
+    val chapterSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var showNewFolderDialog by remember { mutableStateOf(false) }
     var newFolderNameInput by remember { mutableStateOf("") }
@@ -197,6 +206,54 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+
+            if (chapters.isNotEmpty() || isLoadingChapters) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    onClick = { showChapterSheet = true },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bookmarks,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        if (isLoadingChapters) {
+                            Text(
+                                text = "Memindai bab...",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        } else {
+                            Text(
+                                text = activeChapter?.title ?: "Daftar Bab (${chapters.size})",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 240.dp)
+                            )
+                            if (activeChapter != null) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = activeChapter!!.formatTime(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -314,11 +371,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Control Row 1: Repeat (Left), Sleep Timer (Center) & Shuffle (Right)
+            // Control Row 1: Repeat, Sleep Timer, Bab (CUE), Shuffle
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -346,7 +403,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     modifier = Modifier.clip(RoundedCornerShape(20.dp))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -365,6 +422,35 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                // Chapter List Button
+                Surface(
+                    onClick = { showChapterSheet = true },
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (chapters.isNotEmpty()) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                    modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bookmarks,
+                            contentDescription = "Bab Audio",
+                            tint = if (chapters.isNotEmpty()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        if (chapters.isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${chapters.size}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
                             )
                         }
                     }
@@ -950,6 +1036,221 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+
+    if (showChapterSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showChapterSheet = false },
+            sheetState = chapterSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.80f)
+                    .padding(horizontal = 16.dp)
+                    .nestedScroll(sheetNestedScroll)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Daftar Bab & Tracklist",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = if (chapters.isNotEmpty()) "${chapters.size} Bab terdeteksi (CUE Sheet)" else "Sinkronisasi bab audio",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Refresh / Sync Online Button
+                    IconButton(
+                        onClick = {
+                            viewModel.loadChaptersForCurrentTrack(forceOnline = true)
+                            Toast.makeText(context, "Memindai bab dari internet...", Toast.LENGTH_SHORT).show()
+                        },
+                        enabled = !isLoadingChapters
+                    ) {
+                        if (isLoadingChapters) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Sinkron Ulang Bab",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = {
+                            scope.launch { chapterSheetState.hide() }.invokeOnCompletion {
+                                showChapterSheet = false
+                            }
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Tutup",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                if (chapters.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Bookmarks,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Belum Ada Bab Terdeteksi",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Audio ini belum memiliki berkas .cue pendamping atau penanda waktu internal.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = {
+                                    viewModel.loadChaptersForCurrentTrack(forceOnline = true)
+                                },
+                                enabled = !isLoadingChapters
+                            ) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Cari Bab Online (JapaneseASMR / asmr.one)")
+                            }
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .nestedScroll(sheetNestedScroll),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(top = 10.dp, bottom = 32.dp)
+                    ) {
+                        itemsIndexed(chapters) { idx, chapter ->
+                            val isActive = (idx == activeChapterIndex)
+                            Surface(
+                                onClick = {
+                                    viewModel.seekToChapter(chapter)
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = if (isActive) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Track Number Badge
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = String.format(Locale.US, "%02d", idx + 1),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    // Title & Time Range
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = chapter.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (chapter.endMs > chapter.startMs) {
+                                            val durSec = (chapter.endMs - chapter.startMs) / 1000
+                                            val m = durSec / 60
+                                            val s = durSec % 60
+                                            Text(
+                                                text = "Durasi: ${String.format(Locale.US, "%02d:%02d", m, s)}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    // Timestamp Badge (e.g. 12:45)
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                    ) {
+                                        Text(
+                                            text = chapter.formatTime(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

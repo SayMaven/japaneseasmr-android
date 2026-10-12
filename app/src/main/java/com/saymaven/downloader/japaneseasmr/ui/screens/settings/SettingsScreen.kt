@@ -51,6 +51,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val parallelConn by viewModel.parallelConnections.collectAsState()
     val autoClipboard by viewModel.autoClipboard.collectAsState()
     val useDetailedFilename by viewModel.useDetailedFilename.collectAsState()
+    val createCueSheet by viewModel.createCueSheet.collectAsState()
 
     // Audio Player States
     val exclusiveUsbDac by viewModel.exclusiveUsbDac.collectAsState()
@@ -271,6 +272,22 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         Switch(
                             checked = useDetailedFilename,
                             onCheckedChange = { viewModel.setUseDetailedFilename(it) }
+                        )
+                    }
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+
+
+                ListItem(
+                    headlineContent = { Text("Hasilkan CUE Sheet (.cue)", fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text("Simpan file .cue eksternal di folder unduhan (hanya untuk player pihak ketiga, player internal JapaneseASMR otomatis membaca bab tanpa berkas ini)", style = MaterialTheme.typography.bodySmall) },
+                    leadingContent = { Icon(Icons.Default.LibraryMusic, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = {
+                        Switch(
+                            checked = createCueSheet,
+                            onCheckedChange = { viewModel.setCreateCueSheet(it) }
                         )
                     }
                 )
@@ -686,13 +703,23 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         )
     }
 
+
+
     if (showChangelogDialog) {
         AlertDialog(
             onDismissRequest = { showChangelogDialog = false },
             title = { Text("Catatan Rilis (Changelog)") },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text("Versi 1.2.1 (Terbaru)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Versi 1.3.0 (Terbaru)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("• Universal Link & Multi-Site Resolver: Dukungan tautan asmr.one, japaneseasmr.com, DLsite, & auto-prefix RJ.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Dual-Source Track Discovery: Fallback cerdas dengan WAF bypass header & Smart Track Filter.", style = MaterialTheme.typography.bodySmall)
+                    Text("• 4-Tier Smart Hybrid Chapter Engine: Penanda bab presisi, ekspor otomatis berkas .cue, & pemindaian online.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Interactive Chapter Player UI: Chip bab aktif real-time & lembar daftar bab interaktif (tap-to-seek).", style = MaterialTheme.typography.bodySmall)
+                    Text("• Pilihan Format Audio Unduhan: Pengaturan preferensi format (Otomatis, M4A, MP3, Lossless FLAC).", style = MaterialTheme.typography.bodySmall)
+                    Text("• Enhanced Metadata Enrichment: Sinkronisasi CV, Circle, Genre, dan HD Cover dari DLsite & asmr.one.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Versi 1.2.1", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text("• Auto-Sync Penyimpanan Instan (120 FPS): Pemindaian latar belakang bebas lag.", style = MaterialTheme.typography.bodySmall)
                     Text("• Pemindaian Subfolder Rekursif: Deteksi otomatis subfolder penyimpanan.", style = MaterialTheme.typography.bodySmall)
                     Text("• Auto-Fetch Metadata & Cover: Otomatis melengkapi info karya & cover offline.", style = MaterialTheme.typography.bodySmall)

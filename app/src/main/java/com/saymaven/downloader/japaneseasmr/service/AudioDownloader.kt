@@ -21,6 +21,27 @@ object AudioDownloader {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
     private const val REFERER = "https://japaneseasmr.com"
 
+    private fun applyHeaders(builder: Request.Builder, url: String, customReferer: String? = null): Request.Builder {
+        val effectiveReferer = when {
+            !customReferer.isNullOrBlank() -> customReferer
+            url.contains("asmr.one", ignoreCase = true) || url.contains("kiko-play", ignoreCase = true) -> "https://asmr.one/"
+            else -> REFERER
+        }
+        val isAsmrOne = effectiveReferer.contains("asmr.one", ignoreCase = true) ||
+                url.contains("asmr.one", ignoreCase = true) ||
+                url.contains("kiko-play", ignoreCase = true)
+
+        builder.header("User-Agent", USER_AGENT)
+        builder.header("Referer", effectiveReferer)
+        if (isAsmrOne) {
+            builder.header("Origin", "https://asmr.one")
+            builder.header("Accept-Language", "zh-CN,zh;q=0.9,ja;q=0.8,en;q=0.7")
+        } else {
+            builder.header("Origin", effectiveReferer)
+        }
+        return builder
+    }
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -31,13 +52,14 @@ object AudioDownloader {
         destFile: File,
         tempDir: File,
         parallelConnections: Int = 16,
+        referer: String? = null,
         onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -> Unit,
         onLog: (String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         if (url.endsWith(".m3u8", ignoreCase = true)) {
-            downloadHlsStream(url, destFile, tempDir, parallelConnections, onProgress, onLog)
+            downloadHlsStream(url, destFile, tempDir, parallelConnections, referer, onProgress, onLog)
         } else {
-            downloadDirectFileParallel(url, destFile, parallelConnections, onProgress, onLog)
+            downloadDirectFileParallel(url, destFile, parallelConnections, referer, onProgress, onLog)
         }
     }
 
@@ -46,6 +68,7 @@ object AudioDownloader {
         destFile: File,
         tempDir: File,
         parallelConnections: Int,
+        referer: String? = null,
         onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -> Unit,
         onLog: (String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
@@ -54,12 +77,9 @@ object AudioDownloader {
 
         try {
             onLog("[i] Mengambil playlist HLS (.m3u8)...")
-            val request = Request.Builder()
-                .url(m3u8Url)
-                .header("Referer", REFERER)
-                .header("Origin", REFERER)
-                .header("User-Agent", USER_AGENT)
-                .build()
+            val reqBuilder = Request.Builder().url(m3u8Url)
+            applyHeaders(reqBuilder, m3u8Url, referer)
+            val request = reqBuilder.build()
 
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
@@ -104,12 +124,9 @@ object AudioDownloader {
                             while (!success && attempts < 4) {
                                 attempts++
                                 try {
-                                    val segReq = Request.Builder()
-                                        .url(segUrl)
-                                        .header("Referer", REFERER)
-                                        .header("Origin", REFERER)
-                                        .header("User-Agent", USER_AGENT)
-                                        .build()
+                                    val segReqBuilder = Request.Builder().url(segUrl)
+                                    applyHeaders(segReqBuilder, segUrl, referer)
+                                    val segReq = segReqBuilder.build()
 
                                     val segResp = client.newCall(segReq).execute()
                                     if (segResp.isSuccessful) {
@@ -158,26 +175,22 @@ object AudioDownloader {
                 }.awaitAll()
             }
 
-            // Gabungkan segmen-segmen ke single temporary ADTS file secara streaming cepat (RAM < 2MB)
-            onLog("[i] Menggabungkan $totalSegments segmen audio secara streaming...")
+            // Gabungkan segmen-segmen ke single temporary ADTS file menggunakan kernel-level zero-copy transferTo
+            onLog("[i] Menggabungkan $totalSegments segmen audio secara streaming cepat...")
             val tempAdtsCombined = File(tempDir, "temp_combined_${System.currentTimeMillis()}.adts")
-            tempAdtsCombined.outputStream().buffered(256 * 1024).use { outStream ->
-                val buffer = ByteArray(64 * 1024)
+            FileOutputStream(tempAdtsCombined).channel.use { outChan ->
                 for (i in 0 until totalSegments) {
                     val sFile = File(segDir, "seg_$i.adts")
                     if (sFile.exists()) {
-                        sFile.inputStream().use { input ->
-                            var read: Int
-                            while (input.read(buffer).also { read = it } != -1) {
-                                outStream.write(buffer, 0, read)
-                            }
+                        FileInputStream(sFile).channel.use { inChan ->
+                            inChan.transferTo(0, inChan.size(), outChan)
                         }
                         sFile.delete()
                     }
                 }
             }
 
-            onLog("[i] Mengemas audio ke container ISO M4A (100% Seekable & Indeks Durasi Presisi)...")
+            onLog("[i] Fast Remux: Mengemas audio ke container ISO M4A (100% Seekable & Indeks Durasi Presisi)...")
             destFile.parentFile?.mkdirs()
 
             val muxSuccess = muxAdtsFileToM4a(tempAdtsCombined, destFile, onLog)
@@ -203,7 +216,7 @@ object AudioDownloader {
     }
 
     /**
-     * Muxing cepat dan akurat ke container ISO M4A dengan offset buffer nol yang kompatibel 100% dengan MediaMuxer Android.
+     * Muxing cepat dan akurat ke container ISO M4A dengan zero-copy direct buffer yang kompatibel 100% dengan MediaMuxer Android.
      */
     private fun muxAdtsFileToM4a(adtsFile: File, outputFile: File, onLog: (String) -> Unit): Boolean {
         if (!adtsFile.exists() || adtsFile.length() < 7) return false
@@ -263,12 +276,13 @@ object AudioDownloader {
             val trackIndex = muxer.addTrack(mediaFormat)
             muxer.start()
 
-            val directBuf = ByteBuffer.allocateDirect(64 * 1024)
-            val tempArray = ByteArray(64 * 1024)
+            val directBuf = ByteBuffer.allocateDirect(128 * 1024)
             val bufferInfo = MediaCodec.BufferInfo()
             var frameIndex = 0L
             var pos = firstOffset
             val totalSize = fileSize.toInt()
+            var lastReportedPct = -1
+            val logIntervalFrames = 25000L
 
             while (pos <= totalSize - 7) {
                 val b0 = mappedBuf.get(pos).toInt() and 0xFF
@@ -284,11 +298,12 @@ object AudioDownloader {
                     val rawPayloadLen = frameLen - headerLen
                     if (rawPayloadLen in 1..65535 && pos + frameLen <= totalSize) {
                         mappedBuf.position(pos + headerLen)
-                        mappedBuf.get(tempArray, 0, rawPayloadLen)
+                        mappedBuf.limit(pos + headerLen + rawPayloadLen)
 
                         directBuf.clear()
-                        directBuf.put(tempArray, 0, rawPayloadLen)
+                        directBuf.put(mappedBuf)
                         directBuf.flip()
+                        mappedBuf.limit(totalSize)
 
                         bufferInfo.offset = 0
                         bufferInfo.size = rawPayloadLen
@@ -298,6 +313,14 @@ object AudioDownloader {
                         muxer.writeSampleData(trackIndex, directBuf, bufferInfo)
                         frameIndex++
                         pos += frameLen
+
+                        if (frameIndex % logIntervalFrames == 0L || pos >= totalSize - 100) {
+                            val pct = ((pos.toLong() * 100) / totalSize).toInt().coerceIn(0, 100)
+                            if (pct >= lastReportedPct + 15) {
+                                lastReportedPct = pct
+                                onLog("  [remux] Fast Remux ke container M4A: $pct% ($frameIndex frame)...")
+                            }
+                        }
                     } else {
                         pos++
                     }
@@ -366,17 +389,15 @@ object AudioDownloader {
         url: String,
         destFile: File,
         parallelConnections: Int,
+        referer: String? = null,
         onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -> Unit,
         onLog: (String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             onLog("[i] Memeriksa ukuran file direct MP3...")
-            val headReq = Request.Builder()
-                .url(url)
-                .head()
-                .header("Referer", REFERER)
-                .header("User-Agent", USER_AGENT)
-                .build()
+            val headReqBuilder = Request.Builder().url(url).head()
+            applyHeaders(headReqBuilder, url, referer)
+            val headReq = headReqBuilder.build()
 
             val headResp = client.newCall(headReq).execute()
             val totalBytes = headResp.headers["Content-Length"]?.toLongOrNull() ?: 0L
@@ -386,7 +407,7 @@ object AudioDownloader {
 
             if (totalBytes <= 0L || !acceptRanges || parallelConnections <= 1) {
                 onLog("[i] Mengunduh single-stream...")
-                return@withContext downloadDirectSingleStream(url, destFile, onProgress, onLog)
+                return@withContext downloadDirectSingleStream(url, destFile, referer, onProgress, onLog)
             }
 
             val concurrency = parallelConnections.coerceIn(2, 32)
@@ -415,12 +436,11 @@ object AudioDownloader {
                         while (!success && attempts < 4) {
                             attempts++
                             try {
-                                val rangeReq = Request.Builder()
+                                val rangeReqBuilder = Request.Builder()
                                     .url(url)
                                     .header("Range", "bytes=$startByte-$endByte")
-                                    .header("Referer", REFERER)
-                                    .header("User-Agent", USER_AGENT)
-                                    .build()
+                                applyHeaders(rangeReqBuilder, url, referer)
+                                val rangeReq = rangeReqBuilder.build()
 
                                 val rangeResp = client.newCall(rangeReq).execute()
                                 val body = rangeResp.body ?: throw Exception("Empty body")
@@ -474,23 +494,21 @@ object AudioDownloader {
             true
         } catch (e: Exception) {
             onLog("[ERROR] Gagal unduhan multi-part: ${e.message}")
-            downloadDirectSingleStream(url, destFile, onProgress, onLog)
+            downloadDirectSingleStream(url, destFile, referer, onProgress, onLog)
         }
     }
 
     private suspend fun downloadDirectSingleStream(
         url: String,
         destFile: File,
+        referer: String? = null,
         onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -> Unit,
         onLog: (String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder()
-                .url(url)
-                .header("Referer", REFERER)
-                .header("Origin", REFERER)
-                .header("User-Agent", USER_AGENT)
-                .build()
+            val reqBuilder = Request.Builder().url(url)
+            applyHeaders(reqBuilder, url, referer)
+            val request = reqBuilder.build()
 
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) return@withContext false
@@ -548,15 +566,11 @@ object AudioDownloader {
         }
     }
 
-    suspend fun downloadImage(url: String, destFile: File): Boolean = withContext(Dispatchers.IO) {
+    suspend fun downloadImage(url: String, destFile: File, customReferer: String? = null): Boolean = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder()
-                .url(url)
-                .header("Referer", REFERER)
-                .header("User-Agent", USER_AGENT)
-                .build()
-
-            val response = client.newCall(request).execute()
+            val reqBuilder = Request.Builder().url(url)
+            applyHeaders(reqBuilder, url, customReferer)
+            val response = client.newCall(reqBuilder.build()).execute()
             if (!response.isSuccessful) return@withContext false
             val bytes = response.body?.bytes() ?: return@withContext false
             destFile.parentFile?.mkdirs()

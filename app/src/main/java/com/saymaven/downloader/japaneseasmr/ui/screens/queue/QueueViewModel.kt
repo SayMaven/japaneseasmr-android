@@ -8,6 +8,7 @@ import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.model.AsmrWork
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
+import com.saymaven.downloader.japaneseasmr.data.remote.UniversalCodeResolver
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -65,24 +66,49 @@ class QueueViewModel : ViewModel() {
 
     private fun fetchPreviewDebounced(text: String) {
         previewJob?.cancel()
-        val firstId = extractRjIds(text).firstOrNull()
-        if (firstId == null) {
-            _previewWork.value = null
-            _isLoadingPreview.value = false
+
+        // Cek cepat secara sinkron
+        val syncIds = extractRjIds(text)
+        if (syncIds.isNotEmpty()) {
+            val firstId = syncIds.first()
+            previewJob = viewModelScope.launch {
+                delay(350)
+                _isLoadingPreview.value = true
+                try {
+                    val meta = DLsiteScraper.fetchMetadata(firstId)
+                    _previewWork.value = meta
+                } catch (e: Exception) {
+                    _previewWork.value = null
+                } finally {
+                    _isLoadingPreview.value = false
+                }
+            }
             return
         }
 
-        previewJob = viewModelScope.launch {
-            delay(500)
-            _isLoadingPreview.value = true
-            try {
-                val meta = DLsiteScraper.fetchMetadata(firstId)
-                _previewWork.value = meta
-            } catch (e: Exception) {
-                _previewWork.value = null
-            } finally {
-                _isLoadingPreview.value = false
+        // Jika berupa tautan web yang membutuhkan resolusi HTML (misal japaneseasmr.com/150854/)
+        if (text.contains("japaneseasmr.com", ignoreCase = true) || text.contains("http://") || text.contains("https://")) {
+            previewJob = viewModelScope.launch {
+                delay(400)
+                _isLoadingPreview.value = true
+                try {
+                    val resolved = UniversalCodeResolver.resolveAllInputs(text)
+                    val firstId = resolved.firstOrNull()
+                    if (firstId != null) {
+                        val meta = DLsiteScraper.fetchMetadata(firstId)
+                        _previewWork.value = meta
+                    } else {
+                        _previewWork.value = null
+                    }
+                } catch (e: Exception) {
+                    _previewWork.value = null
+                } finally {
+                    _isLoadingPreview.value = false
+                }
             }
+        } else {
+            _previewWork.value = null
+            _isLoadingPreview.value = false
         }
     }
 
@@ -92,11 +118,15 @@ class QueueViewModel : ViewModel() {
             val clip = clipboard.primaryClip
             if (clip != null && clip.itemCount > 0) {
                 val text = clip.getItemAt(0).text?.toString() ?: ""
-                val extracted = extractRjIds(text)
-                if (extracted.isNotEmpty()) {
-                    onInputChanged(extracted.joinToString(", "))
-                } else if (text.isNotBlank()) {
-                    onInputChanged(text.trim())
+                if (text.isNotBlank()) {
+                    viewModelScope.launch {
+                        val resolved = UniversalCodeResolver.resolveAllInputs(text)
+                        if (resolved.isNotEmpty()) {
+                            onInputChanged(resolved.joinToString(", "))
+                        } else {
+                            onInputChanged(text.trim())
+                        }
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -115,7 +145,7 @@ class QueueViewModel : ViewModel() {
                 val clip = clipboard.primaryClip
                 if (clip != null && clip.itemCount > 0) {
                     val text = clip.getItemAt(0).text?.toString() ?: ""
-                    
+
                     if (isFirstResume) {
                         isFirstResume = false
                         lastProcessedClipboardText = text
@@ -123,10 +153,10 @@ class QueueViewModel : ViewModel() {
                     }
 
                     if (text.isNotBlank() && text != lastProcessedClipboardText) {
-                        val extracted = extractRjIds(text)
-                        if (extracted.isNotEmpty()) {
+                        val resolved = UniversalCodeResolver.resolveAllInputs(text)
+                        if (resolved.isNotEmpty()) {
                             lastProcessedClipboardText = text
-                            onInputChanged(extracted.joinToString(", "))
+                            onInputChanged(resolved.joinToString(", "))
                         }
                     }
                 }
@@ -136,25 +166,59 @@ class QueueViewModel : ViewModel() {
     }
 
     fun addToQueue(): Boolean {
-        val ids = extractRjIds(_inputText.value)
-        if (ids.isEmpty()) return false
-
-        val items = ids.map { id ->
-            DownloadQueueItem(
-                rjid = id,
-                title = if (_previewWork.value?.rjid == id) _previewWork.value!!.title else "Memuat info...",
-                cv = if (_previewWork.value?.rjid == id) _previewWork.value!!.cv else "-",
-                circle = if (_previewWork.value?.rjid == id) _previewWork.value!!.circle else "-",
-                genre = if (_previewWork.value?.rjid == id) _previewWork.value!!.genre else "-",
-                ageRating = if (_previewWork.value?.rjid == id) _previewWork.value!!.ageRating else "-",
-                coverUrl = "https://pic.weeabo0.xyz/${id}_img_main.jpg"
-            )
+        val currentText = _inputText.value
+        val syncIds = extractRjIds(currentText)
+        if (syncIds.isNotEmpty()) {
+            val items = syncIds.map { id ->
+                DownloadQueueItem(
+                    rjid = id,
+                    title = if (_previewWork.value?.rjid == id) _previewWork.value!!.title else "Memuat info...",
+                    cv = if (_previewWork.value?.rjid == id) _previewWork.value!!.cv else "-",
+                    circle = if (_previewWork.value?.rjid == id) _previewWork.value!!.circle else "-",
+                    genre = if (_previewWork.value?.rjid == id) _previewWork.value!!.genre else "-",
+                    ageRating = if (_previewWork.value?.rjid == id) _previewWork.value!!.ageRating else "-",
+                    coverUrl = if (_previewWork.value?.rjid == id && _previewWork.value!!.coverUrl.isNotBlank()) {
+                        _previewWork.value!!.coverUrl
+                    } else {
+                        DLsiteScraper.resolveBestCoverUrl(id)
+                    }
+                )
+            }
+            DownloadService.enqueue(items)
+            _inputText.value = ""
+            _previewWork.value = null
+            return true
         }
 
-        DownloadService.enqueue(items)
-        _inputText.value = ""
-        _previewWork.value = null
-        return true
+        // Fallback untuk URL yang membutuhkan resolusi HTML
+        if (currentText.contains("japaneseasmr.com", ignoreCase = true) || currentText.contains("http", ignoreCase = true)) {
+            viewModelScope.launch {
+                val resolved = UniversalCodeResolver.resolveAllInputs(currentText)
+                if (resolved.isNotEmpty()) {
+                    val items = resolved.map { id ->
+                        DownloadQueueItem(
+                            rjid = id,
+                            title = if (_previewWork.value?.rjid == id) _previewWork.value!!.title else "Memuat info...",
+                            cv = if (_previewWork.value?.rjid == id) _previewWork.value!!.cv else "-",
+                            circle = if (_previewWork.value?.rjid == id) _previewWork.value!!.circle else "-",
+                            genre = if (_previewWork.value?.rjid == id) _previewWork.value!!.genre else "-",
+                            ageRating = if (_previewWork.value?.rjid == id) _previewWork.value!!.ageRating else "-",
+                            coverUrl = if (_previewWork.value?.rjid == id && _previewWork.value!!.coverUrl.isNotBlank()) {
+                                _previewWork.value!!.coverUrl
+                            } else {
+                                DLsiteScraper.resolveBestCoverUrl(id)
+                            }
+                        )
+                    }
+                    DownloadService.enqueue(items)
+                    _inputText.value = ""
+                    _previewWork.value = null
+                }
+            }
+            return true
+        }
+
+        return false
     }
 
     fun startDownload(context: Context) {
@@ -172,21 +236,45 @@ class QueueViewModel : ViewModel() {
     private fun extractRjIds(input: String): List<String> {
         val tokens = input.split(Regex("[\\s,;]+"))
         val result = mutableListOf<String>()
-        val pattern = Pattern.compile("(RJ\\d+|\\d{6,8})", Pattern.CASE_INSENSITIVE)
 
         for (token in tokens) {
             val t = token.trim()
             if (t.isEmpty()) continue
-            val matcher = pattern.matcher(t)
-            if (matcher.find()) {
-                var id = matcher.group(1)!!.uppercase()
-                if (!id.startsWith("RJ")) {
+
+            // 1. Tautan asmr.one (misal asmr.one/work/RJ01220411 atau /work/01220411)
+            if (t.contains("asmr.one", ignoreCase = true)) {
+                val m = Pattern.compile("asmr\\.one/(?:work|api/work)/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE).matcher(t)
+                if (m.find()) {
+                    var code = m.group(1)!!.uppercase()
+                    if (!code.startsWith("RJ")) code = "RJ$code"
+                    if (!result.contains(code)) result.add(code)
+                    continue
+                }
+            }
+
+            // 2. Tautan DLsite
+            if (t.contains("dlsite.com", ignoreCase = true)) {
+                val m = Pattern.compile("product_id/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE).matcher(t)
+                if (m.find()) {
+                    var code = m.group(1)!!.uppercase()
+                    if (!code.startsWith("RJ") && code.matches(Regex("\\d+"))) code = "RJ$code"
+                    if (!result.contains(code)) result.add(code)
+                    continue
+                }
+            }
+
+            // 3. Kode RJ / VJ / BJ atau angka numerik 5-8 digit
+            val p = Pattern.compile("((?:RJ|VJ|BJ)\\d+|\\b\\d{5,8}\\b)", Pattern.CASE_INSENSITIVE)
+            val m = p.matcher(t)
+            if (m.find()) {
+                var id = m.group(1)!!.uppercase()
+                if (id.matches(Regex("^\\d+$"))) {
                     id = "RJ$id"
                 }
                 if (!result.contains(id)) {
                     result.add(id)
                 }
-            } else if (t.startsWith("RJ", ignoreCase = true)) {
+            } else if (t.matches(Regex("^(?:RJ|VJ|BJ)\\d+$", RegexOption.IGNORE_CASE))) {
                 val id = t.uppercase()
                 if (!result.contains(id)) {
                     result.add(id)

@@ -21,9 +21,11 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
+import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
 import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
+import com.saymaven.downloader.japaneseasmr.service.ChapterDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.service.PlaybackService
 import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
@@ -134,6 +136,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _sleepTimerRemainingMs = MutableStateFlow<Long?>(null)
     val sleepTimerRemainingMs = _sleepTimerRemainingMs.asStateFlow()
 
+    // Interactive Chapters State
+    private val _currentChapters = MutableStateFlow<List<ChapterItem>>(emptyList())
+    val currentChapters = _currentChapters.asStateFlow()
+
+    private val _isLoadingChapters = MutableStateFlow(false)
+    val isLoadingChapters = _isLoadingChapters.asStateFlow()
+
+    val activeChapterIndex = combine(_currentPosition, _currentChapters) { pos, chapters ->
+        if (chapters.isEmpty()) -1
+        else chapters.indexOfLast { pos >= it.startMs }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), -1)
+
+    val activeChapter = combine(activeChapterIndex, _currentChapters) { idx, chapters ->
+        if (idx in chapters.indices) chapters[idx] else null
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     private var progressJob: Job? = null
     private var sleepTimerJob: Job? = null
 
@@ -145,6 +163,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         restorePlaybackState()
         observeAudioSettings()
         StorageSyncManager.syncStorageWithDatabase(application)
+        if (!_currentRjId.value.isNullOrBlank()) {
+            loadChaptersForCurrentTrack(_currentRjId.value)
+        }
     }
 
     private fun resolveAndPreloadInitialCover() {
@@ -360,7 +381,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _shuffleMode.value = p.shuffleModeEnabled
 
             p.currentMediaItem?.let { item ->
+                val prevRj = _currentRjId.value
                 _currentRjId.value = item.mediaId
+                if (prevRj != item.mediaId) {
+                    loadChaptersForCurrentTrack(item.mediaId)
+                }
                 item.mediaMetadata.let { meta ->
                     _currentTitle.value = meta.title?.toString() ?: _currentTitle.value
                     _currentArtist.value = meta.artist?.toString() ?: _currentArtist.value
@@ -499,7 +524,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (mediaItem != null) {
+                    val prevRj = _currentRjId.value
                     _currentRjId.value = mediaItem.mediaId
+                    if (prevRj != mediaItem.mediaId) {
+                        loadChaptersForCurrentTrack(mediaItem.mediaId)
+                    }
                     mediaItem.mediaMetadata.let { meta ->
                         _currentTitle.value = meta.title?.toString() ?: ""
                         _currentArtist.value = meta.artist?.toString() ?: "-"
@@ -675,6 +704,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _currentArtist.value = targetPair.first.cv
             _currentCoverUrl.value = finalCover
             preloadCoverArtInMemory(finalCover)
+            loadChaptersForCurrentTrack(targetPair.first.rjid)
 
             p.setMediaItems(mediaItems, targetIndex, startPositionMs)
             p.prepare()
@@ -825,6 +855,106 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         p.shuffleModeEnabled = nextState
         _shuffleMode.value = nextState
         saveCurrentState()
+    }
+
+    fun seekToChapter(chapter: ChapterItem) {
+        seekTo(chapter.startMs)
+    }
+
+    fun loadChaptersForCurrentTrack(targetRjid: String? = _currentRjId.value, forceOnline: Boolean = false) {
+        if (targetRjid.isNullOrBlank()) {
+            _currentChapters.value = emptyList()
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoadingChapters.value = true
+            try {
+                fun isBogus(chapters: List<ChapterItem>): Boolean {
+                    if (chapters.isEmpty()) return false
+                    val hasGarbageTitle = chapters.any { ch ->
+                        val t = ch.title
+                        t.contains("http://") || t.contains("https://") ||
+                                t.contains("x.com") || t.contains("twitter.com") ||
+                                t.contains("CV:") || t.contains("CV：") ||
+                                t.contains("クレジット") ||
+                                t.contains("pixiv") || t.contains("dlsite") ||
+                                t.startsWith("◆トラック") ||
+                                t.contains("同時に犯す") || t.contains("妹の処女喪失")
+                    }
+                    val hasLateStart = chapters.first().startMs > 60000L
+                    val hasMisplacedEpilogue = chapters.filterIndexed { idx, ch ->
+                        idx < chapters.size - 1 && (ch.title.contains("エピローグ") || ch.title.contains("epilogue", ignoreCase = true))
+                    }.isNotEmpty()
+                    return hasGarbageTitle || hasLateStart || hasMisplacedEpilogue
+                }
+
+                // 1. Cek cache database terlebih dahulu (jika bukan forceOnline)
+                val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
+                if (!forceOnline && !history?.chaptersJson.isNullOrBlank()) {
+                    val cached = ChapterItem.fromJsonArray(history?.chaptersJson)
+                    val cleaned = ChapterDiscoveryService.deduplicateChapters(cached)
+                    val valid = if (_duration.value > 0) cleaned.filter { it.startMs < _duration.value - 1000L } else cleaned
+                    if (valid.isNotEmpty() && !isBogus(valid)) {
+                        _currentChapters.value = valid
+                        if (valid.size != cached.size) {
+                            withContext(Dispatchers.IO) {
+                                historyDao.updateChapters(targetRjid, ChapterItem.toJsonArray(valid))
+                            }
+                        }
+                        return@launch
+                    }
+                }
+
+                // 2. Cek file .cue lokal di storage
+                val localChapters = withContext(Dispatchers.IO) {
+                    val customDirStr = prefs.downloadDirFlow.first()
+                    val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
+                    val audioFile = AudioStorageHelper.resolveValidAudioFile(downloadDir, history?.localFilePath, targetRjid)
+                    if (audioFile != null && audioFile.exists()) {
+                        val cueFile = File(audioFile.parentFile, "${audioFile.nameWithoutExtension}.cue")
+                        if (cueFile.exists()) {
+                            val parsed = ChapterDiscoveryService.parseCueFile(cueFile)
+                            val deduped = ChapterDiscoveryService.deduplicateChapters(parsed)
+                            val dur = AudioStorageHelper.resolveValidAudioFile(downloadDir, history?.localFilePath, targetRjid)?.let {
+                                ChapterDiscoveryService.getAudioDurationMs(it)
+                            } ?: 0L
+                            if (dur > 0L) deduped.filter { it.startMs < dur - 1000L } else deduped
+                        } else null
+                    } else null
+                }
+
+                if (!forceOnline && !localChapters.isNullOrEmpty() && !isBogus(localChapters)) {
+                    _currentChapters.value = localChapters
+                    withContext(Dispatchers.IO) {
+                        historyDao.updateChapters(targetRjid, ChapterItem.toJsonArray(localChapters))
+                    }
+                    return@launch
+                }
+
+                // 3. Online Chapter Discovery fallback (japaneseasmr.com / asmr.one)
+                val onlineChapters = withContext(Dispatchers.IO) {
+                    val fetched = ChapterDiscoveryService.discoverChapters(targetRjid)
+                    val deduped = ChapterDiscoveryService.deduplicateChapters(fetched)
+                    if (_duration.value > 0L) deduped.filter { it.startMs < _duration.value - 1000L } else deduped
+                }
+
+                if (onlineChapters.isNotEmpty()) {
+                    _currentChapters.value = onlineChapters
+                    withContext(Dispatchers.IO) {
+                        historyDao.updateChapters(targetRjid, ChapterItem.toJsonArray(onlineChapters))
+                    }
+                } else if (!localChapters.isNullOrEmpty()) {
+                    _currentChapters.value = localChapters
+                } else {
+                    _currentChapters.value = emptyList()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isLoadingChapters.value = false
+            }
+        }
     }
 
     private fun saveCacheSynchronously() {
