@@ -1154,9 +1154,12 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     IconButton(
                         onClick = {
                             viewModel.loadChaptersForCurrentTrack(forceOnline = true)
-                            Toast.makeText(context, "Memindai bab dari internet...", Toast.LENGTH_SHORT).show()
+                            if (isTranslationActive) {
+                                viewModel.loadOrFetchTranslations(forceOnline = true)
+                            }
+                            Toast.makeText(context, "Memindai & menerjemahkan ulang bab...", Toast.LENGTH_SHORT).show()
                         },
-                        enabled = !isLoadingChapters
+                        enabled = !isLoadingChapters && !isTranslating
                     ) {
                         if (isLoadingChapters) {
                             CircularProgressIndicator(

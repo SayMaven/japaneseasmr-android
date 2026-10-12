@@ -1035,14 +1035,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val targetLang = prefs.translationLanguageFlow.first()
                 val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
 
-                // 1. Cek cache DB jika tidak forceOnline
+                // 1. Cek cache DB jika tidak forceOnline (dan pastikan bukan cache rusak peninggalan MyMemory)
                 if (!forceOnline && history != null && !history.translatedTitle.isNullOrBlank()) {
-                    _translatedTitle.value = history.translatedTitle
-                    if (!history.translatedChaptersJson.isNullOrBlank()) {
-                        val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
-                        _translatedChapters.value = parsed
+                    val isCorrupted = history.translatedTitle.contains("Komomamanko", ignoreCase = true) ||
+                            history.translatedTitle.contains("Kid Oho", ignoreCase = true) ||
+                            history.translatedChaptersJson?.contains("buang air kecil", ignoreCase = true) == true ||
+                            history.translatedChaptersJson?.contains("Kiwai Kirai", ignoreCase = true) == true ||
+                            history.translatedChaptersJson?.contains("anak ayam", ignoreCase = true) == true ||
+                            history.translatedChaptersJson?.contains("urin paman", ignoreCase = true) == true ||
+                            history.translatedChaptersJson?.contains("lutut saya kering", ignoreCase = true) == true ||
+                            history.translatedChaptersJson?.contains("Lover's Nice", ignoreCase = true) == true
+
+                    if (!isCorrupted) {
+                        _translatedTitle.value = history.translatedTitle
+                        if (!history.translatedChaptersJson.isNullOrBlank()) {
+                            val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
+                            _translatedChapters.value = parsed
+                        }
+                        return@launch
                     }
-                    return@launch
                 }
 
                 _isTranslating.value = true
@@ -1094,10 +1105,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
                 if (!history?.translatedChaptersJson.isNullOrBlank()) {
-                    val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
-                    if (parsed.size == chapters.size) {
-                        _translatedChapters.value = parsed
-                        return@launch
+                    val isCorrupted = history.translatedChaptersJson.contains("buang air kecil", ignoreCase = true) ||
+                            history.translatedChaptersJson.contains("Kiwai Kirai", ignoreCase = true) ||
+                            history.translatedChaptersJson.contains("anak ayam", ignoreCase = true) ||
+                            history.translatedChaptersJson.contains("urin paman", ignoreCase = true) ||
+                            history.translatedChaptersJson.contains("lutut saya kering", ignoreCase = true) ||
+                            history.translatedChaptersJson.contains("Lover's Nice", ignoreCase = true)
+
+                    if (!isCorrupted) {
+                        val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
+                        if (parsed.size == chapters.size) {
+                            _translatedChapters.value = parsed
+                            return@launch
+                        }
                     }
                 }
                 val targetLang = prefs.translationLanguageFlow.first()
