@@ -29,8 +29,17 @@ class QueueViewModel : ViewModel() {
     private val _previewWork = MutableStateFlow<AsmrWork?>(null)
     val previewWork = _previewWork.asStateFlow()
 
+    private val _previewTranslatedTitle = MutableStateFlow<String?>(null)
+    val previewTranslatedTitle = _previewTranslatedTitle.asStateFlow()
+
     private val _isLoadingPreview = MutableStateFlow(false)
     val isLoadingPreview = _isLoadingPreview.asStateFlow()
+
+    private val _isTranslationActive = MutableStateFlow(false)
+    val isTranslationActive = _isTranslationActive.asStateFlow()
+
+    private val _translationTargetLang = MutableStateFlow("id")
+    val translationTargetLang = _translationTargetLang.asStateFlow()
 
     private val _showConsole = MutableStateFlow(true)
     val showConsole = _showConsole.asStateFlow()
@@ -45,8 +54,43 @@ class QueueViewModel : ViewModel() {
         isPrefsLoaded = true
         viewModelScope.launch {
             val prefs = PreferencesManager(context)
-            prefs.showConsoleFlow.collect {
-                _showConsole.value = it
+            launch {
+                prefs.showConsoleFlow.collect {
+                    _showConsole.value = it
+                }
+            }
+            launch {
+                prefs.isTranslationActiveFlow.collect { active ->
+                    _isTranslationActive.value = active
+                    val work = _previewWork.value
+                    if (active && work != null) {
+                        translatePreviewTitle(work.title, _translationTargetLang.value)
+                    } else if (!active) {
+                        _previewTranslatedTitle.value = null
+                    }
+                }
+            }
+            launch {
+                prefs.translationLanguageFlow.collect { lang ->
+                    _translationTargetLang.value = lang
+                    val work = _previewWork.value
+                    if (_isTranslationActive.value && work != null) {
+                        translatePreviewTitle(work.title, lang)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun translatePreviewTitle(rawTitle: String, targetLang: String) {
+        viewModelScope.launch {
+            try {
+                val res = com.saymaven.downloader.japaneseasmr.service.TranslationService.translateText(rawTitle, targetLang)
+                if (res.isNotBlank()) {
+                    _previewTranslatedTitle.value = res
+                }
+            } catch (e: Exception) {
+                // ignore
             }
         }
     }
@@ -66,6 +110,7 @@ class QueueViewModel : ViewModel() {
 
     private fun fetchPreviewDebounced(text: String) {
         previewJob?.cancel()
+        _previewTranslatedTitle.value = null
 
         // Cek cepat secara sinkron
         val syncIds = extractRjIds(text)
@@ -77,8 +122,12 @@ class QueueViewModel : ViewModel() {
                 try {
                     val meta = DLsiteScraper.fetchMetadata(firstId)
                     _previewWork.value = meta
+                    if (_isTranslationActive.value) {
+                        translatePreviewTitle(meta.title, _translationTargetLang.value)
+                    }
                 } catch (e: Exception) {
                     _previewWork.value = null
+                    _previewTranslatedTitle.value = null
                 } finally {
                     _isLoadingPreview.value = false
                 }
@@ -97,17 +146,23 @@ class QueueViewModel : ViewModel() {
                     if (firstId != null) {
                         val meta = DLsiteScraper.fetchMetadata(firstId)
                         _previewWork.value = meta
+                        if (_isTranslationActive.value) {
+                            translatePreviewTitle(meta.title, _translationTargetLang.value)
+                        }
                     } else {
                         _previewWork.value = null
+                        _previewTranslatedTitle.value = null
                     }
                 } catch (e: Exception) {
                     _previewWork.value = null
+                    _previewTranslatedTitle.value = null
                 } finally {
                     _isLoadingPreview.value = false
                 }
             }
         } else {
             _previewWork.value = null
+            _previewTranslatedTitle.value = null
             _isLoadingPreview.value = false
         }
     }
@@ -170,23 +225,26 @@ class QueueViewModel : ViewModel() {
         val syncIds = extractRjIds(currentText)
         if (syncIds.isNotEmpty()) {
             val items = syncIds.map { id ->
+                val isPreviewTarget = (_previewWork.value?.rjid == id)
                 DownloadQueueItem(
                     rjid = id,
-                    title = if (_previewWork.value?.rjid == id) _previewWork.value!!.title else "Memuat info...",
-                    cv = if (_previewWork.value?.rjid == id) _previewWork.value!!.cv else "-",
-                    circle = if (_previewWork.value?.rjid == id) _previewWork.value!!.circle else "-",
-                    genre = if (_previewWork.value?.rjid == id) _previewWork.value!!.genre else "-",
-                    ageRating = if (_previewWork.value?.rjid == id) _previewWork.value!!.ageRating else "-",
-                    coverUrl = if (_previewWork.value?.rjid == id && _previewWork.value!!.coverUrl.isNotBlank()) {
+                    title = if (isPreviewTarget) _previewWork.value!!.title else "Memuat info...",
+                    cv = if (isPreviewTarget) _previewWork.value!!.cv else "-",
+                    circle = if (isPreviewTarget) _previewWork.value!!.circle else "-",
+                    genre = if (isPreviewTarget) _previewWork.value!!.genre else "-",
+                    ageRating = if (isPreviewTarget) _previewWork.value!!.ageRating else "-",
+                    coverUrl = if (isPreviewTarget && _previewWork.value!!.coverUrl.isNotBlank()) {
                         _previewWork.value!!.coverUrl
                     } else {
                         DLsiteScraper.resolveBestCoverUrl(id)
-                    }
+                    },
+                    translatedTitle = if (isPreviewTarget) _previewTranslatedTitle.value else null
                 )
             }
             DownloadService.enqueue(items)
             _inputText.value = ""
             _previewWork.value = null
+            _previewTranslatedTitle.value = null
             return true
         }
 
@@ -196,23 +254,26 @@ class QueueViewModel : ViewModel() {
                 val resolved = UniversalCodeResolver.resolveAllInputs(currentText)
                 if (resolved.isNotEmpty()) {
                     val items = resolved.map { id ->
+                        val isPreviewTarget = (_previewWork.value?.rjid == id)
                         DownloadQueueItem(
                             rjid = id,
-                            title = if (_previewWork.value?.rjid == id) _previewWork.value!!.title else "Memuat info...",
-                            cv = if (_previewWork.value?.rjid == id) _previewWork.value!!.cv else "-",
-                            circle = if (_previewWork.value?.rjid == id) _previewWork.value!!.circle else "-",
-                            genre = if (_previewWork.value?.rjid == id) _previewWork.value!!.genre else "-",
-                            ageRating = if (_previewWork.value?.rjid == id) _previewWork.value!!.ageRating else "-",
-                            coverUrl = if (_previewWork.value?.rjid == id && _previewWork.value!!.coverUrl.isNotBlank()) {
+                            title = if (isPreviewTarget) _previewWork.value!!.title else "Memuat info...",
+                            cv = if (isPreviewTarget) _previewWork.value!!.cv else "-",
+                            circle = if (isPreviewTarget) _previewWork.value!!.circle else "-",
+                            genre = if (isPreviewTarget) _previewWork.value!!.genre else "-",
+                            ageRating = if (isPreviewTarget) _previewWork.value!!.ageRating else "-",
+                            coverUrl = if (isPreviewTarget && _previewWork.value!!.coverUrl.isNotBlank()) {
                                 _previewWork.value!!.coverUrl
                             } else {
                                 DLsiteScraper.resolveBestCoverUrl(id)
-                            }
+                            },
+                            translatedTitle = if (isPreviewTarget) _previewTranslatedTitle.value else null
                         )
                     }
                     DownloadService.enqueue(items)
                     _inputText.value = ""
                     _previewWork.value = null
+                    _previewTranslatedTitle.value = null
                 }
             }
             return true

@@ -27,6 +27,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_CREATE_CUE_SHEET = booleanPreferencesKey("create_cue_sheet")
         val KEY_TRANSLATION_LANGUAGE = stringPreferencesKey("translation_language")
         val KEY_IS_TRANSLATION_ACTIVE = booleanPreferencesKey("is_translation_active")
+        val KEY_TRANSLATION_ENGINE_VERSION = intPreferencesKey("translation_engine_version")
 
         // Audio Player Settings
         val KEY_EXCLUSIVE_USB_DAC = booleanPreferencesKey("exclusive_usb_dac")
@@ -240,6 +241,16 @@ class PreferencesManager(private val context: Context) {
     suspend fun setTranslationActive(active: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_IS_TRANSLATION_ACTIVE] = active
+        }
+    }
+
+    val translationEngineVersionFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[KEY_TRANSLATION_ENGINE_VERSION] ?: 0
+    }
+
+    suspend fun setTranslationEngineVersion(version: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_TRANSLATION_ENGINE_VERSION] = version
         }
     }
 

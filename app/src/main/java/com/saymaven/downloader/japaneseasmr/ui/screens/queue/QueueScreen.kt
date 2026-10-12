@@ -43,6 +43,9 @@ fun QueueScreen(viewModel: QueueViewModel) {
     val isDownloading by viewModel.isDownloading.collectAsState()
     val inputText by viewModel.inputText.collectAsState()
     val previewWork by viewModel.previewWork.collectAsState()
+    val previewTranslatedTitle by viewModel.previewTranslatedTitle.collectAsState()
+    val isTranslationActive by viewModel.isTranslationActive.collectAsState()
+    val translationTargetLang by viewModel.translationTargetLang.collectAsState()
     val isLoadingPreview by viewModel.isLoadingPreview.collectAsState()
     val logs by DownloadService.logsState.collectAsState()
     val showConsole by viewModel.showConsole.collectAsState()
@@ -87,12 +90,19 @@ fun QueueScreen(viewModel: QueueViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "JapaneseASMR Downloader",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Column {
+                    Text(
+                        text = "JapaneseASMR Downloader",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = if (queue.isNotEmpty()) "${queue.size} item dalam antrean" else "Siap mengunduh",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 IconButton(
                     onClick = { viewModel.toggleShowConsole(context) },
@@ -151,30 +161,45 @@ fun QueueScreen(viewModel: QueueViewModel) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                                .padding(8.dp)
+                                .padding(10.dp)
                         ) {
                             AsyncImage(
                                 model = previewWork?.coverUrl,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(54.dp, 40.dp)
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .size(60.dp, 44.dp)
+                                    .clip(RoundedCornerShape(8.dp))
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
+                                val showTrans = isTranslationActive && !previewTranslatedTitle.isNullOrBlank()
+                                val displayPreviewTitle = if (showTrans) previewTranslatedTitle!! else (previewWork?.title ?: "")
+
                                 Text(
-                                    text = previewWork?.title ?: "",
+                                    text = "[${previewWork?.rjid}] $displayPreviewTitle",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
+
+                                if (showTrans && previewTranslatedTitle != previewWork?.title) {
+                                    Text(
+                                        text = previewWork?.title ?: "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
                                 Text(
-                                    text = "CV: ${previewWork?.cv ?: "-"}",
+                                    text = "CV: ${previewWork?.cv ?: "-"} \u2022 ${previewWork?.circle ?: "-"}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -253,7 +278,43 @@ fun QueueScreen(viewModel: QueueViewModel) {
         }
 
         // ================= 2. QUEUE LIST SECTION =================
-        if (queue.isNotEmpty()) {
+        if (queue.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDownload,
+                            contentDescription = null,
+                            modifier = Modifier.size(44.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Antrean Unduhan Kosong",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Masukkan kode RJ atau salin tautan karya dari browser untuk mulai mengunduh audio.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
+        } else {
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -418,48 +479,79 @@ fun QueueItemCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 AsyncImage(
                     model = item.coverUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(54.dp, 40.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .size(60.dp, 44.dp)
+                        .clip(RoundedCornerShape(8.dp))
                 )
 
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
+                    val hasTranslation = !item.translatedTitle.isNullOrBlank()
+                    val mainTitle = if (hasTranslation) item.translatedTitle!! else item.title.ifBlank { "Mengambil info..." }
+
                     Text(
-                        text = "[${item.rjid}] ${item.title.ifBlank { "Mengambil info..." }}",
+                        text = "[${item.rjid}] $mainTitle",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = item.statusText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = when (item.status) {
-                            DownloadStatus.DOWNLOADING -> MaterialTheme.colorScheme.primary
-                            DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.secondary
-                            DownloadStatus.FAILED -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+
+                    if (hasTranslation && item.translatedTitle != item.title) {
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Status Pill Chip
+                    val (statusBg, statusFg) = when (item.status) {
+                        DownloadStatus.DOWNLOADING -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
+                        DownloadStatus.PROCESSING -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.tertiary
+                        DownloadStatus.COMPLETED -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.secondary
+                        DownloadStatus.FAILED -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = statusBg.copy(alpha = 0.8f)
+                    ) {
+                        Text(
+                            text = item.statusText,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = statusFg,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
 
                 if (item.status != DownloadStatus.DOWNLOADING && item.status != DownloadStatus.PROCESSING) {
+                    Spacer(modifier = Modifier.width(6.dp))
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             Icons.Default.Close,
@@ -472,13 +564,16 @@ fun QueueItemCard(
             }
 
             if (item.status == DownloadStatus.DOWNLOADING || item.status == DownloadStatus.PROCESSING) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 LinearProgressIndicator(
                     progress = { item.progress },
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -486,12 +581,14 @@ fun QueueItemCard(
                     Text(
                         text = "${(item.progress * 100).toInt()}% • ${item.speed}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = "${item.downloadedSize} / ${item.totalSize} • ETA: ${item.eta}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }

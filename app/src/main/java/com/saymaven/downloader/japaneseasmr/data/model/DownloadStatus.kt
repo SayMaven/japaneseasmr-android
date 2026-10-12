@@ -26,5 +26,6 @@ data class DownloadQueueItem(
     val downloadedSize: String = "-",
     val totalSize: String = "-",
     val error: String? = null,
-    val tracks: List<TrackInfo> = emptyList()
+    val tracks: List<TrackInfo> = emptyList(),
+    val translatedTitle: String? = null
 )

@@ -51,6 +51,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val sp = application.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
     private val prefs = PreferencesManager(application)
     private val historyDao = AsmrDatabase.getDatabase(application).historyDao()
+    private val CURRENT_TRANSLATION_ENGINE_VERSION = 2
 
     // Playlist: HANYA berisi audio yang benar-benar ada filenya di HP (0 missing tracks)
     private val _playlist = MutableStateFlow<List<HistoryEntity>>(emptyList())
@@ -177,6 +178,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         restorePlaybackState()
         observeAudioSettings()
         observeTranslationPreference()
+        checkAndMigrateTranslationEngine()
         StorageSyncManager.syncStorageWithDatabase(application)
         if (!_currentRjId.value.isNullOrBlank()) {
             loadChaptersForCurrentTrack(_currentRjId.value)
@@ -236,6 +238,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) {
             val dbList = historyDao.getAllHistoryDirect()
             filterAndSetPlaylist(dbList)
+        }
+    }
+
+    private fun checkAndMigrateTranslationEngine() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val cachedVer = prefs.translationEngineVersionFlow.first()
+            if (cachedVer < CURRENT_TRANSLATION_ENGINE_VERSION) {
+                historyDao.clearAllTranslations()
+                prefs.setTranslationEngineVersion(CURRENT_TRANSLATION_ENGINE_VERSION)
+            }
         }
     }
 
@@ -1035,25 +1047,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val targetLang = prefs.translationLanguageFlow.first()
                 val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
 
-                // 1. Cek cache DB jika tidak forceOnline (dan pastikan bukan cache rusak peninggalan MyMemory)
+                // 1. Cek cache DB jika tidak forceOnline
                 if (!forceOnline && history != null && !history.translatedTitle.isNullOrBlank()) {
-                    val isCorrupted = history.translatedTitle.contains("Komomamanko", ignoreCase = true) ||
-                            history.translatedTitle.contains("Kid Oho", ignoreCase = true) ||
-                            history.translatedChaptersJson?.contains("buang air kecil", ignoreCase = true) == true ||
-                            history.translatedChaptersJson?.contains("Kiwai Kirai", ignoreCase = true) == true ||
-                            history.translatedChaptersJson?.contains("anak ayam", ignoreCase = true) == true ||
-                            history.translatedChaptersJson?.contains("urin paman", ignoreCase = true) == true ||
-                            history.translatedChaptersJson?.contains("lutut saya kering", ignoreCase = true) == true ||
-                            history.translatedChaptersJson?.contains("Lover's Nice", ignoreCase = true) == true
-
-                    if (!isCorrupted) {
-                        _translatedTitle.value = history.translatedTitle
-                        if (!history.translatedChaptersJson.isNullOrBlank()) {
-                            val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
-                            _translatedChapters.value = parsed
-                        }
-                        return@launch
+                    _translatedTitle.value = history.translatedTitle
+                    if (!history.translatedChaptersJson.isNullOrBlank()) {
+                        val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
+                        _translatedChapters.value = parsed
                     }
+                    return@launch
                 }
 
                 _isTranslating.value = true
@@ -1110,19 +1111,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
                 if (!history?.translatedChaptersJson.isNullOrBlank()) {
-                    val isCorrupted = history.translatedChaptersJson.contains("buang air kecil", ignoreCase = true) ||
-                            history.translatedChaptersJson.contains("Kiwai Kirai", ignoreCase = true) ||
-                            history.translatedChaptersJson.contains("anak ayam", ignoreCase = true) ||
-                            history.translatedChaptersJson.contains("urin paman", ignoreCase = true) ||
-                            history.translatedChaptersJson.contains("lutut saya kering", ignoreCase = true) ||
-                            history.translatedChaptersJson.contains("Lover's Nice", ignoreCase = true)
-
-                    if (!isCorrupted) {
-                        val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
-                        if (parsed.size == chapters.size) {
-                            _translatedChapters.value = parsed
-                            return@launch
-                        }
+                    val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
+                    if (parsed.size == chapters.size) {
+                        _translatedChapters.value = parsed
+                        return@launch
                     }
                 }
                 val targetLang = prefs.translationLanguageFlow.first()

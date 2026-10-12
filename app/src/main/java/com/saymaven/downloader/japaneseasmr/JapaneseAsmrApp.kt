@@ -22,6 +22,7 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        com.saymaven.downloader.japaneseasmr.service.TranslationService.init(this)
     }
 
     private fun createNotificationChannels() {

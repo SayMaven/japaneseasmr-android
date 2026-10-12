@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeMute
@@ -186,35 +187,67 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Metadata Title (Top)
-            val displayTitle = if (isTranslationActive && !translatedTitle.isNullOrBlank()) {
-                val rjPrefix = if (!currentRjId.isNullOrBlank()) "[${currentRjId}] " else ""
-                "$rjPrefix$translatedTitle"
-            } else currentTitle
+            // RJID Pill Badge
+            if (!currentRjId.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Text(
+                        text = currentRjId ?: "",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            // Clean Title (Clean from [RJxxxx] prefix for cleaner presentation)
+            val cleanOriginalTitle = currentTitle.replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+\\]\\s*"), "").trim()
+            val cleanTranslatedTitle = translatedTitle?.replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+\\]\\s*"), "")?.trim()
+
+            val displayTitle = if (isTranslationActive && !cleanTranslatedTitle.isNullOrBlank()) {
+                cleanTranslatedTitle
+            } else cleanOriginalTitle
 
             Text(
-                text = displayTitle,
+                text = displayTitle.ifBlank { "Belum ada audio diputar" },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 12.dp)
+                modifier = Modifier.padding(horizontal = 14.dp)
             )
 
-            if (isTranslationActive && !translatedTitle.isNullOrBlank() && displayTitle != currentTitle) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = currentTitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            // Original Title Subtext (when translation is active and differs)
+            if (isTranslationActive && !cleanTranslatedTitle.isNullOrBlank() && cleanOriginalTitle.isNotBlank() && cleanTranslatedTitle != cleanOriginalTitle) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
                     modifier = Modifier.padding(horizontal = 16.dp)
-                )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Translate,
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = cleanOriginalTitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -230,15 +263,16 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             )
 
             if (chapters.isNotEmpty() || isLoadingChapters) {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Surface(
                     onClick = { showChapterSheet = true },
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)),
+                    modifier = Modifier.clip(RoundedCornerShape(16.dp))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -266,30 +300,39 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 240.dp)
+                                modifier = Modifier.widthIn(max = 220.dp)
                             )
                             if (activeChapter != null) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = activeChapter!!.formatTime(),
                                     style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.secondary
                                 )
                             }
                         }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Big Center Cover Art (Instant 0ms display)
+            // Big Center Cover Art (Adaptive responsive sizing)
             Card(
                 shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 modifier = Modifier
-                    .size(260.dp)
+                    .fillMaxWidth(0.68f)
                     .aspectRatio(1f)
+                    .heightIn(max = 260.dp)
             ) {
                 val cover = currentCoverUrl
                 if (!cover.isNullOrBlank()) {
@@ -487,15 +530,16 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     onClick = { viewModel.toggleTranslation() },
                     shape = RoundedCornerShape(20.dp),
                     color = if (isTranslationActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    border = if (isTranslationActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)) else null,
                     modifier = Modifier.clip(RoundedCornerShape(20.dp))
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (isTranslating) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -506,6 +550,15 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                                 modifier = Modifier.size(20.dp)
                             )
+                            if (isTranslationActive) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "ID",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }
@@ -1507,7 +1560,7 @@ fun PlaylistItemCard(
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.DriveFileMove,
+                    imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
                     contentDescription = "Pindah Folder",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(20.dp)

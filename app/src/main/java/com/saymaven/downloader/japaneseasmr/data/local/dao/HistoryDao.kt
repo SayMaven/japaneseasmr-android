@@ -37,6 +37,9 @@ interface HistoryDao {
     @Query("UPDATE history_table SET translatedTitle = :translatedTitle, translatedChaptersJson = :translatedChaptersJson WHERE rjid = :rjid")
     suspend fun updateTranslations(rjid: String, translatedTitle: String?, translatedChaptersJson: String?)
 
+    @Query("UPDATE history_table SET translatedTitle = NULL, translatedChaptersJson = NULL")
+    suspend fun clearAllTranslations()
+
     @Query("DELETE FROM history_table")
     suspend fun clearAll()
 }
