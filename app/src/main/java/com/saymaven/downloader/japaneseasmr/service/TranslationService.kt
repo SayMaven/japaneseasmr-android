@@ -7,7 +7,6 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
-import java.util.regex.Pattern
 
 /**
  * TranslationService Engine:
@@ -273,23 +272,76 @@ object TranslationService {
         postProcessTranslation(result, isEn)
     }
 
+    // Pre-compiled regex patterns untuk efisiensi instan (tanpa alokasi ulang saat batch)
+    private val FUSEJI_RULES = listOf(
+        Regex("こ[○●×〇]まんこ", RegexOption.IGNORE_CASE) to "こまんこ",
+        Regex("ち[○●×〇]ぽ", RegexOption.IGNORE_CASE) to "ちんぽ",
+        Regex("ま[○●×〇]こ", RegexOption.IGNORE_CASE) to "まんこ",
+        Regex("せ[○●×〇]くす", RegexOption.IGNORE_CASE) to "セックス",
+        Regex("セ[○●×〇]クス", RegexOption.IGNORE_CASE) to "セックス",
+        Regex("オ[○●×〇]ニー", RegexOption.IGNORE_CASE) to "オナニー",
+        Regex("お[○●×〇]にー", RegexOption.IGNORE_CASE) to "オナニー",
+        Regex("処[○●×〇]", RegexOption.IGNORE_CASE) to "処女",
+        Regex("精[○●×〇]", RegexOption.IGNORE_CASE) to "精液",
+        Regex("中[○●×〇]し", RegexOption.IGNORE_CASE) to "中出し",
+        Regex("潮[○●×〇]き", RegexOption.IGNORE_CASE) to "潮吹き",
+        Regex("[○●×〇]ナサポ", RegexOption.IGNORE_CASE) to "オナサポ",
+        Regex("オ[○●×〇]サポ", RegexOption.IGNORE_CASE) to "オナサポ"
+    )
+
+    private val YEAR_PATTERN = Regex("([1-6１-６])年生編")
+
+    private val POST_PROCESS_ID = listOf(
+        Regex("\\blelaki tua\\b", RegexOption.IGNORE_CASE) to "Paman",
+        Regex("\\borang tua\\b", RegexOption.IGNORE_CASE) to "Paman",
+        Regex("\\bpamanmu\\b", RegexOption.IGNORE_CASE) to "Paman",
+        Regex("\\bpaman saya\\b", RegexOption.IGNORE_CASE) to "Paman",
+        Regex("\\bteman pamanku\\b", RegexOption.IGNORE_CASE) to "pacar Paman",
+        Regex("\\bbersikap nakal\\b", RegexOption.IGNORE_CASE) to "berbuat mesum (ecchi)",
+        Regex("\\bperilaku nakal\\b", RegexOption.IGNORE_CASE) to "hal mesum (ecchi)",
+        Regex("\\bpermintaan nakal\\b", RegexOption.IGNORE_CASE) to "ajakan mesum",
+        Regex("\\btawaran seksual\\b", RegexOption.IGNORE_CASE) to "ajakan mesum",
+        Regex("\\bmendamaikan kekasihku\\b", RegexOption.IGNORE_CASE) to "baikan dengan pacar",
+        Regex("\\bmendamaikan kekasih\\b", RegexOption.IGNORE_CASE) to "baikan dengan pacar",
+        Regex("\\bNakaori Kekasih\\b", RegexOption.IGNORE_CASE) to "Baikan dengan Pacar",
+        Regex("\\banak ayam\\b", RegexOption.IGNORE_CASE) to "Hina",
+        Regex("\\banak - anak ayam\\b", RegexOption.IGNORE_CASE) to "Hina",
+        Regex("\\bHina masih bayi\\b", RegexOption.IGNORE_CASE) to "Hina anak bayi",
+        Regex("\\bAiji\\b", RegexOption.IGNORE_CASE) to "Airi",
+        Regex("\\bAiry\\b", RegexOption.IGNORE_CASE) to "Airi",
+        Regex("\\bKiwai Kirai\\b", RegexOption.IGNORE_CASE) to "benci",
+        Regex("\\bKiwai\\b", RegexOption.IGNORE_CASE) to "benci",
+        Regex("\\bmencium telinga\\b", RegexOption.IGNORE_CASE) to "membersihkan telinga",
+        Regex("\\bgaruk telinga\\b", RegexOption.IGNORE_CASE) to "membersihkan telinga",
+        Regex("\\btusuk telinga\\b", RegexOption.IGNORE_CASE) to "membersihkan telinga",
+        Regex("\\bTelinga bersiul\\b", RegexOption.IGNORE_CASE) to "Pembersihan Telinga",
+        Regex("\\bDukungan bawang\\b", RegexOption.IGNORE_CASE) to "Panduan Masturbasi",
+        Regex("\\bbawang\\b", RegexOption.IGNORE_CASE) to "Onasapo",
+        Regex("\\bejakulasi tepi\\b", RegexOption.IGNORE_CASE) to "Edging (Menahan Puncak)",
+        Regex("\\bkontrol tepi\\b", RegexOption.IGNORE_CASE) to "Edging",
+        Regex("\\blutut saya kering\\b", RegexOption.IGNORE_CASE) to "tenggorokan saya kering"
+    )
+
+    private val POST_PROCESS_EN = listOf(
+        Regex("\\bold man\\b", RegexOption.IGNORE_CASE) to "Uncle",
+        Regex("\\bold guy\\b", RegexOption.IGNORE_CASE) to "Uncle",
+        Regex("\\byour uncle\\b", RegexOption.IGNORE_CASE) to "Uncle",
+        Regex("\\bmy uncle\\b", RegexOption.IGNORE_CASE) to "Uncle",
+        Regex("\\breconciliate my lover\\b", RegexOption.IGNORE_CASE) to "make up with lover",
+        Regex("\\bnaughty behavior\\b", RegexOption.IGNORE_CASE) to "doing ecchi things",
+        Regex("\\bbehaving naughtily\\b", RegexOption.IGNORE_CASE) to "doing ecchi things",
+        Regex("\\bOnion support\\b", RegexOption.IGNORE_CASE) to "Onasapo (Masturbation Support)",
+        Regex("\\bwhistling ear\\b", RegexOption.IGNORE_CASE) to "Ear Cleaning",
+        Regex("\\binch stop\\b", RegexOption.IGNORE_CASE) to "Edging"
+    )
+
     private fun preProcessJapaneseText(text: String, isEn: Boolean): String {
         var t = text
 
         // A. Buka sensor fuseji khas DLsite (こ○まんこ, ち○ぽ, ま○こ, dll)
-        t = t.replace(Regex("こ[○●×〇]まんこ", RegexOption.IGNORE_CASE), "こまんこ")
-        t = t.replace(Regex("ち[○●×〇]ぽ", RegexOption.IGNORE_CASE), "ちんぽ")
-        t = t.replace(Regex("ま[○●×〇]こ", RegexOption.IGNORE_CASE), "まんこ")
-        t = t.replace(Regex("せ[○●×〇]くす", RegexOption.IGNORE_CASE), "セックス")
-        t = t.replace(Regex("セ[○●×〇]クス", RegexOption.IGNORE_CASE), "セックス")
-        t = t.replace(Regex("オ[○●×〇]ニー", RegexOption.IGNORE_CASE), "オナニー")
-        t = t.replace(Regex("お[○●×〇]にー", RegexOption.IGNORE_CASE), "オナニー")
-        t = t.replace(Regex("処[○●×〇]", RegexOption.IGNORE_CASE), "処女")
-        t = t.replace(Regex("精[○●×〇]", RegexOption.IGNORE_CASE), "精液")
-        t = t.replace(Regex("中[○●×〇]し", RegexOption.IGNORE_CASE), "中出し")
-        t = t.replace(Regex("潮[○●×〇]き", RegexOption.IGNORE_CASE), "潮吹き")
-        t = t.replace(Regex("[○●×〇]ナサポ", RegexOption.IGNORE_CASE), "オナサポ")
-        t = t.replace(Regex("オ[○●×〇]サポ", RegexOption.IGNORE_CASE), "オナサポ")
+        for ((regex, rep) in FUSEJI_RULES) {
+            t = t.replace(regex, rep)
+        }
         t = t.replace("○", "").replace("●", "").replace("×", "").replace("〇", "")
 
         // B. Normalisasi hiragana ambigu agar penerjemah mengenali kanji yang benar
@@ -301,10 +353,9 @@ object TranslationService {
         t = t.replace("愛吏", "アイリ")
 
         // C. Pola numerik umum bab sekolah (1年生編 -> Bab Tahun ke-1)
-        val yearPattern = Pattern.compile("([1-6１-６])年生編")
-        val yearMatcher = yearPattern.matcher(t)
-        if (yearMatcher.find()) {
-            val num = yearMatcher.group(1) ?: "1"
+        val match = YEAR_PATTERN.find(t)
+        if (match != null) {
+            val num = match.groupValues.getOrNull(1) ?: "1"
             val normNum = when (num) {
                 "１" -> "1"
                 "２" -> "2"
@@ -315,7 +366,7 @@ object TranslationService {
                 else -> num
             }
             val replacement = if (isEn) "Year $normNum Arc" else "Bab Tahun ke-$normNum"
-            t = yearMatcher.replaceAll(replacement)
+            t = YEAR_PATTERN.replace(t, replacement)
         }
 
         return t
@@ -397,48 +448,9 @@ object TranslationService {
 
     private fun postProcessTranslation(text: String, isEn: Boolean): String {
         var refined = text
-        if (!isEn) {
-            // Perbaikan idiom & istilah ASMR dalam Bahasa Indonesia
-            refined = refined.replace(Regex("\\blelaki tua\\b", RegexOption.IGNORE_CASE), "Paman")
-            refined = refined.replace(Regex("\\borang tua\\b", RegexOption.IGNORE_CASE), "Paman")
-            refined = refined.replace(Regex("\\bpamanmu\\b", RegexOption.IGNORE_CASE), "Paman")
-            refined = refined.replace(Regex("\\bpaman saya\\b", RegexOption.IGNORE_CASE), "Paman")
-            refined = refined.replace(Regex("\\bteman pamanku\\b", RegexOption.IGNORE_CASE), "pacar Paman")
-            refined = refined.replace(Regex("\\bbersikap nakal\\b", RegexOption.IGNORE_CASE), "berbuat mesum (ecchi)")
-            refined = refined.replace(Regex("\\bperilaku nakal\\b", RegexOption.IGNORE_CASE), "hal mesum (ecchi)")
-            refined = refined.replace(Regex("\\bpermintaan nakal\\b", RegexOption.IGNORE_CASE), "ajakan mesum")
-            refined = refined.replace(Regex("\\btawaran seksual\\b", RegexOption.IGNORE_CASE), "ajakan mesum")
-            refined = refined.replace(Regex("\\bmendamaikan kekasihku\\b", RegexOption.IGNORE_CASE), "baikan dengan pacar")
-            refined = refined.replace(Regex("\\bmendamaikan kekasih\\b", RegexOption.IGNORE_CASE), "baikan dengan pacar")
-            refined = refined.replace(Regex("\\bNakaori Kekasih\\b", RegexOption.IGNORE_CASE), "Baikan dengan Pacar")
-            refined = refined.replace(Regex("\\banak ayam\\b", RegexOption.IGNORE_CASE), "Hina")
-            refined = refined.replace(Regex("\\banak - anak ayam\\b", RegexOption.IGNORE_CASE), "Hina")
-            refined = refined.replace(Regex("\\bHina masih bayi\\b", RegexOption.IGNORE_CASE), "Hina anak bayi")
-            refined = refined.replace(Regex("\\bAiji\\b", RegexOption.IGNORE_CASE), "Airi")
-            refined = refined.replace(Regex("\\bAiry\\b", RegexOption.IGNORE_CASE), "Airi")
-            refined = refined.replace(Regex("\\bKiwai Kirai\\b", RegexOption.IGNORE_CASE), "benci")
-            refined = refined.replace(Regex("\\bKiwai\\b", RegexOption.IGNORE_CASE), "benci")
-            refined = refined.replace(Regex("\\bmencium telinga\\b", RegexOption.IGNORE_CASE), "membersihkan telinga")
-            refined = refined.replace(Regex("\\bgaruk telinga\\b", RegexOption.IGNORE_CASE), "membersihkan telinga")
-            refined = refined.replace(Regex("\\btusuk telinga\\b", RegexOption.IGNORE_CASE), "membersihkan telinga")
-            refined = refined.replace(Regex("\\bTelinga bersiul\\b", RegexOption.IGNORE_CASE), "Pembersihan Telinga")
-            refined = refined.replace(Regex("\\bDukungan bawang\\b", RegexOption.IGNORE_CASE), "Panduan Masturbasi")
-            refined = refined.replace(Regex("\\bbawang\\b", RegexOption.IGNORE_CASE), "Onasapo")
-            refined = refined.replace(Regex("\\bejakulasi tepi\\b", RegexOption.IGNORE_CASE), "Edging (Menahan Puncak)")
-            refined = refined.replace(Regex("\\bkontrol tepi\\b", RegexOption.IGNORE_CASE), "Edging")
-            refined = refined.replace(Regex("\\blutut saya kering\\b", RegexOption.IGNORE_CASE), "tenggorokan saya kering")
-        } else {
-            // Perbaikan idiom & istilah ASMR dalam English
-            refined = refined.replace(Regex("\\bold man\\b", RegexOption.IGNORE_CASE), "Uncle")
-            refined = refined.replace(Regex("\\bold guy\\b", RegexOption.IGNORE_CASE), "Uncle")
-            refined = refined.replace(Regex("\\byour uncle\\b", RegexOption.IGNORE_CASE), "Uncle")
-            refined = refined.replace(Regex("\\bmy uncle\\b", RegexOption.IGNORE_CASE), "Uncle")
-            refined = refined.replace(Regex("\\breconciliate my lover\\b", RegexOption.IGNORE_CASE), "make up with lover")
-            refined = refined.replace(Regex("\\bnaughty behavior\\b", RegexOption.IGNORE_CASE), "doing ecchi things")
-            refined = refined.replace(Regex("\\bbehaving naughtily\\b", RegexOption.IGNORE_CASE), "doing ecchi things")
-            refined = refined.replace(Regex("\\bOnion support\\b", RegexOption.IGNORE_CASE), "Onasapo (Masturbation Support)")
-            refined = refined.replace(Regex("\\bwhistling ear\\b", RegexOption.IGNORE_CASE), "Ear Cleaning")
-            refined = refined.replace(Regex("\\binch stop\\b", RegexOption.IGNORE_CASE), "Edging")
+        val rules = if (isEn) POST_PROCESS_EN else POST_PROCESS_ID
+        for ((regex, rep) in rules) {
+            refined = refined.replace(regex, rep)
         }
         return refined
     }

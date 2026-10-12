@@ -177,6 +177,10 @@ fun HistoryScreen(
                 )
             }
         } else {
+            val onPlayAction = remember(onPlayTrack) { { entity: HistoryEntity -> onPlayTrack(entity) } }
+            val onRedownloadAction = remember(onRedownload) { { entity: HistoryEntity -> onRedownload(entity) } }
+            val onDeleteAction = remember { { uiItem: HistoryUiItem -> itemToDelete = uiItem } }
+
             key(sortOrder) {
                 val listState = rememberLazyListState()
 
@@ -192,9 +196,9 @@ fun HistoryScreen(
                     ) { item ->
                         HistoryItemCard(
                             item = item,
-                            onPlay = { onPlayTrack(item.entity) },
-                            onRedownload = { onRedownload(item.entity) },
-                            onDelete = { itemToDelete = item }
+                            onPlay = onPlayAction,
+                            onRedownload = onRedownloadAction,
+                            onDelete = onDeleteAction
                         )
                     }
                 }
@@ -247,12 +251,15 @@ fun HistoryScreen(
     }
 }
 
+private val HistoryCardShape = RoundedCornerShape(12.dp)
+private val HistoryThumbShape = RoundedCornerShape(8.dp)
+
 @Composable
 fun HistoryItemCard(
     item: HistoryUiItem,
-    onPlay: () -> Unit,
-    onRedownload: () -> Unit,
-    onDelete: () -> Unit,
+    onPlay: (HistoryEntity) -> Unit,
+    onRedownload: (HistoryEntity) -> Unit,
+    onDelete: (HistoryUiItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -261,12 +268,12 @@ fun HistoryItemCard(
             .fillMaxWidth()
             .clickable {
                 if (item.isPresent) {
-                    onPlay()
+                    onPlay(item.entity)
                 } else {
                     Toast.makeText(context, "File audio tidak ditemukan. Silakan unduh ulang.", Toast.LENGTH_SHORT).show()
                 }
             },
-        shape = RoundedCornerShape(12.dp),
+        shape = HistoryCardShape,
         colors = CardDefaults.cardColors(
             containerColor = if (item.isPresent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
         )
@@ -293,13 +300,13 @@ fun HistoryItemCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(70.dp, 52.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(HistoryThumbShape)
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(70.dp, 52.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(HistoryThumbShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
@@ -340,7 +347,7 @@ fun HistoryItemCard(
 
             Row {
                 if (item.isPresent) {
-                    IconButton(onClick = onPlay) {
+                    IconButton(onClick = { onPlay(item.entity) }) {
                         Icon(
                             Icons.Default.PlayArrow,
                             contentDescription = "Putar",
@@ -348,7 +355,7 @@ fun HistoryItemCard(
                         )
                     }
                 } else {
-                    IconButton(onClick = onRedownload) {
+                    IconButton(onClick = { onRedownload(item.entity) }) {
                         Icon(
                             Icons.Default.Download,
                             contentDescription = "Unduh Ulang",
@@ -357,7 +364,7 @@ fun HistoryItemCard(
                     }
                 }
 
-                IconButton(onClick = onDelete) {
+                IconButton(onClick = { onDelete(item) }) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Hapus Riwayat",

@@ -66,12 +66,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         false
     )
 
-    val preferredAudioFormat = preferencesManager.preferredAudioFormatFlow.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        "auto"
-    )
-
     val createCueSheet = preferencesManager.createCueSheetFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
@@ -166,12 +160,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setUseDetailedFilename(enabled: Boolean) {
         viewModelScope.launch {
             preferencesManager.setUseDetailedFilename(enabled)
-        }
-    }
-
-    fun setPreferredAudioFormat(format: String) {
-        viewModelScope.launch {
-            preferencesManager.setPreferredAudioFormat(format)
         }
     }
 

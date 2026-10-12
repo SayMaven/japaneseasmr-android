@@ -1070,19 +1070,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 // Terjemahkan Daftar Bab jika sudah ada
                 val currentChaps = _currentChapters.value
-                val translatedChapsList = mutableListOf<ChapterItem>()
-                if (currentChaps.isNotEmpty()) {
-                    val titles = currentChaps.map { it.title }
-                    val translatedBatch = withContext(Dispatchers.IO) {
-                        TranslationService.translateBatch(titles, targetLang)
+                val translatedChapsList = if (currentChaps.isNotEmpty()) {
+                    translateChaptersBatch(currentChaps, targetLang).also {
+                        _translatedChapters.value = it
                     }
-                    for (i in currentChaps.indices) {
-                        val orig = currentChaps[i]
-                        val trans = if (i < translatedBatch.size) translatedBatch[i] else orig.title
-                        translatedChapsList.add(orig.copy(title = trans))
-                    }
-                    _translatedChapters.value = translatedChapsList
-                }
+                } else emptyList()
 
                 val chapsJson = if (translatedChapsList.isNotEmpty()) {
                     ChapterItem.toJsonArray(translatedChapsList)
@@ -1096,6 +1088,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             } finally {
                 _isTranslating.value = false
             }
+        }
+    }
+
+    private suspend fun translateChaptersBatch(
+        chapters: List<ChapterItem>,
+        targetLang: String
+    ): List<ChapterItem> = withContext(Dispatchers.IO) {
+        if (chapters.isEmpty()) return@withContext emptyList()
+        val titles = chapters.map { it.title }
+        val translatedBatch = TranslationService.translateBatch(titles, targetLang)
+        chapters.mapIndexed { idx, orig ->
+            val trans = if (idx < translatedBatch.size) translatedBatch[idx] else orig.title
+            orig.copy(title = trans)
         }
     }
 
@@ -1121,14 +1126,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
                 val targetLang = prefs.translationLanguageFlow.first()
-                val titles = chapters.map { it.title }
-                val translatedBatch = withContext(Dispatchers.IO) {
-                    TranslationService.translateBatch(titles, targetLang)
-                }
-                val translatedChapsList = chapters.mapIndexed { idx, orig ->
-                    val trans = if (idx < translatedBatch.size) translatedBatch[idx] else orig.title
-                    orig.copy(title = trans)
-                }
+                val translatedChapsList = translateChaptersBatch(chapters, targetLang)
                 _translatedChapters.value = translatedChapsList
                 withContext(Dispatchers.IO) {
                     historyDao.updateTranslations(

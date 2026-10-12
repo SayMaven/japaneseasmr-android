@@ -24,7 +24,6 @@ class PreferencesManager(private val context: Context) {
         val KEY_AUTO_CLIPBOARD = booleanPreferencesKey("auto_clipboard")
         val KEY_USE_DETAILED_FILENAME = booleanPreferencesKey("use_detailed_filename")
         val KEY_SHOW_CONSOLE = booleanPreferencesKey("show_console")
-        val KEY_PREFERRED_AUDIO_FORMAT = stringPreferencesKey("preferred_audio_format")
         val KEY_CREATE_CUE_SHEET = booleanPreferencesKey("create_cue_sheet")
         val KEY_TRANSLATION_LANGUAGE = stringPreferencesKey("translation_language")
         val KEY_IS_TRANSLATION_ACTIVE = booleanPreferencesKey("is_translation_active")
@@ -106,10 +105,6 @@ class PreferencesManager(private val context: Context) {
 
     val showConsoleFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_SHOW_CONSOLE] ?: true
-    }
-
-    val preferredAudioFormatFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[KEY_PREFERRED_AUDIO_FORMAT] ?: "auto"
     }
 
     val createCueSheetFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -227,12 +222,6 @@ class PreferencesManager(private val context: Context) {
     suspend fun setShowConsole(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_SHOW_CONSOLE] = enabled
-        }
-    }
-
-    suspend fun setPreferredAudioFormat(format: String) {
-        context.dataStore.edit { preferences ->
-            preferences[KEY_PREFERRED_AUDIO_FORMAT] = format
         }
     }
 

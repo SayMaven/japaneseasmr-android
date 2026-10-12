@@ -32,6 +32,7 @@ data class HistoryUiItem(
     val circle: String,
     val coverUrl: String?,
     val downloadDate: String,
+    val timestamp: Long,
     val fileSize: String,
     val isPresent: Boolean
 )
@@ -55,6 +56,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         preloadHistoryCovers()
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val historyUiList: StateFlow<List<HistoryUiItem>> = combine(_searchQuery, _sortOrder) { query, order ->
         Pair(query, order)
     }.flatMapLatest { (query, order) ->
@@ -75,7 +77,8 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
 
             val resolved = list.map { item ->
                 val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)
-                val normalizedDate = AudioStorageHelper.normalizeDateString(item.downloadDate, item.localFilePath)
+                val timestamp = AudioStorageHelper.parseDateToTimestamp(item.downloadDate, item.localFilePath)
+                val normalizedDate = if (timestamp > 0L) AudioStorageHelper.formatDateForDisplay(timestamp) else (item.downloadDate ?: "")
                 val cover = if (localCover != null && localCover.exists()) localCover.absolutePath else item.coverUrl
 
                 val isPresent = isFilePresentInternal(item, downloadDir)
@@ -88,19 +91,16 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                     circle = item.circle,
                     coverUrl = cover,
                     downloadDate = normalizedDate,
+                    timestamp = timestamp,
                     fileSize = item.fileSize,
                     isPresent = isPresent
                 )
             }
 
-            // Pengurutan berbasis Timestamp Milidetik Nyata
+            // Pengurutan instan berbasis Timestamp Milidetik Nyata (O(1) memory lookup)
             when (order) {
-                HistorySortOrder.DATE_DESC -> resolved.sortedByDescending {
-                    AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.entity.localFilePath)
-                }
-                HistorySortOrder.DATE_ASC -> resolved.sortedBy {
-                    AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.entity.localFilePath)
-                }
+                HistorySortOrder.DATE_DESC -> resolved.sortedByDescending { it.timestamp }
+                HistorySortOrder.DATE_ASC -> resolved.sortedBy { it.timestamp }
                 HistorySortOrder.TITLE_ASC -> resolved.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
                 HistorySortOrder.TITLE_DESC -> resolved.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.title })
             }

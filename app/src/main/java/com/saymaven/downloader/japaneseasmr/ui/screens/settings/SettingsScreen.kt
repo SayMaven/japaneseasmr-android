@@ -794,11 +794,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text("Versi 1.3.0 (Terbaru)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("• Penerjemah ASMR DLsite Cerdas: Terjemahan dwibahasa (Indonesia/Inggris) untuk judul karya & daftar bab/tracklist dengan kamus istilah khusus ASMR DLsite.", style = MaterialTheme.typography.bodySmall)
+                    Text("• De-Sensor Fuseji & Normalisasi Teks: Membuka sensor simbol (○, ●, ×) dan menormalkan teks judul agar hasil terjemahan akurat dan alami.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Smart Fast Remux Engine: Penggabungan audio multi-segmen instan (< 1 detik) tanpa transcoding demi menjaga kualitas suara 100% loss-free.", style = MaterialTheme.typography.bodySmall)
+                    Text("• 4-Tier Hybrid Chapter Engine & CUE Sheet: Penanda bab presisi tinggi, ekspor otomatis berkas .cue, dan lembar daftar bab interaktif (tap-to-seek).", style = MaterialTheme.typography.bodySmall)
+                    Text("• Ultra-Smooth 120 FPS Scrolling: Optimasi render daftar putar (playlist drawer) & riwayat download untuk ratusan karya tanpa frame drop / patah-patah.", style = MaterialTheme.typography.bodySmall)
                     Text("• Universal Link & Multi-Site Resolver: Dukungan tautan asmr.one, japaneseasmr.com, DLsite, & auto-prefix RJ.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Dual-Source Track Discovery: Fallback cerdas dengan WAF bypass header & Smart Track Filter.", style = MaterialTheme.typography.bodySmall)
-                    Text("• 4-Tier Smart Hybrid Chapter Engine: Penanda bab presisi, ekspor otomatis berkas .cue, & pemindaian online.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Interactive Chapter Player UI: Chip bab aktif real-time & lembar daftar bab interaktif (tap-to-seek).", style = MaterialTheme.typography.bodySmall)
-                    Text("• Pilihan Format Audio Unduhan: Pengaturan preferensi format (Otomatis, M4A, MP3, Lossless FLAC).", style = MaterialTheme.typography.bodySmall)
+                    Text("• Pembersihan Redundansi & Efisiensi: Optimasi kompilasi regex statis, penghapusan kode redundan, dan O(1) in-memory cache untuk cover & verifikasi berkas.", style = MaterialTheme.typography.bodySmall)
                     Text("• Enhanced Metadata Enrichment: Sinkronisasi CV, Circle, Genre, dan HD Cover dari DLsite & asmr.one.", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("Versi 1.2.1", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)

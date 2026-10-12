@@ -7,20 +7,36 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 object AudioStorageHelper {
 
-    val INDONESIAN_LOCALE = Locale("id", "ID")
+    val INDONESIAN_LOCALE: Locale = Locale.forLanguageTag("id-ID")
     val DISPLAY_DATE_FORMAT = SimpleDateFormat("dd MMM yyyy", INDONESIAN_LOCALE)
+
+    // O(1) in-memory caches untuk scroll bebas jank & latensi 0ms
+    private val localCoverCache = ConcurrentHashMap<String, File?>()
+    private val timestampCache = ConcurrentHashMap<String, Long>()
 
     fun formatDateForDisplay(timestamp: Long): String {
         return DISPLAY_DATE_FORMAT.format(Date(timestamp))
     }
 
     /**
-     * Mengurai string tanggal ke milidetik secara akurat untuk pengurutan kronologis.
+     * Mengurai string tanggal ke milidetik secara akurat untuk pengurutan kronologis (Cached).
      */
     fun parseDateToTimestamp(dateStr: String?, localFilePath: String?): Long {
+        val cacheKey = "${dateStr ?: ""}_${localFilePath ?: ""}"
+        timestampCache[cacheKey]?.let { return it }
+
+        val ts = computeTimestampInternal(dateStr, localFilePath)
+        if (ts > 0L) {
+            timestampCache[cacheKey] = ts
+        }
+        return ts
+    }
+
+    private fun computeTimestampInternal(dateStr: String?, localFilePath: String?): Long {
         // 1. Jika file lokal ada di memori HP, gunakan lastModified fisik file (paling akurat)
         if (!localFilePath.isNullOrBlank()) {
             val file = File(localFilePath)
@@ -179,21 +195,28 @@ object AudioStorageHelper {
      * Mengambil file cover lokal instan (0ms) dari cache atau mengekstrak dari embedded audio.
      */
     fun getLocalCoverFile(context: Context, rjid: String, audioFilePath: String?): File? {
-        val coversDir = File(context.cacheDir, "covers").apply { if (!exists()) mkdirs() }
-        val cachedCover = File(coversDir, "${rjid.uppercase()}.jpg")
+        val cleanRj = rjid.uppercase().trim()
+        val cacheKey = "${cleanRj}_${audioFilePath ?: ""}"
+        localCoverCache[cacheKey]?.let { return it }
+
+        val coversDir = File(context.cacheDir, "covers")
+        val cachedCover = File(coversDir, "$cleanRj.jpg")
         if (cachedCover.exists() && cachedCover.length() > 0) {
+            localCoverCache[cacheKey] = cachedCover
             return cachedCover
         }
 
         if (!audioFilePath.isNullOrBlank()) {
             val audioFile = File(audioFilePath)
             if (audioFile.exists() && audioFile.length() > 0) {
+                if (!coversDir.exists()) coversDir.mkdirs()
                 val retriever = MediaMetadataRetriever()
                 try {
                     retriever.setDataSource(audioFile.absolutePath)
                     val pic = retriever.embeddedPicture
                     if (pic != null && pic.isNotEmpty()) {
                         FileOutputStream(cachedCover).use { it.write(pic) }
+                        localCoverCache[cacheKey] = cachedCover
                         return cachedCover
                     }
                 } catch (e: Exception) {

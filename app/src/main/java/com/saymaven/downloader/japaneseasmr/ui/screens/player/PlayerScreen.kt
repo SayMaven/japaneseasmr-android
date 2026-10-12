@@ -726,6 +726,57 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         )
                     }
                 } else {
+                    val onDragStartAction = remember {
+                        { rjid: String ->
+                            val currentIdx = filteredPlaylist.indexOfFirst { it.rjid == rjid }
+                            if (currentIdx != -1) {
+                                draggedRjid = rjid
+                                dragAccumulatedY = 0f
+                            }
+                        }
+                    }
+                    val onDragAction = remember(slotHeightPx) {
+                        { dragAmount: Float ->
+                            dragAccumulatedY += dragAmount
+
+                            val targetRjid = draggedRjid ?: return@remember
+                            val curIdx = filteredPlaylist.indexOfFirst { it.rjid == targetRjid }
+                            if (curIdx == -1) return@remember
+
+                            val threshold = slotHeightPx * 0.48f
+
+                            if (dragAccumulatedY > threshold && curIdx < filteredPlaylist.size - 1) {
+                                viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
+                                dragAccumulatedY -= slotHeightPx
+                            } else if (dragAccumulatedY < -threshold && curIdx > 0) {
+                                viewModel.reorderPlaylistInMemory(curIdx, curIdx - 1)
+                                dragAccumulatedY += slotHeightPx
+                            }
+                        }
+                    }
+                    val onDragEndAction = remember {
+                        {
+                            viewModel.commitPlaylistReorder()
+                            draggedRjid = null
+                            dragAccumulatedY = 0f
+                        }
+                    }
+                    val onItemClickAction = remember {
+                        { clickedItem: HistoryEntity ->
+                            viewModel.playLocalTrack(clickedItem, filteredPlaylist)
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                showBottomSheet = false
+                            }
+                            Unit
+                        }
+                    }
+                    val onItemMoveAction = remember {
+                        { clickedItem: HistoryEntity ->
+                            itemToMove = clickedItem
+                            showMoveDialog = true
+                        }
+                    }
+
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
@@ -735,7 +786,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(top = 10.dp, bottom = 52.dp)
                     ) {
-                        itemsIndexed(filteredPlaylist, key = { _, item -> item.rjid }) { _, item ->
+                        items(
+                            items = filteredPlaylist,
+                            key = { it.rjid },
+                            contentType = { "playlist_item" }
+                        ) { item ->
                             val isCurrentTrack = (item.rjid == currentRjId)
                             val isDragged = (draggedRjid == item.rjid)
 
@@ -746,45 +801,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 isPlaying = (isCurrentTrack && isPlaying),
                                 isDragged = isDragged,
                                 dragOffsetY = if (isDragged) dragAccumulatedY else 0f,
-                                onDragStart = { rjid ->
-                                    val currentIdx = filteredPlaylist.indexOfFirst { it.rjid == rjid }
-                                    if (currentIdx != -1) {
-                                        draggedRjid = rjid
-                                        dragAccumulatedY = 0f
-                                    }
-                                },
-                                onDrag = { dragAmount ->
-                                    dragAccumulatedY += dragAmount
-
-                                    val targetRjid = draggedRjid ?: return@PlaylistItemCard
-                                    val curIdx = filteredPlaylist.indexOfFirst { it.rjid == targetRjid }
-                                    if (curIdx == -1) return@PlaylistItemCard
-
-                                    val threshold = slotHeightPx * 0.48f
-
-                                    if (dragAccumulatedY > threshold && curIdx < filteredPlaylist.size - 1) {
-                                        viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
-                                        dragAccumulatedY -= slotHeightPx
-                                    } else if (dragAccumulatedY < -threshold && curIdx > 0) {
-                                        viewModel.reorderPlaylistInMemory(curIdx, curIdx - 1)
-                                        dragAccumulatedY += slotHeightPx
-                                    }
-                                },
-                                onDragEnd = {
-                                    viewModel.commitPlaylistReorder()
-                                    draggedRjid = null
-                                    dragAccumulatedY = 0f
-                                },
-                                onClick = {
-                                    viewModel.playLocalTrack(item, filteredPlaylist)
-                                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                        showBottomSheet = false
-                                    }
-                                },
-                                onMoveClick = {
-                                    itemToMove = item
-                                    showMoveDialog = true
-                                }
+                                onDragStart = onDragStartAction,
+                                onDrag = onDragAction,
+                                onDragEnd = onDragEndAction,
+                                onClick = onItemClickAction,
+                                onMoveClick = onItemMoveAction
                             )
                         }
                     }
@@ -1248,7 +1269,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(top = 10.dp, bottom = 32.dp)
                     ) {
-                        itemsIndexed(chapters) { idx, chapter ->
+                        itemsIndexed(
+                            items = chapters,
+                            key = { idx, ch -> "${idx}_${ch.startMs}" },
+                            contentType = { _, _ -> "chapter_item" }
+                        ) { idx, chapter ->
                             val isActive = (idx == activeChapterIndex)
                             Surface(
                                 onClick = {
@@ -1348,6 +1373,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     }
 }
 
+private val PlaylistItemCardShape = RoundedCornerShape(12.dp)
+private val PlaylistItemThumbShape = RoundedCornerShape(6.dp)
+
 @Composable
 fun PlaylistItemCard(
     modifier: Modifier = Modifier,
@@ -1359,8 +1387,8 @@ fun PlaylistItemCard(
     onDragStart: (String) -> Unit,
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
-    onClick: () -> Unit,
-    onMoveClick: () -> Unit
+    onClick: (HistoryEntity) -> Unit,
+    onMoveClick: (HistoryEntity) -> Unit
 ) {
     val context = LocalContext.current
     val currentOnDragStart by rememberUpdatedState(onDragStart)
@@ -1368,21 +1396,28 @@ fun PlaylistItemCard(
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
     val currentRjid by rememberUpdatedState(item.rjid)
 
-    Card(
-        modifier = modifier
+    val cardModifier = if (isDragged) {
+        modifier
             .fillMaxWidth()
-            .zIndex(if (isDragged) 100f else 1f)
+            .zIndex(100f)
             .graphicsLayer {
-                translationY = if (isDragged) dragOffsetY else 0f
-                val s = if (isDragged) 1.03f else 1.0f
-                scaleX = s
-                scaleY = s
-                shadowElevation = if (isDragged) 30f else 0f
-                shape = RoundedCornerShape(12.dp)
+                translationY = dragOffsetY
+                scaleX = 1.03f
+                scaleY = 1.03f
+                shadowElevation = 30f
+                shape = PlaylistItemCardShape
                 clip = false
             }
-            .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
+            .clickable { onClick(item) }
+    } else {
+        modifier
+            .fillMaxWidth()
+            .clickable { onClick(item) }
+    }
+
+    Card(
+        modifier = cardModifier,
+        shape = PlaylistItemCardShape,
         colors = CardDefaults.cardColors(
             containerColor = when {
                 isDragged -> MaterialTheme.colorScheme.secondaryContainer
@@ -1411,13 +1446,13 @@ fun PlaylistItemCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(54.dp, 40.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(PlaylistItemThumbShape)
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(54.dp, 40.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(PlaylistItemThumbShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1468,7 +1503,7 @@ fun PlaylistItemCard(
 
             // Tombol Pindah Folder
             IconButton(
-                onClick = onMoveClick,
+                onClick = { onMoveClick(item) },
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(
