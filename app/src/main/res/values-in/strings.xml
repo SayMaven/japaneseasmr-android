@@ -156,7 +156,7 @@
     <string name="queue_toast_empty_input">Masukkan kode RJ terlebih dahulu</string>
     <string name="queue_toast_added">Berhasil ditambahkan ke antrean</string>
     <string name="queue_toast_invalid_rj">Format kode RJ tidak valid</string>
-    <string name="queue_btn_enqueue">+ Antrean</string>
+    <string name="queue_btn_enqueue">Antrean</string>
     <string name="queue_fetching_info">Mengambil info…</string>
     <string name="queue_remove_item">Hapus Antrean</string>
     <string name="history_dialog_delete_msg_format">Hapus [%1$s] %2$s dari riwayat koleksi?</string>

@@ -76,14 +76,14 @@ object AudioDownloader {
         segDir.mkdirs()
 
         try {
-            onLog("[i] Mengambil playlist HLS (.m3u8)...")
+            onLog(DownloadLogHelper.hlsFetchingPlaylist())
             val reqBuilder = Request.Builder().url(m3u8Url)
             applyHeaders(reqBuilder, m3u8Url, referer)
             val request = reqBuilder.build()
 
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
-                onLog("[!] Gagal mengambil playlist m3u8 (HTTP ${response.code})")
+                onLog(DownloadLogHelper.hlsPlaylistFetchFailed(response.code))
                 return@withContext false
             }
 
@@ -92,7 +92,7 @@ object AudioDownloader {
             val rawSegments = lines.map { it.trim() }.filter { it.isNotBlank() && !it.startsWith("#") }
 
             if (rawSegments.isEmpty()) {
-                onLog("[!] Tidak ada segmen audio ditemukan di playlist m3u8.")
+                onLog(DownloadLogHelper.hlsNoSegmentsFound())
                 return@withContext false
             }
 
@@ -103,7 +103,7 @@ object AudioDownloader {
 
             val totalSegments = segmentUrls.size
             val concurrency = parallelConnections.coerceIn(1, 32)
-            onLog("[i] Terdeteksi $totalSegments segmen audio HLS. Memulai unduhan paralel ($concurrency koneksi)...")
+            onLog(DownloadLogHelper.hlsSegmentsDetected(totalSegments, concurrency))
 
             val completedCount = AtomicInteger(0)
             val totalBytesDownloaded = AtomicLong(0)
@@ -164,7 +164,7 @@ object AudioDownloader {
                                 onProgress(pct, speedStr, etaStr, downloadedStr, "~${formatFileSize(estTotal)}")
 
                                 if (done % 50 == 0 || done == totalSegments) {
-                                    onLog("  [download] Segmen $done/$totalSegments (${(pct * 100).toInt()}%) - $downloadedStr @ $speedStr")
+                                    onLog(DownloadLogHelper.downloadSegmentProgress(done, totalSegments, (pct * 100).toInt(), downloadedStr, speedStr))
                                 }
 
                                 lastLogTime = now
@@ -176,7 +176,7 @@ object AudioDownloader {
             }
 
             // Gabungkan segmen-segmen ke single temporary ADTS file menggunakan kernel-level zero-copy transferTo
-            onLog("[i] Menggabungkan $totalSegments segmen audio secara streaming cepat...")
+            onLog(DownloadLogHelper.hlsMergingSegments(totalSegments))
             val tempAdtsCombined = File(tempDir, "temp_combined_${System.currentTimeMillis()}.adts")
             FileOutputStream(tempAdtsCombined).channel.use { outChan ->
                 for (i in 0 until totalSegments) {
@@ -190,22 +190,22 @@ object AudioDownloader {
                 }
             }
 
-            onLog("[i] Fast Remux: Mengemas audio ke container ISO M4A (100% Seekable & Indeks Durasi Presisi)...")
+            onLog(DownloadLogHelper.hlsPackagingM4a())
             destFile.parentFile?.mkdirs()
 
             val muxSuccess = muxAdtsFileToM4a(tempAdtsCombined, destFile, onLog)
             if (!muxSuccess) {
-                onLog("[!] Gagal mengemas ISO M4A, menyalin file stream...")
+                onLog(DownloadLogHelper.hlsPackagingFallback())
                 tempAdtsCombined.copyTo(destFile, overwrite = true)
             }
             tempAdtsCombined.delete()
 
             val finalSizeStr = formatFileSize(destFile.length())
-            onLog("[SUCCESS] File audio berhasil dibuat: $finalSizeStr (100% Seekable & Jernih)")
-            onProgress(1f, "Selesai", "00:00", finalSizeStr, finalSizeStr)
+            onLog(DownloadLogHelper.audioFileCreated(finalSizeStr))
+            onProgress(1f, DownloadLogHelper.speedCompleted(), "00:00", finalSizeStr, finalSizeStr)
             true
         } catch (e: Exception) {
-            onLog("[ERROR] Gagal mengunduh HLS: ${e.message}")
+            onLog(DownloadLogHelper.hlsDownloadFailed(e.message))
             e.printStackTrace()
             false
         } finally {
@@ -241,7 +241,7 @@ object AudioDownloader {
             }
 
             if (firstOffset >= fileSize - 7) {
-                onLog("[!] Header ADTS pertama tidak ditemukan.")
+                onLog(DownloadLogHelper.adtsHeaderNotFound())
                 return false
             }
 
@@ -318,7 +318,7 @@ object AudioDownloader {
                             val pct = ((pos.toLong() * 100) / totalSize).toInt().coerceIn(0, 100)
                             if (pct >= lastReportedPct + 15) {
                                 lastReportedPct = pct
-                                onLog("  [remux] Fast Remux ke container M4A: $pct% ($frameIndex frame)...")
+                                onLog(DownloadLogHelper.remuxM4aProgress(pct, frameIndex))
                             }
                         }
                     } else {
@@ -332,7 +332,7 @@ object AudioDownloader {
             muxer.stop()
             true
         } catch (e: Exception) {
-            onLog("[!] Gagal muxing M4A: ${e.message}")
+            onLog(DownloadLogHelper.muxM4aFailed(e.message))
             e.printStackTrace()
             false
         } finally {
@@ -394,7 +394,7 @@ object AudioDownloader {
         onLog: (String) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            onLog("[i] Memeriksa ukuran file direct MP3...")
+            onLog(DownloadLogHelper.checkingDirectFileSize())
             val headReqBuilder = Request.Builder().url(url).head()
             applyHeaders(headReqBuilder, url, referer)
             val headReq = headReqBuilder.build()
@@ -406,13 +406,13 @@ object AudioDownloader {
             destFile.parentFile?.mkdirs()
 
             if (totalBytes <= 0L || !acceptRanges || parallelConnections <= 1) {
-                onLog("[i] Mengunduh single-stream...")
+                onLog(DownloadLogHelper.downloadingSingleStream())
                 return@withContext downloadDirectSingleStream(url, destFile, referer, onProgress, onLog)
             }
 
             val concurrency = parallelConnections.coerceIn(2, 32)
             val totalStr = formatFileSize(totalBytes)
-            onLog("[i] Ukuran file: $totalStr. Memulai unduhan multi-part Range ($concurrency thread paralel)...")
+            onLog(DownloadLogHelper.startMultiPartRange(totalStr, concurrency))
 
             val raf = RandomAccessFile(destFile, "rw")
             raf.setLength(totalBytes)
@@ -489,11 +489,11 @@ object AudioDownloader {
             }
 
             val finalSizeStr = formatFileSize(destFile.length())
-            onLog("[SUCCESS] Unduhan multi-part selesai: $finalSizeStr")
-            onProgress(1f, "Selesai", "00:00", finalSizeStr, totalStr)
+            onLog(DownloadLogHelper.multiPartDownloadSuccess(finalSizeStr))
+            onProgress(1f, DownloadLogHelper.speedCompleted(), "00:00", finalSizeStr, totalStr)
             true
         } catch (e: Exception) {
-            onLog("[ERROR] Gagal unduhan multi-part: ${e.message}")
+            onLog(DownloadLogHelper.multiPartDownloadFailed(e.message))
             downloadDirectSingleStream(url, destFile, referer, onProgress, onLog)
         }
     }
@@ -558,8 +558,8 @@ object AudioDownloader {
             }
 
             val finalSize = formatFileSize(destFile.length())
-            onLog("[SUCCESS] Unduhan selesai: $finalSize")
-            onProgress(1f, "Selesai", "00:00", finalSize, totalStr)
+            onLog(DownloadLogHelper.directDownloadSuccess(finalSize))
+            onProgress(1f, DownloadLogHelper.speedCompleted(), "00:00", finalSize, totalStr)
             true
         } catch (e: Exception) {
             false

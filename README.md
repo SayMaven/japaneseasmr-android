@@ -5,7 +5,8 @@
 
   <p>
     <a href="README.md">English</a> |
-    <a href="README.id.md">Bahasa Indonesia</a>
+    <a href="README.id.md">Bahasa Indonesia</a> |
+    <a href="README.zh.md">简体中文</a>
   </p>
 
   <p>
@@ -86,6 +87,10 @@ JapaneseASMR Downloader is a full-featured, open-source Android application engi
   <img src="assets/screenshots/4.jpg" width="32%" alt="Screenshot 4" />
   <img src="assets/screenshots/5.jpg" width="32%" alt="Screenshot 5" />
   <img src="assets/screenshots/6.jpg" width="32%" alt="Screenshot 6" />
+  <br />
+  <img src="assets/screenshots/7.jpg" width="32%" alt="Screenshot 7" />
+  <img src="assets/screenshots/8.jpg" width="32%" alt="Screenshot 8" />
+  <img src="assets/screenshots/9.jpg" width="32%" alt="Screenshot 9" />
 </div>
 
 ---

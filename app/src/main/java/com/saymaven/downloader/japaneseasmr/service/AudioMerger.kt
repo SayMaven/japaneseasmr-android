@@ -292,7 +292,7 @@ object AudioMerger {
 
         var muxer: MediaMuxer? = null
         return try {
-            onLog?.invoke("[+] Fast Remux: Menggabungkan ${trackFiles.size} track M4A...")
+            onLog?.invoke(DownloadLogHelper.fastRemuxM4aStart(trackFiles.size))
             destFile.parentFile?.mkdirs()
             muxer = MediaMuxer(destFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 

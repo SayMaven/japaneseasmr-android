@@ -43,6 +43,10 @@ import androidx.compose.ui.platform.LocalContext
 import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.util.LocaleHelper
 import com.saymaven.downloader.japaneseasmr.ui.theme.JapaneseASMRTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -75,11 +79,16 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
+        installSplashScreen()
         super.onCreate(savedInstanceState)
 
-        checkAndRequestPermissions()
-        StorageSyncManager.syncStorageWithDatabase(this)
+        window.decorView.post {
+            checkAndRequestPermissions()
+            CoroutineScope(Dispatchers.IO).launch {
+                delay(2500)
+                StorageSyncManager.syncStorageWithDatabase(this@MainActivity)
+            }
+        }
 
         setContent {
             val themeMode by settingsViewModel.themeMode.collectAsState()
@@ -99,19 +108,22 @@ class MainActivity : ComponentActivity() {
                 LocalConfiguration provides localizedConfig,
                 LocalContext provides localizedContext
             ) {
-                var currentTab by remember {
-                    val initial = if (isColdLaunch) {
+                val initialTab = remember {
+                    if (isColdLaunch) {
                         isColdLaunch = false
                         activeTab = NavTab.HOME
                         NavTab.HOME
                     } else {
                         activeTab
                     }
-                    mutableStateOf(initial)
                 }
-
+                var currentTab by remember { mutableStateOf(initialTab) }
+                val visitedTabs = remember { mutableStateListOf(initialTab) }
                 LaunchedEffect(currentTab) {
                     activeTab = currentTab
+                    if (!visitedTabs.contains(currentTab)) {
+                        visitedTabs.add(currentTab)
+                    }
                 }
 
                 JapaneseASMRTheme(
@@ -164,72 +176,78 @@ class MainActivity : ComponentActivity() {
                             }
 
                             // Tab 1: Unduhan / Queue
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .zIndex(if (currentTab == NavTab.QUEUE) 1f else 0f)
-                                    .graphicsLayer {
-                                        val active = (currentTab == NavTab.QUEUE)
-                                        alpha = if (active) 1f else 0f
-                                        translationX = if (active) 0f else 99999f
-                                    }
-                            ) {
-                                QueueScreen(viewModel = queueViewModel)
+                            if (visitedTabs.contains(NavTab.QUEUE)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .zIndex(if (currentTab == NavTab.QUEUE) 1f else 0f)
+                                        .graphicsLayer {
+                                            val active = (currentTab == NavTab.QUEUE)
+                                            alpha = if (active) 1f else 0f
+                                            translationX = if (active) 0f else 99999f
+                                        }
+                                ) {
+                                    QueueScreen(viewModel = queueViewModel)
+                                }
                             }
 
                             // Tab 2: Riwayat / History
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .zIndex(if (currentTab == NavTab.HISTORY) 1f else 0f)
-                                    .graphicsLayer {
-                                        val active = (currentTab == NavTab.HISTORY)
-                                        alpha = if (active) 1f else 0f
-                                        translationX = if (active) 0f else 99999f
-                                    }
-                            ) {
-                                HistoryScreen(
-                                    viewModel = historyViewModel,
-                                    onPlayTrack = { historyEntity ->
-                                        playerViewModel.playLocalTrack(historyEntity)
-                                        currentTab = NavTab.HOME
-                                    },
-                                    onRedownload = { historyEntity ->
-                                        val item = DownloadQueueItem(
-                                            rjid = historyEntity.rjid,
-                                            title = historyEntity.title,
-                                            cv = historyEntity.cv,
-                                            circle = historyEntity.circle,
-                                            genre = historyEntity.genre,
-                                            ageRating = historyEntity.ageRating,
-                                            coverUrl = historyEntity.coverUrl
-                                        )
-                                        DownloadService.enqueue(listOf(item))
-                                        queueViewModel.onInputChanged(historyEntity.rjid)
-
-                                        if (!DownloadService.isDownloading.value) {
-                                            DownloadService.startDownload(this@MainActivity)
-                                            Toast.makeText(this@MainActivity, getString(R.string.player_toast_download_starting, historyEntity.rjid), Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(this@MainActivity, getString(R.string.player_toast_download_enqueued, historyEntity.rjid), Toast.LENGTH_SHORT).show()
+                            if (visitedTabs.contains(NavTab.HISTORY)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .zIndex(if (currentTab == NavTab.HISTORY) 1f else 0f)
+                                        .graphicsLayer {
+                                            val active = (currentTab == NavTab.HISTORY)
+                                            alpha = if (active) 1f else 0f
+                                            translationX = if (active) 0f else 99999f
                                         }
-                                        currentTab = NavTab.QUEUE
-                                    }
-                                )
+                                ) {
+                                    HistoryScreen(
+                                        viewModel = historyViewModel,
+                                        onPlayTrack = { historyEntity ->
+                                            playerViewModel.playLocalTrack(historyEntity)
+                                            currentTab = NavTab.HOME
+                                        },
+                                        onRedownload = { historyEntity ->
+                                            val item = DownloadQueueItem(
+                                                rjid = historyEntity.rjid,
+                                                title = historyEntity.title,
+                                                cv = historyEntity.cv,
+                                                circle = historyEntity.circle,
+                                                genre = historyEntity.genre,
+                                                ageRating = historyEntity.ageRating,
+                                                coverUrl = historyEntity.coverUrl
+                                            )
+                                            DownloadService.enqueue(listOf(item))
+                                            queueViewModel.onInputChanged(historyEntity.rjid)
+
+                                            if (!DownloadService.isDownloading.value) {
+                                                DownloadService.startDownload(this@MainActivity)
+                                                Toast.makeText(this@MainActivity, getString(R.string.player_toast_download_starting, historyEntity.rjid), Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(this@MainActivity, getString(R.string.player_toast_download_enqueued, historyEntity.rjid), Toast.LENGTH_SHORT).show()
+                                            }
+                                            currentTab = NavTab.QUEUE
+                                        }
+                                    )
+                                }
                             }
 
                             // Tab 3: Pengaturan / Settings
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .zIndex(if (currentTab == NavTab.SETTINGS) 1f else 0f)
-                                    .graphicsLayer {
-                                        val active = (currentTab == NavTab.SETTINGS)
-                                        alpha = if (active) 1f else 0f
-                                        translationX = if (active) 0f else 99999f
-                                    }
-                            ) {
-                                SettingsScreen(viewModel = settingsViewModel)
+                            if (visitedTabs.contains(NavTab.SETTINGS)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .zIndex(if (currentTab == NavTab.SETTINGS) 1f else 0f)
+                                        .graphicsLayer {
+                                            val active = (currentTab == NavTab.SETTINGS)
+                                            alpha = if (active) 1f else 0f
+                                            translationX = if (active) 0f else 99999f
+                                        }
+                                ) {
+                                    SettingsScreen(viewModel = settingsViewModel)
+                                }
                             }
                         }
                     }
@@ -296,6 +314,5 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        StorageSyncManager.syncStorageWithDatabase(this)
     }
 }

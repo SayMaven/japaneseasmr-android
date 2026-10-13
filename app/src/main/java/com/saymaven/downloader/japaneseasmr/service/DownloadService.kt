@@ -131,7 +131,7 @@ class DownloadService : Service() {
 
         startForeground(
             NOTIFICATION_ID,
-            buildNotification("Memulai unduhan antrean...", 0, true)
+            buildNotification(DownloadLogHelper.notificationStarting(), 0, true)
         )
 
         if (!_isDownloading.value) {

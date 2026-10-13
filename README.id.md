@@ -5,7 +5,8 @@
 
   <p>
     <a href="README.md">English</a> |
-    <a href="README.id.md">Bahasa Indonesia</a>
+    <a href="README.id.md">Bahasa Indonesia</a> |
+    <a href="README.zh.md">简体中文</a>
   </p>
 
   <p>
@@ -86,6 +87,10 @@ JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) len
   <img src="assets/screenshots/4.jpg" width="32%" alt="Tangkapan Layar 4" />
   <img src="assets/screenshots/5.jpg" width="32%" alt="Tangkapan Layar 5" />
   <img src="assets/screenshots/6.jpg" width="32%" alt="Tangkapan Layar 6" />
+  <br />
+  <img src="assets/screenshots/7.jpg" width="32%" alt="Tangkapan Layar 7" />
+  <img src="assets/screenshots/8.jpg" width="32%" alt="Tangkapan Layar 8" />
+  <img src="assets/screenshots/9.jpg" width="32%" alt="Tangkapan Layar 9" />
 </div>
 
 ---

@@ -80,7 +80,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     val playlist by viewModel.playlist.collectAsState()
     val availableFolders by viewModel.availableFolders.collectAsState()
     val selectedFolder by viewModel.selectedFolder.collectAsState()
-    val filteredPlaylist by viewModel.filteredPlaylist.collectAsState()
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
     val dacState by viewModel.dacState.collectAsState()
     val hardwareVolume by viewModel.hardwareVolume.collectAsState()
@@ -108,11 +107,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     var isSliderDragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableLongStateOf(0L) }
     var showBottomSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
     var showChapterSheet by remember { mutableStateOf(false) }
-    val chapterSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
     var showNewFolderDialog by remember { mutableStateOf(false) }
     var newFolderNameInput by remember { mutableStateOf("") }
     var itemToMove by remember { mutableStateOf<HistoryEntity?>(null) }
@@ -132,7 +127,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     }
 
     var showSleepTimerSheet by remember { mutableStateOf(false) }
-    val sleepTimerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var draftTimerMinutes by remember { mutableIntStateOf(15) }
 
     val effectivePosition = if (isSliderDragging) dragPosition else currentPosition
@@ -690,6 +684,8 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
     // ================= 3. PLAYLIST BOTTOM SHEET =================
     if (showBottomSheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val filteredPlaylist by viewModel.filteredPlaylist.collectAsState()
         val currentLocalConfig = LocalConfiguration.current
         val currentLocalContext = LocalContext.current
         ModalBottomSheet(
@@ -976,6 +972,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     }
 
     if (showSleepTimerSheet) {
+        val sleepTimerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val currentLocalConfig = LocalConfiguration.current
         val currentLocalContext = LocalContext.current
         ModalBottomSheet(
@@ -1204,6 +1201,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 }
 
     if (showChapterSheet) {
+        val chapterSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val currentLocalConfig = LocalConfiguration.current
         val currentLocalContext = LocalContext.current
         ModalBottomSheet(

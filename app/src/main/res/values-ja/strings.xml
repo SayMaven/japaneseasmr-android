@@ -156,7 +156,7 @@
     <string name="queue_toast_empty_input">RJコードを入力してください</string>
     <string name="queue_toast_added">キューに追加しました</string>
     <string name="queue_toast_invalid_rj">RJコードの形式が無効です</string>
-    <string name="queue_btn_enqueue">+ キュー追加</string>
+    <string name="queue_btn_enqueue">キュー追加</string>
     <string name="queue_fetching_info">作品情報を取得中…</string>
     <string name="queue_remove_item">キューから削除</string>
     <string name="history_dialog_delete_msg_format">履歴から [%1$s] %2$s を削除しますか？</string>

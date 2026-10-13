@@ -171,17 +171,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var sleepTimerJob: Job? = null
 
     init {
-        resolveAndPreloadInitialCover()
-        initMediaController()
-        observeDatabasePlaylist()
-        observeSyncTicks()
-        restorePlaybackState()
-        observeAudioSettings()
-        observeTranslationPreference()
-        checkAndMigrateTranslationEngine()
-        StorageSyncManager.syncStorageWithDatabase(application)
-        if (!_currentRjId.value.isNullOrBlank()) {
-            loadChaptersForCurrentTrack(_currentRjId.value)
+        viewModelScope.launch {
+            delay(1500)
+            withContext(Dispatchers.IO) {
+                resolveAndPreloadInitialCover()
+            }
+            initMediaController()
+            observeDatabasePlaylist()
+            observeSyncTicks()
+            restorePlaybackState()
+            observeAudioSettings()
+            observeTranslationPreference()
+            checkAndMigrateTranslationEngine()
+            if (!_currentRjId.value.isNullOrBlank()) {
+                loadChaptersForCurrentTrack(_currentRjId.value)
+            }
         }
     }
 
@@ -449,7 +453,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val lastRj = _currentRjId.value
             val lastPos = _currentPosition.value
             if (autoResume && !lastRj.isNullOrBlank()) {
-                viewModelScope.launch {
+                viewModelScope.launch(Dispatchers.IO) {
+                    delay(2000)
                     val history = historyDao.getHistoryById(lastRj)
                     if (history != null) {
                         prepareTrackSilently(history, _playlist.value, lastPos)
@@ -504,7 +509,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                     val p = player
                     if (p != null && p.mediaItemCount == 0) {
-                        prepareTrackSilently(history.copy(coverUrl = finalCover), _playlist.value, _currentPosition.value)
+                        viewModelScope.launch(Dispatchers.IO) {
+                            delay(2000)
+                            prepareTrackSilently(history.copy(coverUrl = finalCover), _playlist.value, _currentPosition.value)
+                        }
                     }
                 }
             }
@@ -830,7 +838,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun togglePlayPause() {
-        val p = player ?: return
+        val p = player ?: run {
+            initMediaController()
+            return
+        }
         if (p.isPlaying) {
             p.pause()
         } else {

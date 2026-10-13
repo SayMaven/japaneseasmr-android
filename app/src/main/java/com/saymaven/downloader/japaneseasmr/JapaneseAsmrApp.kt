@@ -8,6 +8,9 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
 class JapaneseAsmrApp : Application(), ImageLoaderFactory {
@@ -24,8 +27,10 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        createNotificationChannels()
-        com.saymaven.downloader.japaneseasmr.service.TranslationService.init(this)
+        CoroutineScope(Dispatchers.IO).launch {
+            createNotificationChannels()
+            com.saymaven.downloader.japaneseasmr.service.TranslationService.init(this@JapaneseAsmrApp)
+        }
     }
 
     private fun createNotificationChannels() {

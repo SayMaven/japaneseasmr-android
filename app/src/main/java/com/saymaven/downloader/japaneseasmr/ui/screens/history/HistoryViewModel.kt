@@ -52,7 +52,6 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     private val filePresenceCache = ConcurrentHashMap<String, Boolean>()
 
     init {
-        syncStorageWithDatabase()
         preloadHistoryCovers()
     }
 
@@ -129,6 +128,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
 
     private fun preloadHistoryCovers() {
         viewModelScope.launch(Dispatchers.IO) {
+            kotlinx.coroutines.delay(2000)
             dao.getAllHistory().collect { list ->
                 list.take(40).forEach { item ->
                     val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)

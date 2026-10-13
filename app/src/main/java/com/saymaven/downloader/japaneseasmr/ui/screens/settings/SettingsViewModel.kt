@@ -18,6 +18,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     init {
         viewModelScope.launch {
+            kotlinx.coroutines.delay(500)
             preferencesManager.exclusiveUsbDacFlow.collect { enabled ->
                 UsbDacManager.init(getApplication(), enabled)
             }
