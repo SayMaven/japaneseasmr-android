@@ -13,11 +13,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 
-enum class NavTab(val title: String, val icon: ImageVector) {
-    HOME("Home", Icons.Default.Home),
-    QUEUE("Unduhan", Icons.Default.Download),
-    HISTORY("Riwayat", Icons.Default.History),
-    SETTINGS("Pengaturan", Icons.Default.Settings)
+import androidx.compose.ui.res.stringResource
+import com.saymaven.downloader.japaneseasmr.R
+
+enum class NavTab(val titleRes: Int, val icon: ImageVector) {
+    HOME(R.string.tab_player, Icons.Default.Home),
+    QUEUE(R.string.tab_queue, Icons.Default.Download),
+    HISTORY(R.string.tab_history, Icons.Default.History),
+    SETTINGS(R.string.tab_settings, Icons.Default.Settings)
 }
 
 @Composable
@@ -30,11 +33,12 @@ fun BottomNavBar(
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         NavTab.values().forEach { tab ->
+            val labelText = stringResource(tab.titleRes)
             NavigationBarItem(
                 selected = currentTab == tab,
                 onClick = { onTabSelected(tab) },
-                icon = { Icon(tab.icon, contentDescription = tab.title) },
-                label = { Text(tab.title) }
+                icon = { Icon(tab.icon, contentDescription = labelText) },
+                label = { Text(labelText) }
             )
         }
     }

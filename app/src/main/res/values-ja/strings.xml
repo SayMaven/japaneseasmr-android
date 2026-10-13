@@ -1,0 +1,149 @@
+<resources>
+    <string name="app_name">JapaneseASMR</string>
+
+    <!-- ナビゲーションタブ -->
+    <string name="tab_player">プレーヤー</string>
+    <string name="tab_queue">ダウンロード</string>
+    <string name="tab_history">ライブラリ</string>
+    <string name="tab_settings">設定</string>
+
+    <!-- 共通操作 -->
+    <string name="action_close">閉じる</string>
+    <string name="action_cancel">キャンセル</string>
+    <string name="action_confirm">OK</string>
+    <string name="action_save">保存</string>
+    <string name="action_delete">削除</string>
+    <string name="action_create">作成</string>
+    <string name="action_refresh">更新</string>
+
+    <!-- ダウンロードキュー画面 -->
+    <string name="queue_header_title">JapaneseASMR Downloader</string>
+    <string name="queue_items_count">キューに %1$d 件</string>
+    <string name="queue_ready_to_download">ダウンロード待機中</string>
+    <string name="queue_hide_console">ログコンソールを非表示</string>
+    <string name="queue_show_console">ログコンソールを表示</string>
+    <string name="queue_input_hint">RJコード（例: RJ123456）またはURLを入力</string>
+    <string name="queue_btn_download">ダウンロード</string>
+    <string name="queue_btn_clear_all">すべてクリア</string>
+    <string name="queue_btn_pause_all">すべて一時停止</string>
+    <string name="queue_btn_resume_all">すべて再開</string>
+    <string name="queue_empty_title">ダウンロードキューは空です</string>
+    <string name="queue_empty_desc">上記にURLを貼り付けるか、RJコードを入力してダウンロードを開始します。</string>
+    <string name="queue_status_downloading">ダウンロード中</string>
+    <string name="queue_status_paused">一時停止中</string>
+    <string name="queue_status_completed">完了</string>
+    <string name="queue_status_error">エラー</string>
+    <string name="queue_stat_speed">速度</string>
+    <string name="queue_stat_eta">残り時間</string>
+    <string name="queue_stat_threads">スレッド</string>
+    <string name="queue_console_title">ライブコンソール</string>
+    <string name="queue_console_auto_scroll">自動スクロール</string>
+    <string name="queue_console_clear">ログ消去</string>
+
+    <!-- ライブラリ・履歴画面 -->
+    <string name="history_header_title">ライブラリと履歴</string>
+    <string name="history_menu_options">履歴オプション</string>
+    <string name="history_menu_clean_missing">行方不明ファイルを整理</string>
+    <string name="history_menu_clear_all">履歴をすべて消去</string>
+    <string name="history_toast_missing_cleaned">行方不明ファイルを履歴から整理しました。</string>
+    <string name="history_toast_all_cleared">すべての履歴を消去しました。</string>
+    <string name="history_search_hint">作品名、CV、サークルを検索…</string>
+    <string name="history_sort_date_desc">日時 (新しい順 ↓)</string>
+    <string name="history_sort_date_asc">日時 (古い順 ↑)</string>
+    <string name="history_sort_title_asc">タイトル (昇順 ↑)</string>
+    <string name="history_sort_title_desc">タイトル (降順 ↓)</string>
+    <string name="history_empty_title">ダウンロード履歴がありません</string>
+    <string name="history_empty_desc">ダウンロードした作品がここに整理されて表示されます。</string>
+    <string name="history_search_empty_title">検索結果がありません</string>
+    <string name="history_search_empty_desc">別の検索キーワードをお試しください。</string>
+    <string name="history_item_tracks_count">%1$d トラック</string>
+    <string name="history_action_play">再生</string>
+    <string name="history_action_delete_file">ファイル削除</string>
+    <string name="history_dialog_delete_title">作品ファイルを削除しますか？</string>
+    <string name="history_dialog_delete_msg">ストレージからこの音声ファイルを完全に削除してもよろしいですか？</string>
+
+    <!-- プレーヤー画面・コンポーネント -->
+    <string name="player_audio_player">オーディオプレーヤー</string>
+    <string name="player_no_track">トラックが選択されていません</string>
+    <string name="player_cv_label">CV: %1$s</string>
+    <string name="player_circle_label">サークル: %1$s</string>
+    <string name="player_action_play">再生</string>
+    <string name="player_action_pause">一時停止</string>
+    <string name="player_action_next">次のトラック</string>
+    <string name="player_action_prev">前のトラック</string>
+    <string name="player_action_replay10">10秒戻る</string>
+    <string name="player_action_forward10">10秒進む</string>
+    <string name="player_action_shuffle">シャッフル</string>
+    <string name="player_action_repeat">リピート</string>
+    <string name="player_action_playlist">プレイリスト</string>
+    <string name="player_action_chapters">チャプター</string>
+    <string name="player_action_translate">タイトルとチャプターを翻訳</string>
+    <string name="player_speed_dialog_title">再生速度</string>
+    <string name="player_speed_normal">1.0x 標準</string>
+    <string name="player_timer_dialog_title">スリープタイマー</string>
+    <string name="player_timer_turn_off">オフにする</string>
+    <string name="player_timer_active_desc">タイマー有効: 自動停止まで残り %1$02d:%2$02d。</string>
+    <string name="player_timer_inactive_desc">音声再生を自動停止する時間を選択してください。</string>
+    <string name="player_timer_btn_update">タイマー更新 (%1$d 分)</string>
+    <string name="player_timer_btn_start">スリープタイマー開始 (%1$d 分)</string>
+    <string name="player_timer_toast_set">スリープタイマー設定: %1$s</string>
+    <string name="player_timer_toast_off">スリープタイマーをオフにしました</string>
+    <string name="player_chapter_sheet_title">チャプターとトラック</string>
+    <string name="player_chapter_detected">%1$d 個のチャプターを検出</string>
+    <string name="player_chapter_sync">チャプター同期中</string>
+    <string name="player_chapter_resync_toast">チャプターを再取得・再翻訳中…</string>
+    <string name="player_playlist_sheet_title">プレイリスト</string>
+    <string name="player_folder_all">すべて</string>
+    <string name="player_folder_main">メイン</string>
+    <string name="player_folder_new">+ フォルダ</string>
+    <string name="player_folder_create_title">新規フォルダ作成</string>
+    <string name="player_folder_create_desc">音声コレクションを整理するフォルダ名を入力:</string>
+    <string name="player_folder_create_hint">例: お気に入り、ASMRなど</string>
+    <string name="player_folder_move_title">音声をフォルダに移動</string>
+    <string name="player_folder_move_desc">%1$s の移動先フォルダを選択:</string>
+    <string name="player_dac_exclusive">ハイレゾDAC排他モード</string>
+
+    <!-- 設定画面 -->
+    <string name="settings_header_title">設定</string>
+    <string name="settings_cat_general">一般</string>
+    <string name="settings_cat_download">ダウンロード</string>
+    <string name="settings_cat_player">プレーヤー</string>
+    <string name="settings_cat_translation">ASMR翻訳</string>
+    <string name="settings_cat_about">アプリについて</string>
+    <string name="settings_lang_title">アプリ言語</string>
+    <string name="settings_lang_desc">アプリの表示言語を選択</string>
+    <string name="settings_lang_system">システム設定に従う (自動)</string>
+    <string name="settings_lang_en">English</string>
+    <string name="settings_lang_in">Bahasa Indonesia</string>
+    <string name="settings_lang_ja">日本語</string>
+    <string name="settings_lang_zh">简体中文</string>
+    <string name="settings_theme_title">テーマとカラー</string>
+    <string name="settings_theme_desc">カラーパレットとダークモードのカスタマイズ</string>
+    <string name="settings_download_dir_title">保存先フォルダ</string>
+    <string name="settings_threads_title">並列接続数</string>
+    <string name="settings_threads_desc">現在: %1$d 並列接続</string>
+    <string name="settings_cue_sheet_title">CUEシートの自動書き出し</string>
+    <string name="settings_cue_sheet_desc">外部プレーヤー用に .cue ファイルを自動生成</string>
+    <string name="settings_target_lang_title">翻訳先言語</string>
+    <string name="settings_target_lang_desc">作品名とチャプターの翻訳先言語</string>
+    <string name="settings_auto_translate_title">自動翻訳</string>
+    <string name="settings_auto_translate_desc">作品読み込み時にメタデータを自動翻訳</string>
+    <string name="settings_clear_trans_cache_title">翻訳キャッシュを削除</string>
+    <string name="settings_clear_trans_cache_desc">保存されたSQLite翻訳キャッシュを削除</string>
+    <string name="settings_clear_trans_cache_toast">翻訳キャッシュを削除しました。</string>
+    <string name="settings_dac_title">ハイレゾDAC排他モード</string>
+    <string name="settings_dac_desc">高音質再生のためにUSB DACを直接制御</string>
+    <string name="settings_audio_focus_title">音声フォーカスの排他</string>
+    <string name="settings_audio_focus_desc">他のアプリによる音声中断を無視</string>
+    <string name="settings_pause_unplug_title">イヤホン抜去時に一時停止</string>
+    <string name="settings_pause_unplug_desc">イヤホンやDACが外れたときに自動停止</string>
+    <string name="settings_keep_screen_title">画面常時点灯</string>
+    <string name="settings_keep_screen_desc">再生中に画面がオフになるのを防止</string>
+    <string name="settings_auto_resume_title">前回の続きから再生</string>
+    <string name="settings_auto_resume_desc">起動時に最後の曲と再生位置を復元</string>
+    <string name="settings_default_speed_title">デフォルト再生速度</string>
+    <string name="settings_default_speed_desc">現在: %1$.2fx</string>
+    <string name="settings_changelog_title">更新履歴 (Changelog)</string>
+    <string name="settings_disclaimer_title">免責事項</string>
+    <string name="settings_app_version">バージョン %1$s</string>
+</resources>

@@ -9,7 +9,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.3.0-blue?style=for-the-badge" alt="Versi v1.3.0" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.3.1-blue?style=for-the-badge" alt="Versi v1.3.1" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/Lisensi-GPL%20v3.0-10b981?style=for-the-badge" alt="Lisensi GPL v3.0" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Bahasa-Kotlin-7c3aed?style=for-the-badge" alt="Bahasa" />
@@ -17,7 +17,7 @@
   </p>
 
   <p>
-    <a href="#apa-yang-baru-di-v130">Pembaruan</a> •
+    <a href="#apa-yang-baru-di-v131">Pembaruan</a> •
     <a href="#fitur-utama">Fitur Utama</a> •
     <a href="#tangkapan-layar">Tangkapan Layar</a> •
     <a href="#unduh-aplikasi">Unduh</a> •
@@ -32,6 +32,15 @@
 ## Gambaran Umum
 
 JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) lengkap yang dirancang khusus untuk mengunduh, mengarsipkan, dan mendengarkan drama suara ASMR Jepang (Karya RJ). Dibangun menggunakan teknologi modern Android seperti Jetpack Compose, Kotlin Coroutines, Room Database, dan AndroidX Media3 (ExoPlayer), aplikasi ini menghadirkan performa pengunduhan berkecepatan tinggi, keamanan memori tanpa risiko OOM (Out of Memory), serta pemutaran audio latar belakang yang stabil dan hemat daya.
+
+---
+
+## Apa yang Baru di v1.3.1
+
+* **Lokalisasi Antarmuka Multi-Bahasa Lengkap**: Dukungan penuh untuk 4 bahasa: **English (`en`)**, **Bahasa Indonesia (`in`)**, **日本語 / Jepang (`ja`)**, dan **简体中文 / Mandarin (`zh`)**.
+* **Deteksi Bahasa Sistem Otomatis**: Menyesuaikan bahasa tampilan secara otomatis mengikuti pengaturan bahasa perangkat Android pengguna tanpa konfigurasi tambahan.
+* **Pemilih Bahasa Mandiri di Pengaturan**: Menu pengaturan bahasa khusus yang memungkinkan penggantian bahasa aplikasi secara bebas tanpa mengubah bahasa sistem ponsel.
+* **Kompatibilitas Android 13+ Per-App Language**: Mendaftarkan konfigurasi `locales_config.xml` untuk integrasi penuh dengan pemilih bahasa per-aplikasi bawaan Android 13+.
 
 ---
 
@@ -186,7 +195,7 @@ cd japaneseasmr-android
 
 Berkas APK hasil kompilasi akan tersimpan di:
 ```
-app/build/outputs/apk/debug/JapaneseASMR-v1.3.0-debug.apk
+app/build/outputs/apk/debug/JapaneseASMR-v1.3.1-debug.apk
 ```
 
 ---

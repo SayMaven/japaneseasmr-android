@@ -1,0 +1,149 @@
+<resources>
+    <string name="app_name">JapaneseASMR</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_player">Player</string>
+    <string name="tab_queue">Queue</string>
+    <string name="tab_history">Library</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Common Actions -->
+    <string name="action_close">Close</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_confirm">OK</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_create">Create</string>
+    <string name="action_refresh">Refresh</string>
+
+    <!-- Queue Screen -->
+    <string name="queue_header_title">JapaneseASMR Downloader</string>
+    <string name="queue_items_count">%1$d items in queue</string>
+    <string name="queue_ready_to_download">Ready to download</string>
+    <string name="queue_hide_console">Hide Log Console</string>
+    <string name="queue_show_console">Show Log Console</string>
+    <string name="queue_input_hint">Enter RJ Code (e.g. RJ123456) or Link</string>
+    <string name="queue_btn_download">Download</string>
+    <string name="queue_btn_clear_all">Clear All</string>
+    <string name="queue_btn_pause_all">Pause All</string>
+    <string name="queue_btn_resume_all">Resume All</string>
+    <string name="queue_empty_title">Download Queue Empty</string>
+    <string name="queue_empty_desc">Paste a URL or enter an RJ code above to start downloading.</string>
+    <string name="queue_status_downloading">Downloading</string>
+    <string name="queue_status_paused">Paused</string>
+    <string name="queue_status_completed">Completed</string>
+    <string name="queue_status_error">Failed</string>
+    <string name="queue_stat_speed">Speed</string>
+    <string name="queue_stat_eta">Remaining</string>
+    <string name="queue_stat_threads">Threads</string>
+    <string name="queue_console_title">Live Console</string>
+    <string name="queue_console_auto_scroll">Auto-scroll</string>
+    <string name="queue_console_clear">Clear Log</string>
+
+    <!-- History Screen -->
+    <string name="history_header_title">Library &amp; History</string>
+    <string name="history_menu_options">History Options</string>
+    <string name="history_menu_clean_missing">Clean Missing Files</string>
+    <string name="history_menu_clear_all">Clear All History</string>
+    <string name="history_toast_missing_cleaned">Missing files cleaned from history.</string>
+    <string name="history_toast_all_cleared">All history cleared.</string>
+    <string name="history_search_hint">Search title, CV, or circle…</string>
+    <string name="history_sort_date_desc">Date (Newest ↓)</string>
+    <string name="history_sort_date_asc">Date (Oldest ↑)</string>
+    <string name="history_sort_title_asc">Title (A-Z ↑)</string>
+    <string name="history_sort_title_desc">Title (Z-A ↓)</string>
+    <string name="history_empty_title">No download history yet</string>
+    <string name="history_empty_desc">Works you download will appear organized here.</string>
+    <string name="history_search_empty_title">No results found</string>
+    <string name="history_search_empty_desc">Try using a different search keyword.</string>
+    <string name="history_item_tracks_count">%1$d tracks</string>
+    <string name="history_action_play">Play</string>
+    <string name="history_action_delete_file">Delete File</string>
+    <string name="history_dialog_delete_title">Delete Work File?</string>
+    <string name="history_dialog_delete_msg">Are you sure you want to permanently delete this audio file from storage?</string>
+
+    <!-- Player Screen & Components -->
+    <string name="player_audio_player">Audio Player</string>
+    <string name="player_no_track">No Track Selected</string>
+    <string name="player_cv_label">CV: %1$s</string>
+    <string name="player_circle_label">Circle: %1$s</string>
+    <string name="player_action_play">Play</string>
+    <string name="player_action_pause">Pause</string>
+    <string name="player_action_next">Next</string>
+    <string name="player_action_prev">Previous</string>
+    <string name="player_action_replay10">Replay 10s</string>
+    <string name="player_action_forward10">Forward 10s</string>
+    <string name="player_action_shuffle">Shuffle</string>
+    <string name="player_action_repeat">Repeat</string>
+    <string name="player_action_playlist">Playlist</string>
+    <string name="player_action_chapters">Chapters</string>
+    <string name="player_action_translate">Translate Title &amp; Chapters</string>
+    <string name="player_speed_dialog_title">Playback Speed</string>
+    <string name="player_speed_normal">1.0x Normal</string>
+    <string name="player_timer_dialog_title">Sleep Timer</string>
+    <string name="player_timer_turn_off">Turn Off</string>
+    <string name="player_timer_active_desc">Timer active: %1$02d:%2$02d remaining before audio pauses automatically.</string>
+    <string name="player_timer_inactive_desc">Choose a sleep duration to automatically pause playback.</string>
+    <string name="player_timer_btn_update">Update Timer (%1$d Min)</string>
+    <string name="player_timer_btn_start">Start Sleep Timer (%1$d Min)</string>
+    <string name="player_timer_toast_set">Sleep Timer set: %1$s</string>
+    <string name="player_timer_toast_off">Sleep Timer turned off</string>
+    <string name="player_chapter_sheet_title">Chapters &amp; Tracklist</string>
+    <string name="player_chapter_detected">%1$d Chapters detected</string>
+    <string name="player_chapter_sync">Synchronizing audio chapters</string>
+    <string name="player_chapter_resync_toast">Rescanning and retranslating chapters…</string>
+    <string name="player_playlist_sheet_title">Audio Playlist</string>
+    <string name="player_folder_all">All</string>
+    <string name="player_folder_main">Main</string>
+    <string name="player_folder_new">+ Folder</string>
+    <string name="player_folder_create_title">Create New Folder</string>
+    <string name="player_folder_create_desc">Enter folder name to categorize audio collection:</string>
+    <string name="player_folder_create_hint">E.g. Favorites, ASMR, etc</string>
+    <string name="player_folder_move_title">Move Audio to Folder</string>
+    <string name="player_folder_move_desc">Select destination folder for %1$s:</string>
+    <string name="player_dac_exclusive">Bit-Perfect USB DAC Mode</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_header_title">Settings</string>
+    <string name="settings_cat_general">General</string>
+    <string name="settings_cat_download">Download Engine</string>
+    <string name="settings_cat_player">Audio Player</string>
+    <string name="settings_cat_translation">ASMR Translation</string>
+    <string name="settings_cat_about">About &amp; Application</string>
+    <string name="settings_lang_title">App Language</string>
+    <string name="settings_lang_desc">Select application display language</string>
+    <string name="settings_lang_system">System Default (Auto)</string>
+    <string name="settings_lang_en">English</string>
+    <string name="settings_lang_in">Bahasa Indonesia</string>
+    <string name="settings_lang_ja">日本語</string>
+    <string name="settings_lang_zh">简体中文</string>
+    <string name="settings_theme_title">Theme &amp; Colors</string>
+    <string name="settings_theme_desc">Color palette and dark mode customization</string>
+    <string name="settings_download_dir_title">Download Directory</string>
+    <string name="settings_threads_title">Parallel Connections</string>
+    <string name="settings_threads_desc">Current: %1$d parallel threads</string>
+    <string name="settings_cue_sheet_title">CUE Sheet Sidecar Export</string>
+    <string name="settings_cue_sheet_desc">Generate companion .cue files for external players</string>
+    <string name="settings_target_lang_title">Translation Target Language</string>
+    <string name="settings_target_lang_desc">Language used for titles &amp; chapters</string>
+    <string name="settings_auto_translate_title">Auto-Translate</string>
+    <string name="settings_auto_translate_desc">Automatically translate metadata when loaded</string>
+    <string name="settings_clear_trans_cache_title">Clear Translation Cache</string>
+    <string name="settings_clear_trans_cache_desc">Delete cached Room SQLite translations</string>
+    <string name="settings_clear_trans_cache_toast">Translation cache cleared.</string>
+    <string name="settings_dac_title">Bit-Perfect USB DAC Mode</string>
+    <string name="settings_dac_desc">Take over USB DAC hardware for pure sound</string>
+    <string name="settings_audio_focus_title">Exclusive Audio Focus</string>
+    <string name="settings_audio_focus_desc">Ignore audio interruptions from other apps</string>
+    <string name="settings_pause_unplug_title">Pause on Unplug</string>
+    <string name="settings_pause_unplug_desc">Automatically pause when headphones are disconnected</string>
+    <string name="settings_keep_screen_title">Keep Screen On</string>
+    <string name="settings_keep_screen_desc">Prevent screen timeout during audio playback</string>
+    <string name="settings_auto_resume_title">Auto-Resume Playback</string>
+    <string name="settings_auto_resume_desc">Restore last track and position on launch</string>
+    <string name="settings_default_speed_title">Default Playback Speed</string>
+    <string name="settings_default_speed_desc">Current: %1$.2fx</string>
+    <string name="settings_changelog_title">Release Notes (Changelog)</string>
+    <string name="settings_disclaimer_title">Disclaimer</string>
+    <string name="settings_app_version">Version %1$s</string>
+</resources>

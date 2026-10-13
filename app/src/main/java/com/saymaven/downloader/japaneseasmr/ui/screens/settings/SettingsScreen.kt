@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.BuildConfig
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
@@ -62,7 +64,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val autoResume by viewModel.autoResume.collectAsState()
     val defaultSpeed by viewModel.defaultSpeed.collectAsState()
     val translationLanguage by viewModel.translationLanguage.collectAsState()
+    val appLanguage by viewModel.appLanguage.collectAsState()
 
+    var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showThreadDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
@@ -94,14 +98,38 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Pengaturan",
+            text = stringResource(R.string.settings_header_title),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
 
+        // ================= 0. UMUM & BAHASA =================
+        SettingsCategoryHeader(title = stringResource(R.string.settings_cat_general), icon = Icons.Default.Language)
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+        ) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_lang_title), fontWeight = FontWeight.SemiBold) },
+                supportingContent = {
+                    val langLabel = when (appLanguage) {
+                        "en" -> "English"
+                        "in" -> "Bahasa Indonesia"
+                        "ja" -> "日本語"
+                        "zh" -> "简体中文"
+                        else -> stringResource(R.string.settings_lang_system)
+                    }
+                    Text(langLabel, style = MaterialTheme.typography.bodySmall)
+                },
+                leadingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                modifier = Modifier.clickable { showLanguageDialog = true }
+            )
+        }
+
         // ================= 1. PENGATURAN PEMUTAR AUDIO =================
-        SettingsCategoryHeader(title = "Pemutar Audio Hi-Res", icon = Icons.AutoMirrored.Filled.VolumeUp)
+        SettingsCategoryHeader(title = stringResource(R.string.settings_cat_player), icon = Icons.AutoMirrored.Filled.VolumeUp)
 
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -787,13 +815,69 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
 
 
+    if (showLanguageDialog) {
+        val languages = listOf(
+            "system" to stringResource(R.string.settings_lang_system),
+            "en" to "English",
+            "in" to "Bahasa Indonesia",
+            "ja" to "日本語",
+            "zh" to "简体中文"
+        )
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text(stringResource(R.string.settings_lang_title)) },
+            text = {
+                Column {
+                    languages.forEach { (code, label) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setAppLanguage(code)
+                                    showLanguageDialog = false
+                                }
+                                .padding(vertical = 8.dp)
+                        ) {
+                            RadioButton(
+                                selected = appLanguage == code,
+                                onClick = {
+                                    viewModel.setAppLanguage(code)
+                                    showLanguageDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (appLanguage == code) FontWeight.Bold else FontWeight.Normal,
+                                color = if (appLanguage == code) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(stringResource(R.string.action_close))
+                }
+            }
+        )
+    }
+
     if (showChangelogDialog) {
         AlertDialog(
             onDismissRequest = { showChangelogDialog = false },
-            title = { Text("Catatan Rilis (Changelog)") },
+            title = { Text(stringResource(R.string.settings_changelog_title)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text("Versi 1.3.0 (Terbaru)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Versi 1.3.1 (Terbaru)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("• Multi-Bahasa Antarmuka (UI Localization): Dukungan penuh bahasa Indonesia, English, 日本語 (Jepang), dan 简体中文 (Mandarin).", style = MaterialTheme.typography.bodySmall)
+                    Text("• Deteksi Bahasa Sistem Otomatis: Aplikasi menyesuaikan bahasa tampilan mengikuti pengaturan perangkat pengguna secara otomatis.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Pemilih Bahasa Manual di Pengaturan: Pengguna dapat bebas memilih bahasa aplikasi tanpa mengubah bahasa sistem ponsel.", style = MaterialTheme.typography.bodySmall)
+                    Text("• Kompatibilitas Android 13+ Per-App Language: Mendukung konfigurasi bahasa per-aplikasi bawaan OS Android.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Versi 1.3.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text("• Penerjemah ASMR DLsite Cerdas: Terjemahan dwibahasa (Indonesia/Inggris) untuk judul karya & daftar bab/tracklist dengan kamus istilah khusus ASMR DLsite.", style = MaterialTheme.typography.bodySmall)
                     Text("• De-Sensor Fuseji & Normalisasi Teks: Membuka sensor simbol (○, ●, ×) dan menormalkan teks judul agar hasil terjemahan akurat dan alami.", style = MaterialTheme.typography.bodySmall)
                     Text("• Smart Fast Remux Engine: Penggabungan audio multi-segmen instan (< 1 detik) tanpa transcoding demi menjaga kualitas suara 100% loss-free.", style = MaterialTheme.typography.bodySmall)

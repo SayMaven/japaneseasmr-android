@@ -1,0 +1,149 @@
+<resources>
+    <string name="app_name">JapaneseASMR</string>
+
+    <!-- Tab Navigasi -->
+    <string name="tab_player">Pemutar</string>
+    <string name="tab_queue">Antrean</string>
+    <string name="tab_history">Riwayat</string>
+    <string name="tab_settings">Pengaturan</string>
+
+    <!-- Aksi Umum -->
+    <string name="action_close">Tutup</string>
+    <string name="action_cancel">Batal</string>
+    <string name="action_confirm">OK</string>
+    <string name="action_save">Simpan</string>
+    <string name="action_delete">Hapus</string>
+    <string name="action_create">Buat</string>
+    <string name="action_refresh">Segarkan</string>
+
+    <!-- Layar Antrean -->
+    <string name="queue_header_title">JapaneseASMR Downloader</string>
+    <string name="queue_items_count">%1$d item dalam antrean</string>
+    <string name="queue_ready_to_download">Siap mengunduh</string>
+    <string name="queue_hide_console">Sembunyikan Konsol Log</string>
+    <string name="queue_show_console">Tampilkan Konsol Log</string>
+    <string name="queue_input_hint">Masukkan Kode RJ (misal: RJ123456) atau Link</string>
+    <string name="queue_btn_download">Unduh</string>
+    <string name="queue_btn_clear_all">Hapus Semua</string>
+    <string name="queue_btn_pause_all">Jeda Semua</string>
+    <string name="queue_btn_resume_all">Lanjutkan Semua</string>
+    <string name="queue_empty_title">Antrean Unduhan Kosong</string>
+    <string name="queue_empty_desc">Tempel tautan atau masukkan kode RJ di atas untuk mulai mengunduh.</string>
+    <string name="queue_status_downloading">Mengunduh</string>
+    <string name="queue_status_paused">Dijeda</string>
+    <string name="queue_status_completed">Selesai</string>
+    <string name="queue_status_error">Gagal</string>
+    <string name="queue_stat_speed">Kecepatan</string>
+    <string name="queue_stat_eta">Sisa Waktu</string>
+    <string name="queue_stat_threads">Jalur</string>
+    <string name="queue_console_title">Konsol Langsung</string>
+    <string name="queue_console_auto_scroll">Gulir otomatis</string>
+    <string name="queue_console_clear">Bersihkan Log</string>
+
+    <!-- Layar Riwayat -->
+    <string name="history_header_title">Riwayat &amp; Koleksi</string>
+    <string name="history_menu_options">Opsi Riwayat</string>
+    <string name="history_menu_clean_missing">Bersihkan File Hilang</string>
+    <string name="history_menu_clear_all">Hapus Semua Riwayat</string>
+    <string name="history_toast_missing_cleaned">File hilang dibersihkan dari riwayat.</string>
+    <string name="history_toast_all_cleared">Semua riwayat dihapus.</string>
+    <string name="history_search_hint">Cari karya, CV, atau circle…</string>
+    <string name="history_sort_date_desc">Waktu (Terbaru ↓)</string>
+    <string name="history_sort_date_asc">Waktu (Terlama ↑)</string>
+    <string name="history_sort_title_asc">Judul (A-Z ↑)</string>
+    <string name="history_sort_title_desc">Judul (Z-A ↓)</string>
+    <string name="history_empty_title">Belum ada riwayat unduhan</string>
+    <string name="history_empty_desc">Karya yang sudah kamu unduh akan muncul rapi di sini.</string>
+    <string name="history_search_empty_title">Tidak ada hasil ditemukan</string>
+    <string name="history_search_empty_desc">Coba gunakan kata kunci pencarian yang lain.</string>
+    <string name="history_item_tracks_count">%1$d trek</string>
+    <string name="history_action_play">Putar</string>
+    <string name="history_action_delete_file">Hapus File</string>
+    <string name="history_dialog_delete_title">Hapus File Karya?</string>
+    <string name="history_dialog_delete_msg">Apakah Anda yakin ingin menghapus berkas audio ini secara permanen dari penyimpanan?</string>
+
+    <!-- Layar Pemutar & Komponen -->
+    <string name="player_audio_player">Pemutar Audio</string>
+    <string name="player_no_track">Tidak Ada Trek Dipilih</string>
+    <string name="player_cv_label">CV: %1$s</string>
+    <string name="player_circle_label">Circle: %1$s</string>
+    <string name="player_action_play">Putar</string>
+    <string name="player_action_pause">Jeda</string>
+    <string name="player_action_next">Trek Berikutnya</string>
+    <string name="player_action_prev">Trek Sebelumnya</string>
+    <string name="player_action_replay10">Mundur 10 Detik</string>
+    <string name="player_action_forward10">Maju 10 Detik</string>
+    <string name="player_action_shuffle">Acak</string>
+    <string name="player_action_repeat">Ulangi</string>
+    <string name="player_action_playlist">Daftar Putar</string>
+    <string name="player_action_chapters">Bab Audio</string>
+    <string name="player_action_translate">Terjemahkan Judul &amp; Bab</string>
+    <string name="player_speed_dialog_title">Kecepatan Putar</string>
+    <string name="player_speed_normal">1.0x Normal</string>
+    <string name="player_timer_dialog_title">Pengatur Waktu Tidur</string>
+    <string name="player_timer_turn_off">Matikan</string>
+    <string name="player_timer_active_desc">Timer aktif: %1$02d:%2$02d tersisa sebelum audio berhenti otomatis.</string>
+    <string name="player_timer_inactive_desc">Pilih durasi tidur untuk menghentikan pemutaran audio secara otomatis.</string>
+    <string name="player_timer_btn_update">Perbarui Timer (%1$d Menit)</string>
+    <string name="player_timer_btn_start">Mulai Sleep Timer (%1$d Menit)</string>
+    <string name="player_timer_toast_set">Sleep Timer disetel: %1$s</string>
+    <string name="player_timer_toast_off">Sleep Timer dimatikan</string>
+    <string name="player_chapter_sheet_title">Daftar Bab &amp; Tracklist</string>
+    <string name="player_chapter_detected">%1$d Bab terdeteksi</string>
+    <string name="player_chapter_sync">Sinkronisasi bab audio</string>
+    <string name="player_chapter_resync_toast">Memindai &amp; menerjemahkan ulang bab…</string>
+    <string name="player_playlist_sheet_title">Daftar Putar Audio</string>
+    <string name="player_folder_all">Semua</string>
+    <string name="player_folder_main">Utama</string>
+    <string name="player_folder_new">+ Folder</string>
+    <string name="player_folder_create_title">Buat Folder Baru</string>
+    <string name="player_folder_create_desc">Masukkan nama folder untuk mengelompokkan koleksi audio:</string>
+    <string name="player_folder_create_hint">Contoh: Bangdream, Hololive, dll</string>
+    <string name="player_folder_move_title">Pindahkan Audio ke Folder</string>
+    <string name="player_folder_move_desc">Pilih folder tujuan untuk %1$s:</string>
+    <string name="player_dac_exclusive">Mode Eksklusif Bit-Perfect USB DAC</string>
+
+    <!-- Layar Pengaturan -->
+    <string name="settings_header_title">Pengaturan</string>
+    <string name="settings_cat_general">Umum</string>
+    <string name="settings_cat_download">Pengunduhan</string>
+    <string name="settings_cat_player">Pemutar Audio</string>
+    <string name="settings_cat_translation">Terjemahan ASMR</string>
+    <string name="settings_cat_about">Tentang Aplikasi</string>
+    <string name="settings_lang_title">Bahasa Tampilan UI</string>
+    <string name="settings_lang_desc">Pilih bahasa antarmuka aplikasi</string>
+    <string name="settings_lang_system">Ikuti Bahasa Sistem (Otomatis)</string>
+    <string name="settings_lang_en">English</string>
+    <string name="settings_lang_in">Bahasa Indonesia</string>
+    <string name="settings_lang_ja">日本語</string>
+    <string name="settings_lang_zh">简体中文</string>
+    <string name="settings_theme_title">Tema &amp; Warna</string>
+    <string name="settings_theme_desc">Pilihan palet warna dan mode gelap</string>
+    <string name="settings_download_dir_title">Folder Penyimpanan Unduhan</string>
+    <string name="settings_threads_title">Jalur Unduh Paralel</string>
+    <string name="settings_threads_desc">Saat ini: %1$d koneksi paralel</string>
+    <string name="settings_cue_sheet_title">Ekspor Berkas CUE Sheet</string>
+    <string name="settings_cue_sheet_desc">Buat berkas .cue pendamping untuk pemutar eksternal</string>
+    <string name="settings_target_lang_title">Bahasa Target Terjemahan</string>
+    <string name="settings_target_lang_desc">Bahasa hasil terjemahan judul &amp; bab</string>
+    <string name="settings_auto_translate_title">Terjemahan Otomatis</string>
+    <string name="settings_auto_translate_desc">Terjemahkan metadata otomatis saat dibuka</string>
+    <string name="settings_clear_trans_cache_title">Hapus Cache Terjemahan</string>
+    <string name="settings_clear_trans_cache_desc">Hapus cache SQLite lokal untuk memuat ulang</string>
+    <string name="settings_clear_trans_cache_toast">Cache terjemahan berhasil dibersihkan.</string>
+    <string name="settings_dac_title">Mode Eksklusif Bit-Perfect USB DAC</string>
+    <string name="settings_dac_desc">Kendalikan hardware USB DAC untuk audio murni</string>
+    <string name="settings_audio_focus_title">Fokus Audio Eksklusif</string>
+    <string name="settings_audio_focus_desc">Abaikan gangguan suara dari aplikasi lain</string>
+    <string name="settings_pause_unplug_title">Jeda Saat Headphone Dicabut</string>
+    <string name="settings_pause_unplug_desc">Otomatis jeda ketika earphone/DAC terlepas</string>
+    <string name="settings_keep_screen_title">Layar Tetap Menyala</string>
+    <string name="settings_keep_screen_desc">Cegah layar mati saat pemutar audio aktif</string>
+    <string name="settings_auto_resume_title">Putar Otomatis Terakhir</string>
+    <string name="settings_auto_resume_desc">Lanjutkan trek dan durasi terakhir saat aplikasi dibuka</string>
+    <string name="settings_default_speed_title">Kecepatan Putar Default</string>
+    <string name="settings_default_speed_desc">Saat ini: %1$.2fx</string>
+    <string name="settings_changelog_title">Catatan Rilis (Changelog)</string>
+    <string name="settings_disclaimer_title">Pernyataan Penyangkalan</string>
+    <string name="settings_app_version">Versi %1$s</string>
+</resources>

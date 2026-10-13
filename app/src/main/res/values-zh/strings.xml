@@ -1,0 +1,149 @@
+<resources>
+    <string name="app_name">JapaneseASMR</string>
+
+    <!-- 导航标签 -->
+    <string name="tab_player">播放器</string>
+    <string name="tab_queue">下载</string>
+    <string name="tab_history">媒体库</string>
+    <string name="tab_settings">设置</string>
+
+    <!-- 通用操作 -->
+    <string name="action_close">关闭</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_confirm">确定</string>
+    <string name="action_save">保存</string>
+    <string name="action_delete">删除</string>
+    <string name="action_create">创建</string>
+    <string name="action_refresh">刷新</string>
+
+    <!-- 下载队列界面 -->
+    <string name="queue_header_title">JapaneseASMR Downloader</string>
+    <string name="queue_items_count">队列中 %1$d 项</string>
+    <string name="queue_ready_to_download">准备下载</string>
+    <string name="queue_hide_console">隐藏日志控制台</string>
+    <string name="queue_show_console">显示日志控制台</string>
+    <string name="queue_input_hint">输入 RJ 号（如: RJ123456）或链接</string>
+    <string name="queue_btn_download">下载</string>
+    <string name="queue_btn_clear_all">全部清空</string>
+    <string name="queue_btn_pause_all">全部暂停</string>
+    <string name="queue_btn_resume_all">全部继续</string>
+    <string name="queue_empty_title">下载队列为空</string>
+    <string name="queue_empty_desc">在上方粘贴链接或输入 RJ 号以开始下载。</string>
+    <string name="queue_status_downloading">正在下载</string>
+    <string name="queue_status_paused">已暂停</string>
+    <string name="queue_status_completed">已完成</string>
+    <string name="queue_status_error">失败</string>
+    <string name="queue_stat_speed">速度</string>
+    <string name="queue_stat_eta">剩余时间</string>
+    <string name="queue_stat_threads">线程</string>
+    <string name="queue_console_title">实时控制台</string>
+    <string name="queue_console_auto_scroll">自动滚动</string>
+    <string name="queue_console_clear">清空日志</string>
+
+    <!-- 媒体库与历史界面 -->
+    <string name="history_header_title">媒体库与历史</string>
+    <string name="history_menu_options">历史选项</string>
+    <string name="history_menu_clean_missing">清理失效文件</string>
+    <string name="history_menu_clear_all">清空所有历史</string>
+    <string name="history_toast_missing_cleaned">已从历史中清理失效文件记录。</string>
+    <string name="history_toast_all_cleared">已清空所有历史记录。</string>
+    <string name="history_search_hint">搜索作品、声优或社团…</string>
+    <string name="history_sort_date_desc">时间 (最新 ↓)</string>
+    <string name="history_sort_date_asc">时间 (最早 ↑)</string>
+    <string name="history_sort_title_asc">标题 (升序 ↑)</string>
+    <string name="history_sort_title_desc">标题 (降序 ↓)</string>
+    <string name="history_empty_title">暂无下载历史</string>
+    <string name="history_empty_desc">下载完成的作品将整齐显示在此处。</string>
+    <string name="history_search_empty_title">未找到相关结果</string>
+    <string name="history_search_empty_desc">请尝试使用其他搜索关键词。</string>
+    <string name="history_item_tracks_count">%1$d 个音频</string>
+    <string name="history_action_play">播放</string>
+    <string name="history_action_delete_file">删除文件</string>
+    <string name="history_dialog_delete_title">删除作品文件？</string>
+    <string name="history_dialog_delete_msg">确定要从存储中永久删除此音频文件吗？</string>
+
+    <!-- 播放器界面与组件 -->
+    <string name="player_audio_player">音频播放器</string>
+    <string name="player_no_track">未选择音频</string>
+    <string name="player_cv_label">CV: %1$s</string>
+    <string name="player_circle_label">社团: %1$s</string>
+    <string name="player_action_play">播放</string>
+    <string name="player_action_pause">暂停</string>
+    <string name="player_action_next">下一曲</string>
+    <string name="player_action_prev">上一曲</string>
+    <string name="player_action_replay10">后退 10 秒</string>
+    <string name="player_action_forward10">前进 10 秒</string>
+    <string name="player_action_shuffle">随机播放</string>
+    <string name="player_action_repeat">循环播放</string>
+    <string name="player_action_playlist">播放列表</string>
+    <string name="player_action_chapters">章节列表</string>
+    <string name="player_action_translate">翻译标题与章节</string>
+    <string name="player_speed_dialog_title">播放速度</string>
+    <string name="player_speed_normal">1.0x 正常</string>
+    <string name="player_timer_dialog_title">睡眠定时器</string>
+    <string name="player_timer_turn_off">关闭</string>
+    <string name="player_timer_active_desc">定时器生效中: 剩余 %1$02d:%2$02d 后自动暂停。</string>
+    <string name="player_timer_inactive_desc">选择睡眠时长以自动停止音频播放。</string>
+    <string name="player_timer_btn_update">更新定时器 (%1$d 分钟)</string>
+    <string name="player_timer_btn_start">开启睡眠定时器 (%1$d 分钟)</string>
+    <string name="player_timer_toast_set">已设置睡眠定时器: %1$s</string>
+    <string name="player_timer_toast_off">睡眠定时器已关闭</string>
+    <string name="player_chapter_sheet_title">章节与曲目列表</string>
+    <string name="player_chapter_detected">检测到 %1$d 个章节</string>
+    <string name="player_chapter_sync">同步音频章节</string>
+    <string name="player_chapter_resync_toast">正在重新扫描并翻译章节…</string>
+    <string name="player_playlist_sheet_title">音频播放列表</string>
+    <string name="player_folder_all">全部</string>
+    <string name="player_folder_main">主目录</string>
+    <string name="player_folder_new">+ 新建文件夹</string>
+    <string name="player_folder_create_title">新建文件夹</string>
+    <string name="player_folder_create_desc">输入文件夹名称以归类音频作品:</string>
+    <string name="player_folder_create_hint">例如: 收藏、ASMR 等</string>
+    <string name="player_folder_move_title">移动音频至文件夹</string>
+    <string name="player_folder_move_desc">选择 %1$s 的目标文件夹:</string>
+    <string name="player_dac_exclusive">USB DAC 独占模式</string>
+
+    <!-- 设置界面 -->
+    <string name="settings_header_title">设置</string>
+    <string name="settings_cat_general">通用</string>
+    <string name="settings_cat_download">下载设置</string>
+    <string name="settings_cat_player">播放器设置</string>
+    <string name="settings_cat_translation">ASMR 翻译</string>
+    <string name="settings_cat_about">关于与应用</string>
+    <string name="settings_lang_title">应用界面语言</string>
+    <string name="settings_lang_desc">选择应用程序界面显示语言</string>
+    <string name="settings_lang_system">跟随系统 (自动)</string>
+    <string name="settings_lang_en">English</string>
+    <string name="settings_lang_in">Bahasa Indonesia</string>
+    <string name="settings_lang_ja">日本語</string>
+    <string name="settings_lang_zh">简体中文</string>
+    <string name="settings_theme_title">主题与色彩</string>
+    <string name="settings_theme_desc">色彩搭配与深色模式</string>
+    <string name="settings_download_dir_title">下载保存目录</string>
+    <string name="settings_threads_title">并行下载连接数</string>
+    <string name="settings_threads_desc">当前: %1$d 个并行线程</string>
+    <string name="settings_cue_sheet_title">导出 CUE 伴生文件</string>
+    <string name="settings_cue_sheet_desc">为外部播放器生成同名 .cue 章节文件</string>
+    <string name="settings_target_lang_title">翻译目标语言</string>
+    <string name="settings_target_lang_desc">作品标题与章节的目标翻译语言</string>
+    <string name="settings_auto_translate_title">自动翻译</string>
+    <string name="settings_auto_translate_desc">加载时自动翻译作品元数据</string>
+    <string name="settings_clear_trans_cache_title">清空翻译缓存</string>
+    <string name="settings_clear_trans_cache_desc">删除已缓存的本地 SQLite 翻译数据</string>
+    <string name="settings_clear_trans_cache_toast">翻译缓存已清空。</string>
+    <string name="settings_dac_title">USB DAC 独占模式</string>
+    <string name="settings_dac_desc">独占接管 USB DAC 设备以输出纯净音质</string>
+    <string name="settings_audio_focus_title">独占音频焦点</string>
+    <string name="settings_audio_focus_desc">忽略其他应用程序的音频打断</string>
+    <string name="settings_pause_unplug_title">拔出耳机时暂停</string>
+    <string name="settings_pause_unplug_desc">耳机或解码器断开连接时自动暂停</string>
+    <string name="settings_keep_screen_title">保持屏幕常亮</string>
+    <string name="settings_keep_screen_desc">播放时防止屏幕休眠</string>
+    <string name="settings_auto_resume_title">自动恢复上次播放</string>
+    <string name="settings_auto_resume_desc">打开应用时恢复最后的曲目与播放进度</string>
+    <string name="settings_default_speed_title">默认播放速度</string>
+    <string name="settings_default_speed_desc">当前: %1$.2fx</string>
+    <string name="settings_changelog_title">更新日志 (Changelog)</string>
+    <string name="settings_disclaimer_title">免责声明</string>
+    <string name="settings_app_version">版本 %1$s</string>
+</resources>

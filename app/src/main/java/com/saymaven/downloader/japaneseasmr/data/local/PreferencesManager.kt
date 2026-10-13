@@ -25,6 +25,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_USE_DETAILED_FILENAME = booleanPreferencesKey("use_detailed_filename")
         val KEY_SHOW_CONSOLE = booleanPreferencesKey("show_console")
         val KEY_CREATE_CUE_SHEET = booleanPreferencesKey("create_cue_sheet")
+        val KEY_APP_LANGUAGE = stringPreferencesKey("app_ui_language")
         val KEY_TRANSLATION_LANGUAGE = stringPreferencesKey("translation_language")
         val KEY_IS_TRANSLATION_ACTIVE = booleanPreferencesKey("is_translation_active")
         val KEY_TRANSLATION_ENGINE_VERSION = intPreferencesKey("translation_engine_version")
@@ -64,6 +65,21 @@ class PreferencesManager(private val context: Context) {
             return try { ColorPalette.valueOf(str) } catch (e: Exception) { ColorPalette.DEFAULT }
         }
         return ColorPalette.DEFAULT
+    }
+
+    fun getInitialAppLanguage(): String {
+        return fastSp.getString("cached_app_language", "system") ?: "system"
+    }
+
+    val appLanguageFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[KEY_APP_LANGUAGE] ?: "system"
+    }
+
+    suspend fun setAppLanguage(lang: String) {
+        fastSp.edit().putString("cached_app_language", lang).apply()
+        context.dataStore.edit { preferences ->
+            preferences[KEY_APP_LANGUAGE] = lang
+        }
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->

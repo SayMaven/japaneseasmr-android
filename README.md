@@ -9,7 +9,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.3.0-blue?style=for-the-badge" alt="Version v1.3.0" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.3.1-blue?style=for-the-badge" alt="Version v1.3.1" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 License" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Language-Kotlin-7c3aed?style=for-the-badge" alt="Language" />
@@ -17,7 +17,7 @@
   </p>
 
   <p>
-    <a href="#whats-new-in-v130">What's New</a> •
+    <a href="#whats-new-in-v131">What's New</a> •
     <a href="#features">Features</a> •
     <a href="#screenshots">Screenshots</a> •
     <a href="#download">Download</a> •
@@ -32,6 +32,15 @@
 ## Overview
 
 JapaneseASMR Downloader is a full-featured, open-source Android application engineered specifically for downloading, archiving, and listening to Japanese ASMR voice dramas (RJ Works). Built from the ground up with Jetpack Compose, Kotlin Coroutines, Room Database, and AndroidX Media3 (ExoPlayer), the app delivers desktop-grade streaming performance, zero-OOM memory safety, and seamless background audio playback on mobile devices.
+
+---
+
+## What's New in v1.3.1
+
+* **Comprehensive Multi-Language UI (UI Localization)**: Complete native localization for 4 languages: **English (`en`)**, **Bahasa Indonesia (`in`)**, **日本語 / Japanese (`ja`)**, and **简体中文 / Simplified Chinese (`zh`)**.
+* **Automatic Device Language Detection**: Automatically adapts the UI to the user's system language out-of-the-box using standard Android resource qualifiers with zero configuration.
+* **In-App Manual Language Selector**: Dedicated language picker in Settings allowing users to customize app language independently from system settings.
+* **Android 13+ Per-App Language Preferences**: Integrated `locales_config.xml` declaring supported app languages for Android 13+ system language selector.
 
 ---
 
@@ -186,7 +195,7 @@ cd japaneseasmr-android
 
 The compiled APK will be located at:
 ```
-app/build/outputs/apk/debug/JapaneseASMR-v1.3.0-debug.apk
+app/build/outputs/apk/debug/JapaneseASMR-v1.3.1-debug.apk
 ```
 
 ---

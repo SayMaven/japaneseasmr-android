@@ -38,6 +38,9 @@ import com.saymaven.downloader.japaneseasmr.ui.screens.queue.QueueScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.queue.QueueViewModel
 import com.saymaven.downloader.japaneseasmr.ui.screens.settings.SettingsScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.settings.SettingsViewModel
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import com.saymaven.downloader.japaneseasmr.util.LocaleHelper
 import com.saymaven.downloader.japaneseasmr.ui.theme.JapaneseASMRTheme
 
 class MainActivity : ComponentActivity() {
@@ -67,27 +70,40 @@ class MainActivity : ComponentActivity() {
             val themeMode by settingsViewModel.themeMode.collectAsState()
             val dynamicColor by settingsViewModel.dynamicColor.collectAsState()
             val colorPalette by settingsViewModel.colorPalette.collectAsState()
+            val appLanguage by settingsViewModel.appLanguage.collectAsState()
 
-            var currentTab by remember {
-                val initial = if (isColdLaunch) {
-                    isColdLaunch = false
-                    activeTab = NavTab.HOME
-                    NavTab.HOME
-                } else {
-                    activeTab
-                }
-                mutableStateOf(initial)
+            val baseContext = LocalContext.current
+            val localizedConfig = remember(appLanguage) {
+                LocaleHelper.getLocalizedConfiguration(baseContext, appLanguage)
+            }
+            val localizedContext = remember(appLanguage) {
+                LocaleHelper.applyLocale(baseContext, appLanguage)
             }
 
-            LaunchedEffect(currentTab) {
-                activeTab = currentTab
-            }
-
-            JapaneseASMRTheme(
-                themeMode = themeMode,
-                dynamicColor = dynamicColor,
-                colorPalette = colorPalette
+            CompositionLocalProvider(
+                LocalConfiguration provides localizedConfig,
+                LocalContext provides localizedContext
             ) {
+                var currentTab by remember {
+                    val initial = if (isColdLaunch) {
+                        isColdLaunch = false
+                        activeTab = NavTab.HOME
+                        NavTab.HOME
+                    } else {
+                        activeTab
+                    }
+                    mutableStateOf(initial)
+                }
+
+                LaunchedEffect(currentTab) {
+                    activeTab = currentTab
+                }
+
+                JapaneseASMRTheme(
+                    themeMode = themeMode,
+                    dynamicColor = dynamicColor,
+                    colorPalette = colorPalette
+                ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     Scaffold(
                         bottomBar = {
@@ -212,6 +228,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
