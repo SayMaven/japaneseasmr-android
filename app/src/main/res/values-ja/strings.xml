@@ -36,7 +36,7 @@
     <string name="queue_stat_speed">速度</string>
     <string name="queue_stat_eta">残り時間</string>
     <string name="queue_stat_threads">スレッド</string>
-    <string name="queue_console_title">ライブコンソール</string>
+    <string name="queue_console_title">リアルタイムダウンロードログ</string>
     <string name="queue_console_auto_scroll">自動スクロール</string>
     <string name="queue_console_clear">ログ消去</string>
 
@@ -239,4 +239,42 @@
     <string name="settings_guide_step4_desc">再生画面で月のアイコンをタップしてタイマーを設定します。一時停止中はカウントダウンも自動で一時停止します。</string>
     <string name="settings_guide_step5_title">5. オーディオ設定と USB DAC:</string>
     <string name="settings_guide_step5_desc">設定タブでマルチスレッドダウンロード、デフォルト再生速度、保存先フォルダ、ビットパーフェクト排他 USB DAC モードを設定できます。</string>
+
+    <string name="queue_header_count_format">ダウンロードキュー (%1$d)</string>
+    <string name="queue_console_toggle">ログの切り替え</string>
+    <string name="queue_console_empty">現在実行中のダウンロードはありません。\n上の入力欄にRJコードを入力し、「ダウンロード」または「+ キュー」をタップしてください。</string>
+    <string name="history_header_title_format">ライブラリ履歴 (%1$d)</string>
+    <string name="settings_threads_opt_4">4スレッド (データ節約)</string>
+    <string name="settings_threads_opt_8">8スレッド (標準)</string>
+    <string name="settings_threads_opt_16">16スレッド (推奨)</string>
+    <string name="settings_threads_opt_24">24スレッド (高速)</string>
+    <string name="settings_threads_opt_32">32スレッド (最大)</string>
+    <string name="settings_changelog_v131_title">バージョン 1.3.1 (最新)</string>
+    <string name="settings_changelog_v131_item1">• UIの多言語対応: 日本語、英語、インドネシア語、簡体字中国語を完全サポート。</string>
+    <string name="settings_changelog_v131_item2">• システム言語自動検出: デバイスの設定に応じて表示言語を自動で切り替えます。</string>
+    <string name="settings_changelog_v131_item3">• 設定での言語手動切替: 端末のシステム言語を変更することなく、アプリ内で自由に言語を変更可能。</string>
+    <string name="settings_changelog_v131_item4">• Android 13+ アプリ別言語設定対応: OS標準のアプリ別言語設定に対応。</string>
+    <string name="settings_changelog_v130_title">バージョン 1.3.0</string>
+    <string name="settings_changelog_v130_item1">• DLsite ASMR スマート翻訳: 作品タイトルとチャプターリストのバイリンガル翻訳、ASMR専門辞書を内蔵。</string>
+    <string name="settings_changelog_v130_item2">• 伏字解除とテキスト正規化: 伏字記号 (○, ●, ×) を解除し、自然で正確な翻訳を実現。</string>
+    <string name="settings_changelog_v130_item3">• Smart Fast Remux Engine: トランスコードなしで複数オーディオを瞬時 (&lt; 1秒) に無劣化結合。</string>
+    <string name="settings_changelog_v130_item4">• 4層ハイブリッドチャプターエンジン &amp; CUEシート: 高精度なチャプターマーカー、.cue 自動書き出し、インタラクティブシート。</string>
+    <string name="settings_changelog_v130_item5">• ウルトラスムーズ 120 FPS スクロール: プレイリストや履歴の描画を最適化し、フレーム落ちを解消。</string>
+    <string name="settings_changelog_v130_item6">• ユニバーサルリンク &amp; マルチサイトリゾルバ: asmr.one、japaneseasmr.com、DLsite リンクおよび RJ プレフィックス自動付与に対応。</string>
+    <string name="settings_changelog_v130_item7">• メタデータ強化: DLsite および asmr.one から CV、サークル、ジャンル、高画質カバーを同期。</string>
+    <string name="settings_changelog_v121_title">バージョン 1.2.1</string>
+    <string name="settings_changelog_v121_item1">• ストレージ瞬時自動同期 (120 FPS): ラグのないバックグラウンドスキャン。</string>
+    <string name="settings_changelog_v121_item2">• 再帰的サブフォルダスキャン: サブディレクトリの自動検出。</string>
+    <string name="settings_changelog_v121_item3">• サブフォルダカテゴリ分類: フォルダ絞り込みと新規作成機能。</string>
+    <string name="settings_changelog_v121_item4">• フォルダ移動機能: サブフォルダ間で音声を即座に移動。</string>
+    <string name="settings_changelog_v120_title">バージョン 1.2.0</string>
+    <string name="settings_changelog_v120_item1">• スマートスリープタイマー: 再生停止時にカウントダウンも自動一時停止。</string>
+    <string name="settings_changelog_v120_item2">• キュー、ライブラリ、設定タブでのインタラクティブなフローティングミニプレーヤー。</string>
+    <string name="settings_changelog_v120_item3">• スライダーと 2x3 プリセット付きデフォルト再生速度ポップアップ。</string>
+    <string name="settings_changelog_v120_item4">• 超スリムなフローティングハードウェア音量 HUD。</string>
+
+    <string name="queue_status_pending">キュー待機中</string>
+    <string name="queue_status_fetching">作品情報を取得中…</string>
+    <string name="queue_status_processing">音声を結合しメタデータを埋め込み中…</string>
+    <string name="queue_status_cancelled">キャンセル済み</string>
 </resources>

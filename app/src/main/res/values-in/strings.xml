@@ -36,7 +36,7 @@
     <string name="queue_stat_speed">Kecepatan</string>
     <string name="queue_stat_eta">Sisa Waktu</string>
     <string name="queue_stat_threads">Jalur</string>
-    <string name="queue_console_title">Konsol Langsung</string>
+    <string name="queue_console_title">Live Log Proses Unduhan</string>
     <string name="queue_console_auto_scroll">Gulir otomatis</string>
     <string name="queue_console_clear">Bersihkan Log</string>
 
@@ -239,4 +239,42 @@
     <string name="settings_guide_step4_desc">Di layar pemutar (Home), tekan ikon bulan untuk menyetel timer. Hitung mundur akan otomatis dijeda saat audio dihentikan sementara.</string>
     <string name="settings_guide_step5_title">5. Pengaturan Audio &amp; USB DAC:</string>
     <string name="settings_guide_step5_desc">Gunakan tab Pengaturan untuk mengatur jalur unduhan (multithread), kecepatan putar default, folder penyimpanan, serta mode bit-perfect USB DAC eksklusif.</string>
+
+    <string name="queue_header_count_format">Antrean Unduhan (%1$d)</string>
+    <string name="queue_console_toggle">Buka/Tutup Log</string>
+    <string name="queue_console_empty">Belum ada proses unduhan berjalan.\nMasukkan kode RJ di atas lalu tekan \'Unduh\' atau \'+ Antrean\'.</string>
+    <string name="history_header_title_format">Riwayat Koleksi (%1$d)</string>
+    <string name="settings_threads_opt_4">4 Jalur (Hemat Kuota)</string>
+    <string name="settings_threads_opt_8">8 Jalur (Standar)</string>
+    <string name="settings_threads_opt_16">16 Jalur (Rekomendasi)</string>
+    <string name="settings_threads_opt_24">24 Jalur (Cepat)</string>
+    <string name="settings_threads_opt_32">32 Jalur (Maksimum)</string>
+    <string name="settings_changelog_v131_title">Versi 1.3.1 (Terbaru)</string>
+    <string name="settings_changelog_v131_item1">• Multi-Bahasa Antarmuka (UI Localization): Dukungan penuh bahasa Indonesia, English, 日本語 (Jepang), dan 简体中文 (Mandarin).</string>
+    <string name="settings_changelog_v131_item2">• Deteksi Bahasa Sistem Otomatis: Aplikasi menyesuaikan bahasa tampilan mengikuti pengaturan perangkat pengguna secara otomatis.</string>
+    <string name="settings_changelog_v131_item3">• Pemilih Bahasa Manual di Pengaturan: Pengguna dapat bebas memilih bahasa aplikasi tanpa mengubah bahasa sistem ponsel.</string>
+    <string name="settings_changelog_v131_item4">• Kompatibilitas Android 13+ Per-App Language: Mendukung konfigurasi bahasa per-aplikasi bawaan OS Android.</string>
+    <string name="settings_changelog_v130_title">Versi 1.3.0</string>
+    <string name="settings_changelog_v130_item1">• Penerjemah ASMR DLsite Cerdas: Terjemahan dwibahasa (Indonesia/Inggris) untuk judul karya &amp; daftar bab/tracklist dengan kamus istilah khusus ASMR DLsite.</string>
+    <string name="settings_changelog_v130_item2">• De-Sensor Fuseji &amp; Normalisasi Teks: Membuka sensor simbol (○, ●, ×) dan menormalkan teks judul agar hasil terjemahan akurat dan alami.</string>
+    <string name="settings_changelog_v130_item3">• Smart Fast Remux Engine: Penggabungan audio multi-segmen instan (&lt; 1 detik) tanpa transcoding demi menjaga kualitas suara 100% loss-free.</string>
+    <string name="settings_changelog_v130_item4">• 4-Tier Hybrid Chapter Engine &amp; CUE Sheet: Penanda bab presisi tinggi, ekspor otomatis berkas .cue, dan lembar daftar bab interaktif (tap-to-seek).</string>
+    <string name="settings_changelog_v130_item5">• Ultra-Smooth 120 FPS Scrolling: Optimasi render daftar putar (playlist drawer) &amp; riwayat download untuk ratusan karya tanpa frame drop / patah-patah.</string>
+    <string name="settings_changelog_v130_item6">• Universal Link &amp; Multi-Site Resolver: Dukungan tautan asmr.one, japaneseasmr.com, DLsite, &amp; auto-prefix RJ.</string>
+    <string name="settings_changelog_v130_item7">• Enhanced Metadata Enrichment: Sinkronisasi CV, Circle, Genre, dan HD Cover dari DLsite &amp; asmr.one.</string>
+    <string name="settings_changelog_v121_title">Versi 1.2.1</string>
+    <string name="settings_changelog_v121_item1">• Auto-Sync Penyimpanan Instan (120 FPS): Pemindaian latar belakang bebas lag.</string>
+    <string name="settings_changelog_v121_item2">• Pemindaian Subfolder Rekursif: Deteksi otomatis subfolder penyimpanan.</string>
+    <string name="settings_changelog_v121_item3">• Kategori Subfolder Koleksi: Filter folder otomatis &amp; tombol buat folder baru.</string>
+    <string name="settings_changelog_v121_item4">• Fitur Pindah Folder: Pindahkan berkas antar subfolder secara instan.</string>
+    <string name="settings_changelog_v120_title">Versi 1.2.0</string>
+    <string name="settings_changelog_v120_item1">• Smart Sleep Timer: Countdown otomatis jeda saat audio di-pause.</string>
+    <string name="settings_changelog_v120_item2">• Floating Mini Player interaktif di tab Unduhan, Riwayat, &amp; Pengaturan.</string>
+    <string name="settings_changelog_v120_item3">• Pop-Up Kecepatan Putar Default baru dengan slider mulus &amp; preset 2x3.</string>
+    <string name="settings_changelog_v120_item4">• Floating Hardware Volume HUD ultra-ramping dan solid.</string>
+
+    <string name="queue_status_pending">Menunggu antrean</string>
+    <string name="queue_status_fetching">Mengambil metadata karya…</string>
+    <string name="queue_status_processing">Menggabungkan audio &amp; menyematkan metadata…</string>
+    <string name="queue_status_cancelled">Dibatalkan</string>
 </resources>

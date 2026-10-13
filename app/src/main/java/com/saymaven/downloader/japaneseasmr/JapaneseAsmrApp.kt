@@ -13,6 +13,8 @@ import okhttp3.OkHttpClient
 class JapaneseAsmrApp : Application(), ImageLoaderFactory {
 
     companion object {
+        lateinit var instance: JapaneseAsmrApp
+            private set
         const val CHANNEL_DOWNLOAD_ID = "japaneseasmr_download_channel"
         const val CHANNEL_DOWNLOAD_NAME = "JapaneseASMR Downloads"
         const val CHANNEL_PLAYBACK_ID = "japaneseasmr_playback_channel"
@@ -21,6 +23,7 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         createNotificationChannels()
         com.saymaven.downloader.japaneseasmr.service.TranslationService.init(this)
     }

@@ -70,7 +70,7 @@ class DownloadService : Service() {
             for (item in items) {
                 if (current.none { it.rjid == item.rjid }) {
                     current.add(item)
-                    log("[+] Ditambahkan ke antrean: ${item.rjid}")
+                    log(DownloadLogHelper.addedToQueue(item.rjid))
                 }
             }
             _queueState.value = current
@@ -85,14 +85,14 @@ class DownloadService : Service() {
                 current.clear()
             }
             _queueState.value = current
-            log("[i] Antrean unduhan dibersihkan.")
+            log(DownloadLogHelper.queueCleared())
         }
 
         fun removeItem(rjid: String) {
             val current = _queueState.value.toMutableList()
             current.removeAll { it.rjid.equals(rjid, ignoreCase = true) }
             _queueState.value = current
-            log("[-] Dihapus dari antrean: $rjid")
+            log(DownloadLogHelper.removedFromQueue(rjid))
         }
 
         fun startDownload(context: Context) {
@@ -164,7 +164,7 @@ class DownloadService : Service() {
 
         _isDownloading.value = true
         log("===================================================")
-        log("[i] Memulai proses pemrosesan antrean unduhan...")
+        log(DownloadLogHelper.startProcessing())
 
         val tempDir = File(cacheDir, "download_temp").apply { mkdirs() }
 
@@ -184,7 +184,7 @@ class DownloadService : Service() {
             }
             val currentNum = finishedCount + 1
 
-            log("[*] Memproses [$currentNum/$totalInQueue]: $itemRjid")
+            log(DownloadLogHelper.processingItem(currentNum, totalInQueue, itemRjid))
 
             // === 1. CEK FILE SUDAH ADA DI PENYIMPANAN (SKIP OTOMATIS) ===
             val existingFile = AudioStorageHelper.findExistingAudioFile(downloadDir, itemRjid)
@@ -192,8 +192,8 @@ class DownloadService : Service() {
                 val fileSizeStr = AudioDownloader.formatFileSize(existingFile.length())
                 val dateStr = AudioStorageHelper.formatDateForDisplay(existingFile.lastModified())
 
-                log("  [i] File audio [$itemRjid] sudah ada di penyimpanan (${existingFile.name}).")
-                log("  [i] Melewati proses unduhan...")
+                log(DownloadLogHelper.fileAlreadyExists(itemRjid, existingFile.name))
+                log(DownloadLogHelper.skippingDownload())
 
                 // Pastikan tersimpan di Room database
                 val existingHistory = historyDao.getHistoryById(itemRjid)
@@ -222,7 +222,7 @@ class DownloadService : Service() {
                 updateItem(itemRjid) {
                     it.copy(
                         status = DownloadStatus.COMPLETED,
-                        statusText = "Sudah ada di penyimpanan (Dilewati)",
+                        statusText = DownloadLogHelper.statusAlreadyExists(),
                         progress = 1f,
                         speed = "-",
                         eta = "-",
@@ -236,7 +236,7 @@ class DownloadService : Service() {
             updateItem(itemRjid) {
                 it.copy(
                     status = DownloadStatus.DOWNLOADING,
-                    statusText = "Mengambil metadata karya..."
+                    statusText = DownloadLogHelper.statusFetchingMetadata()
                 )
             }
 
@@ -244,11 +244,11 @@ class DownloadService : Service() {
             val meta = try {
                 DLsiteScraper.fetchMetadata(itemRjid)
             } catch (e: Exception) {
-                log("[!] Gagal mengambil metadata $itemRjid: ${e.message}")
+                log(DownloadLogHelper.metadataFetchFailed(itemRjid, e.message))
                 updateItem(itemRjid) {
                     it.copy(
                         status = DownloadStatus.FAILED,
-                        statusText = "Gagal mengambil metadata",
+                        statusText = DownloadLogHelper.statusFetchingFailed(),
                         error = e.message
                     )
                 }
@@ -256,7 +256,7 @@ class DownloadService : Service() {
             }
 
             val tracks = TrackDiscoveryService.discoverAllTracks(itemRjid, "auto")
-            log("  [i] Ditemukan ${tracks.size} track (${tracks.joinToString { it.name }})")
+            log(DownloadLogHelper.tracksFound(tracks.size, tracks.joinToString { it.name }))
 
             updateItem(itemRjid) {
                 it.copy(
@@ -271,7 +271,7 @@ class DownloadService : Service() {
             }
 
             // 3. Download Cover
-            log("  [1/3] Mengunduh cover image...")
+            log(DownloadLogHelper.downloadingCover())
             val coverFile = File(tempDir, "${itemRjid}_cover.jpg")
             AudioDownloader.downloadImage(meta.coverUrl, coverFile)
 
@@ -302,11 +302,11 @@ class DownloadService : Service() {
                 updateItem(itemRjid) {
                     it.copy(
                         status = DownloadStatus.DOWNLOADING,
-                        statusText = "Mengunduh ${track.name} [${tIdx + 1}/${tracks.size}]"
+                        statusText = DownloadLogHelper.statusDownloadingTrack(track.name, tIdx + 1, tracks.size)
                     )
                 }
 
-                log("  [2/3] Mengunduh ${track.name} [${tIdx + 1}/${tracks.size}]...")
+                log(DownloadLogHelper.downloadingTrackLog(track.name, tIdx + 1, tracks.size))
 
                 val success = AudioDownloader.downloadTrack(
                     url = track.url,
@@ -323,7 +323,7 @@ class DownloadService : Service() {
                                 eta = eta,
                                 downloadedSize = downStr,
                                 totalSize = totStr,
-                                statusText = "Mengunduh ${track.name} [${tIdx + 1}/${tracks.size}] (${(pct * 100).toInt()}%)"
+                                statusText = DownloadLogHelper.statusDownloadingTrack(track.name, tIdx + 1, tracks.size, (pct * 100).toInt())
                             )
                         }
                         val liveTotal = _queueState.value.size
@@ -342,7 +342,7 @@ class DownloadService : Service() {
                     downloadedTracks.add(trackFile)
                 } else {
                     isFailed = true
-                    log("  [!] Gagal mengunduh track ${track.name}")
+                    log(DownloadLogHelper.trackDownloadFailed(track.name))
                     break
                 }
             }
@@ -351,20 +351,20 @@ class DownloadService : Service() {
                 updateItem(itemRjid) {
                     it.copy(
                         status = DownloadStatus.FAILED,
-                        statusText = "Gagal mengunduh audio",
-                        error = "Gagal mengunduh track audio"
+                        statusText = DownloadLogHelper.statusDownloadFailed(),
+                        error = "Failed to download audio track"
                     )
                 }
-                log("[ERROR] Gagal memproses $itemRjid")
+                log(DownloadLogHelper.processFailed(itemRjid))
                 continue
             }
 
             // 5. Finalizing & Metadata Tagging
-            log("  [3/3] Menggabungkan audio, menyematkan metadata & cover art...")
+            log(DownloadLogHelper.mergingAndTaggingLog())
             updateItem(itemRjid) {
                 it.copy(
                     status = DownloadStatus.PROCESSING,
-                    statusText = "Menggabungkan audio & menyematkan metadata..."
+                    statusText = DownloadLogHelper.statusMerging()
                 )
             }
 
@@ -380,7 +380,7 @@ class DownloadService : Service() {
             if (downloadedTracks.size == 1) {
                 downloadedTracks[0].copyTo(preferredOutputFile, overwrite = true)
             } else {
-                log("  [+] Menggabungkan ${downloadedTracks.size} track audio (Fast Remux)...")
+                log(DownloadLogHelper.mergingTracksCount(downloadedTracks.size))
                 val allM4a = downloadedTracks.all { it.extension.equals("m4a", ignoreCase = true) }
                 if (allM4a) {
                     AudioMerger.mergeM4aFiles(downloadedTracks, preferredOutputFile) { log("    $it") }
@@ -413,7 +413,7 @@ class DownloadService : Service() {
             val actualIsM4a = finalAudioFile.extension.equals("m4a", ignoreCase = true)
             val shouldCreateCue = prefs.createCueSheetFlow.first()
             val chaptersJsonStr = if (generatedChapters.isNotEmpty()) {
-                log("  [i] Berhasil memetakan ${generatedChapters.size} bab cerita!")
+                log(DownloadLogHelper.chaptersMapped(generatedChapters.size))
                 if (!actualIsM4a && shouldCreateCue) {
                     ChapterDiscoveryService.writeCueSheet(
                         audioFile = finalAudioFile,
@@ -421,9 +421,9 @@ class DownloadService : Service() {
                         workTitle = meta.title,
                         performer = meta.cv
                     )
-                    log("  [+] Berkas CUE Sheet berhasil dibuat: ${finalAudioFile.nameWithoutExtension}.cue")
+                    log(DownloadLogHelper.cueSheetCreated(finalAudioFile.nameWithoutExtension))
                 } else {
-                    log("  [i] Penanda bab disematkan langsung ke database player (CUE Sheet dilewati)")
+                    log(DownloadLogHelper.cueSheetSkipped())
                 }
                 ChapterItem.toJsonArray(generatedChapters)
             } else null
@@ -447,7 +447,7 @@ class DownloadService : Service() {
             updateItem(itemRjid) {
                 it.copy(
                     status = DownloadStatus.COMPLETED,
-                    statusText = "Selesai diunduh",
+                    statusText = DownloadLogHelper.statusCompleted(),
                     progress = 1f,
                     speed = "-",
                     eta = "-",
@@ -455,14 +455,14 @@ class DownloadService : Service() {
                 )
             }
 
-            log("[SUCCESS] Selesai: ${finalAudioFile.absolutePath} ($fileSizeStr)")
+            log(DownloadLogHelper.itemSuccess(finalAudioFile.absolutePath, fileSizeStr))
 
             downloadedTracks.forEach { it.delete() }
             coverFile.delete()
         }
 
         log("===================================================")
-        log("[i] Semua antrean telah selesai diproses.")
+        log(DownloadLogHelper.allCompleted())
         _isDownloading.value = false
     }
 

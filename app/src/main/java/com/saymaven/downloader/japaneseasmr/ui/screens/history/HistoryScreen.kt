@@ -54,7 +54,7 @@ fun HistoryScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Riwayat Koleksi (${historyUiList.size})",
+                text = stringResource(R.string.history_header_title_format, historyUiList.size),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold

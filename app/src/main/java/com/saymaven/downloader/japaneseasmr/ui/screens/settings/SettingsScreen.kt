@@ -766,11 +766,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
     if (showThreadDialog) {
         val options = listOf(
-            4 to "4 Jalur (Hemat Kuota)",
-            8 to "8 Jalur (Standar)",
-            16 to "16 Jalur (Rekomendasi)",
-            24 to "24 Jalur (Cepat)",
-            32 to "32 Jalur (Maksimum)"
+            4 to stringResource(R.string.settings_threads_opt_4),
+            8 to stringResource(R.string.settings_threads_opt_8),
+            16 to stringResource(R.string.settings_threads_opt_16),
+            24 to stringResource(R.string.settings_threads_opt_24),
+            32 to stringResource(R.string.settings_threads_opt_32)
         )
         AlertDialog(
             onDismissRequest = { showThreadDialog = false },
@@ -866,38 +866,32 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text(stringResource(R.string.settings_changelog_title)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text("Versi 1.3.1 (Terbaru)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("• Multi-Bahasa Antarmuka (UI Localization): Dukungan penuh bahasa Indonesia, English, 日本語 (Jepang), dan 简体中文 (Mandarin).", style = MaterialTheme.typography.bodySmall)
-                    Text("• Deteksi Bahasa Sistem Otomatis: Aplikasi menyesuaikan bahasa tampilan mengikuti pengaturan perangkat pengguna secara otomatis.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Pemilih Bahasa Manual di Pengaturan: Pengguna dapat bebas memilih bahasa aplikasi tanpa mengubah bahasa sistem ponsel.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Kompatibilitas Android 13+ Per-App Language: Mendukung konfigurasi bahasa per-aplikasi bawaan OS Android.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v131_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_changelog_v131_item1), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v131_item2), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v131_item3), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v131_item4), style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Versi 1.3.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("• Penerjemah ASMR DLsite Cerdas: Terjemahan dwibahasa (Indonesia/Inggris) untuk judul karya & daftar bab/tracklist dengan kamus istilah khusus ASMR DLsite.", style = MaterialTheme.typography.bodySmall)
-                    Text("• De-Sensor Fuseji & Normalisasi Teks: Membuka sensor simbol (○, ●, ×) dan menormalkan teks judul agar hasil terjemahan akurat dan alami.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Smart Fast Remux Engine: Penggabungan audio multi-segmen instan (< 1 detik) tanpa transcoding demi menjaga kualitas suara 100% loss-free.", style = MaterialTheme.typography.bodySmall)
-                    Text("• 4-Tier Hybrid Chapter Engine & CUE Sheet: Penanda bab presisi tinggi, ekspor otomatis berkas .cue, dan lembar daftar bab interaktif (tap-to-seek).", style = MaterialTheme.typography.bodySmall)
-                    Text("• Ultra-Smooth 120 FPS Scrolling: Optimasi render daftar putar (playlist drawer) & riwayat download untuk ratusan karya tanpa frame drop / patah-patah.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Universal Link & Multi-Site Resolver: Dukungan tautan asmr.one, japaneseasmr.com, DLsite, & auto-prefix RJ.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Pembersihan Redundansi & Efisiensi: Optimasi kompilasi regex statis, penghapusan kode redundan, dan O(1) in-memory cache untuk cover & verifikasi berkas.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Enhanced Metadata Enrichment: Sinkronisasi CV, Circle, Genre, dan HD Cover dari DLsite & asmr.one.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v130_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_changelog_v130_item1), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v130_item2), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v130_item3), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v130_item4), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v130_item5), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v130_item6), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v130_item7), style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Versi 1.2.1", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("• Auto-Sync Penyimpanan Instan (120 FPS): Pemindaian latar belakang bebas lag.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Pemindaian Subfolder Rekursif: Deteksi otomatis subfolder penyimpanan.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Auto-Fetch Metadata & Cover: Otomatis melengkapi info karya & cover offline.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Kategori Subfolder Koleksi: Filter folder otomatis & tombol buat folder baru.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Fitur Pindah Folder: Pindahkan berkas antar subfolder secara instan.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Perbaikan Scroll Playlist: Pencegahan penutupan tidak sengaja saat scroll cepat.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v121_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_changelog_v121_item1), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v121_item2), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v121_item3), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v121_item4), style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Versi 1.2.0", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("• Smart Sleep Timer: Countdown otomatis jeda saat audio di-pause.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Floating Mini Player interaktif di tab Unduhan, Riwayat, & Pengaturan.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Pop-Up Kecepatan Putar Default baru dengan slider mulus & preset 2x3.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Optimasi performa scroll Riwayat hingga 120 FPS tanpa frame drop.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Buka daftar putar (playlist) instan 0ms tanpa delay pemindaian.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Floating Hardware Volume HUD ultra-ramping dan solid.", style = MaterialTheme.typography.bodySmall)
-                    Text("• Retensi tab stabil saat aplikasi diminimize & cold start selalu di Home.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v120_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_changelog_v120_item1), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v120_item2), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v120_item3), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v120_item4), style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {

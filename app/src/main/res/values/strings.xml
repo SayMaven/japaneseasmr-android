@@ -36,7 +36,7 @@
     <string name="queue_stat_speed">Speed</string>
     <string name="queue_stat_eta">Remaining</string>
     <string name="queue_stat_threads">Threads</string>
-    <string name="queue_console_title">Live Console</string>
+    <string name="queue_console_title">Live Download Process Log</string>
     <string name="queue_console_auto_scroll">Auto-scroll</string>
     <string name="queue_console_clear">Clear Log</string>
 
@@ -239,4 +239,42 @@
     <string name="settings_guide_step4_desc">On the player screen, tap the moon icon to set a timer. The countdown automatically pauses when audio playback is paused.</string>
     <string name="settings_guide_step5_title">5. Audio Settings &amp; USB DAC:</string>
     <string name="settings_guide_step5_desc">Use the Settings tab to configure multithreaded download connections, default playback speed, storage directory, and bit-perfect exclusive USB DAC mode.</string>
+
+    <string name="queue_header_count_format">Download Queue (%1$d)</string>
+    <string name="queue_console_toggle">Toggle Log</string>
+    <string name="queue_console_empty">No download process currently running.\nEnter an RJ code above then tap \'Download\' or \'+ Queue\'.</string>
+    <string name="history_header_title_format">Collection History (%1$d)</string>
+    <string name="settings_threads_opt_4">4 Threads (Data Saver)</string>
+    <string name="settings_threads_opt_8">8 Threads (Standard)</string>
+    <string name="settings_threads_opt_16">16 Threads (Recommended)</string>
+    <string name="settings_threads_opt_24">24 Threads (Fast)</string>
+    <string name="settings_threads_opt_32">32 Threads (Maximum)</string>
+    <string name="settings_changelog_v131_title">Version 1.3.1 (Latest)</string>
+    <string name="settings_changelog_v131_item1">• Full UI Localization: Complete support for English, Indonesian, Japanese (日本語), and Simplified Chinese (简体中文).</string>
+    <string name="settings_changelog_v131_item2">• Automatic System Language Detection: App automatically matches your device\'s default locale.</string>
+    <string name="settings_changelog_v131_item3">• In-App Language Selector: Switch language anytime in Settings without changing phone system language.</string>
+    <string name="settings_changelog_v131_item4">• Android 13+ Per-App Language Support: Integrated with native Android per-app language preferences.</string>
+    <string name="settings_changelog_v130_title">Version 1.3.0</string>
+    <string name="settings_changelog_v130_item1">• Smart DLsite ASMR Translator: Bilingual title and chapter translation with custom DLsite vocabulary dictionary.</string>
+    <string name="settings_changelog_v130_item2">• Fuseji Mask Unmasking &amp; Normalization: Restores masked characters (○, ●, ×) for clean and natural translations.</string>
+    <string name="settings_changelog_v130_item3">• Smart Fast Remux Engine: Instant audio merging (&lt; 1s) without transcoding, maintaining 100% loss-free quality.</string>
+    <string name="settings_changelog_v130_item4">• 4-Tier Hybrid Chapter Engine &amp; CUE Sheet: High-precision chapter markers, auto .cue export, and interactive chapter sheet.</string>
+    <string name="settings_changelog_v130_item5">• Ultra-Smooth 120 FPS Scrolling: Optimized playlist drawer and download history rendering with zero frame drops.</string>
+    <string name="settings_changelog_v130_item6">• Universal Link &amp; Multi-Site Resolver: Supports asmr.one, japaneseasmr.com, DLsite links, and RJ auto-prefix.</string>
+    <string name="settings_changelog_v130_item7">• Enhanced Metadata Enrichment: Syncs CV, Circle, Genre, and HD Cover from DLsite &amp; asmr.one.</string>
+    <string name="settings_changelog_v121_title">Version 1.2.1</string>
+    <string name="settings_changelog_v121_item1">• Instant Storage Auto-Sync (120 FPS): Lag-free background scanning.</string>
+    <string name="settings_changelog_v121_item2">• Recursive Subfolder Scanning: Automatic detection of storage subdirectories.</string>
+    <string name="settings_changelog_v121_item3">• Collection Subfolder Categories: Automatic folder filters and create folder action.</string>
+    <string name="settings_changelog_v121_item4">• Move to Folder Feature: Transfer audio between subfolders instantly.</string>
+    <string name="settings_changelog_v120_title">Version 1.2.0</string>
+    <string name="settings_changelog_v120_item1">• Smart Sleep Timer: Countdown auto-pauses when playback is paused.</string>
+    <string name="settings_changelog_v120_item2">• Interactive Floating Mini Player across Queue, Library, and Settings tabs.</string>
+    <string name="settings_changelog_v120_item3">• New Default Playback Speed Dialog with smooth slider &amp; 2x3 presets.</string>
+    <string name="settings_changelog_v120_item4">• Floating Hardware Volume HUD: Ultra-slim and solid.</string>
+
+    <string name="queue_status_pending">Waiting in queue</string>
+    <string name="queue_status_fetching">Fetching work metadata…</string>
+    <string name="queue_status_processing">Merging audio &amp; embedding metadata…</string>
+    <string name="queue_status_cancelled">Cancelled</string>
 </resources>

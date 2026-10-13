@@ -742,10 +742,15 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 ) {
                     items(availableFolders) { folder ->
                         val isSelected = (folder == selectedFolder)
+                        val folderDisplayName = when (folder) {
+                            "Semua" -> stringResource(R.string.player_folder_all)
+                            "Utama" -> stringResource(R.string.player_folder_main)
+                            else -> folder
+                        }
                         FilterChip(
                             selected = isSelected,
                             onClick = { viewModel.selectFolder(folder) },
-                            label = { Text(folder, style = MaterialTheme.typography.labelMedium) },
+                            label = { Text(folderDisplayName, style = MaterialTheme.typography.labelMedium) },
                             leadingIcon = if (isSelected) {
                                 { Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp)) }
                             } else {
@@ -778,7 +783,8 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             text = if (selectedFolder == "Semua" || selectedFolder == stringResource(R.string.player_folder_all)) {
                                 stringResource(R.string.player_folder_all_empty)
                             } else {
-                                stringResource(R.string.player_folder_empty_format, selectedFolder)
+                                val folderDisplay = if (selectedFolder == "Utama") stringResource(R.string.player_folder_main) else selectedFolder
+                                stringResource(R.string.player_folder_empty_format, folderDisplay)
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -942,7 +948,8 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             ) {
                                 Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text(folder, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                val targetFolderName = if (folder == "Utama") stringResource(R.string.player_folder_main) else folder
+                                Text(targetFolderName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }

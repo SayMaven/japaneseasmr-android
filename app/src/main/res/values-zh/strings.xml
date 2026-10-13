@@ -36,7 +36,7 @@
     <string name="queue_stat_speed">速度</string>
     <string name="queue_stat_eta">剩余时间</string>
     <string name="queue_stat_threads">线程</string>
-    <string name="queue_console_title">实时控制台</string>
+    <string name="queue_console_title">实时下载日志</string>
     <string name="queue_console_auto_scroll">自动滚动</string>
     <string name="queue_console_clear">清空日志</string>
 
@@ -239,4 +239,42 @@
     <string name="settings_guide_step4_desc">在播放器页面点击月亮图标设置定时器。音频暂停时，倒计时将自动暂停。</string>
     <string name="settings_guide_step5_title">5. 音频与 USB DAC 设置:</string>
     <string name="settings_guide_step5_desc">使用设置页面调整多线程下载并发数、默认播放速度、存储目录以及 Bit-Perfect 独占 USB DAC 模式。</string>
+
+    <string name="queue_header_count_format">下载队列 (%1$d)</string>
+    <string name="queue_console_toggle">切换日志</string>
+    <string name="queue_console_empty">当前没有正在运行的下载进程。\n请在上方输入 RJ 代码，然后点击“下载”或“+ 队列”。</string>
+    <string name="history_header_title_format">收藏历史 (%1$d)</string>
+    <string name="settings_threads_opt_4">4 线程 (省流模式)</string>
+    <string name="settings_threads_opt_8">8 线程 (标准)</string>
+    <string name="settings_threads_opt_16">16 线程 (推荐)</string>
+    <string name="settings_threads_opt_24">24 线程 (快速)</string>
+    <string name="settings_threads_opt_32">32 线程 (极致)</string>
+    <string name="settings_changelog_v131_title">版本 1.3.1 (最新)</string>
+    <string name="settings_changelog_v131_item1">• 全界面多语言支持: 完整支持简体中文、英语、印尼语以及日语 (日本語)。</string>
+    <string name="settings_changelog_v131_item2">• 自动系统语言检测: 应用界面会根据设备系统语言设置自动切换。</string>
+    <string name="settings_changelog_v131_item3">• 应用内手动语言切换: 用户可在设置中自由切换应用语言，无需更改系统语言。</string>
+    <string name="settings_changelog_v131_item4">• 兼容 Android 13+ 单应用语言偏好: 支持原生 Android 系统单应用语言设置。</string>
+    <string name="settings_changelog_v130_title">版本 1.3.0</string>
+    <string name="settings_changelog_v130_item1">• 智能 DLsite ASMR 翻译器: 针对标题与章节的双语翻译，内置 ASMR 专属术语词典。</string>
+    <string name="settings_changelog_v130_item2">• 伏字脱敏与文本规范化: 智能还原伏字符号 (○, ●, ×)，使翻译结果更加自然准确。</string>
+    <string name="settings_changelog_v130_item3">• Smart Fast Remux 极速封装引擎: 毫秒级合并多音轨 (&lt; 1秒)，无需转码保持 100% 无损音质。</string>
+    <string name="settings_changelog_v130_item4">• 四层混合章节引擎与 CUE 导出: 高精度章节标记、自动导出 .cue 文件与交互式章节面板。</string>
+    <string name="settings_changelog_v130_item5">• 极致流畅 120 FPS 滚动: 深度优化播放列表抽屉与历史记录渲染，无掉帧卡顿。</string>
+    <string name="settings_changelog_v130_item6">• 通用链接与多站点解析器: 支持 asmr.one、japaneseasmr.com、DLsite 链接及 RJ 前缀自动补全。</string>
+    <string name="settings_changelog_v130_item7">• 丰富元数据获取: 同步来自 DLsite 与 asmr.one 的声优 (CV)、社团、分类标签与高清封面。</string>
+    <string name="settings_changelog_v121_title">版本 1.2.1</string>
+    <string name="settings_changelog_v121_item1">• 存储极速自动同步 (120 FPS): 丝滑流畅的后台扫描。</string>
+    <string name="settings_changelog_v121_item2">• 递归子文件夹扫描: 自动识别存储目录下的所有子文件夹。</string>
+    <string name="settings_changelog_v121_item3">• 收藏子文件夹分类: 自动文件夹筛选与新建文件夹功能。</string>
+    <string name="settings_changelog_v121_item4">• 移动文件夹功能: 毫秒级在子文件夹之间移动音频文件。</string>
+    <string name="settings_changelog_v120_title">版本 1.2.0</string>
+    <string name="settings_changelog_v120_item1">• 智能睡眠定时器: 音频暂停时倒计时自动暂停。</string>
+    <string name="settings_changelog_v120_item2">• 下载、媒体库和设置页面的交互式悬浮迷你播放器。</string>
+    <string name="settings_changelog_v120_item3">• 全新默认播放速度弹窗，配有平滑滑块与 2x3 快捷预设。</string>
+    <string name="settings_changelog_v120_item4">• 极简超窄悬浮硬件音量条 (Volume HUD)。</string>
+
+    <string name="queue_status_pending">等待下载</string>
+    <string name="queue_status_fetching">正在获取作品元数据…</string>
+    <string name="queue_status_processing">正在合并音频并写入元数据…</string>
+    <string name="queue_status_cancelled">已取消</string>
 </resources>

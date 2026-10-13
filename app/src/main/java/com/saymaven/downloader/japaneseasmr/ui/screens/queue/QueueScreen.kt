@@ -94,13 +94,13 @@ fun QueueScreen(viewModel: QueueViewModel) {
             ) {
                 Column {
                     Text(
-                        text = "JapaneseASMR Downloader",
+                        text = stringResource(R.string.queue_header_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = if (queue.isNotEmpty()) "${queue.size} item dalam antrean" else "Siap mengunduh",
+                        text = if (queue.isNotEmpty()) stringResource(R.string.queue_items_count, queue.size) else stringResource(R.string.queue_ready_to_download),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -112,7 +112,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                 ) {
                     Icon(
                         imageVector = if (showConsole) Icons.Default.Terminal else Icons.Default.Code,
-                        contentDescription = if (showConsole) "Sembunyikan Konsol Log" else "Tampilkan Konsol Log",
+                        contentDescription = if (showConsole) stringResource(R.string.queue_hide_console) else stringResource(R.string.queue_show_console),
                         tint = if (showConsole) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.size(22.dp)
                     )
@@ -301,14 +301,14 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Antrean Unduhan Kosong",
+                            text = stringResource(R.string.queue_empty_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Masukkan kode RJ atau salin tautan karya dari browser untuk mulai mengunduh audio.",
+                            text = stringResource(R.string.queue_empty_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -324,7 +324,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Antrean Unduhan (${queue.size})",
+                        text = stringResource(R.string.queue_header_count_format, queue.size),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -390,7 +390,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Live Log Proses Unduhan",
+                                    text = stringResource(R.string.queue_console_title),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -402,7 +402,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                             ) {
                                 Icon(
                                     if (showLogsInside) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Toggle Log",
+                                    contentDescription = stringResource(R.string.queue_console_toggle),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -422,7 +422,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                                 ) {
                                     if (logs.isEmpty()) {
                                         Text(
-                                            text = "Belum ada proses unduhan berjalan.\nMasukkan kode RJ di atas lalu tekan 'Unduh' atau 'Antrean'.",
+                                            text = stringResource(R.string.queue_console_empty),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                             fontFamily = FontFamily.Monospace
@@ -534,12 +534,26 @@ fun QueueItemCard(
                         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
                     }
 
+                    val displayStatus = if (item.statusText.isNotBlank()) {
+                        item.statusText
+                    } else {
+                        when (item.status) {
+                            DownloadStatus.PENDING -> stringResource(R.string.queue_status_pending)
+                            DownloadStatus.FETCHING_METADATA -> stringResource(R.string.queue_status_fetching)
+                            DownloadStatus.DOWNLOADING -> stringResource(R.string.queue_status_downloading)
+                            DownloadStatus.PROCESSING -> stringResource(R.string.queue_status_processing)
+                            DownloadStatus.COMPLETED -> stringResource(R.string.queue_status_completed)
+                            DownloadStatus.FAILED -> stringResource(R.string.queue_status_error)
+                            DownloadStatus.CANCELLED -> stringResource(R.string.queue_status_cancelled)
+                        }
+                    }
+
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = statusBg.copy(alpha = 0.8f)
                     ) {
                         Text(
-                            text = item.statusText,
+                            text = displayStatus,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = statusFg,

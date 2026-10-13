@@ -12,7 +12,7 @@ enum class DownloadStatus {
 
 data class DownloadQueueItem(
     val rjid: String,
-    val title: String = "Memuat info...",
+    val title: String = "",
     val cv: String = "-",
     val circle: String = "-",
     val genre: String = "-",
@@ -20,7 +20,7 @@ data class DownloadQueueItem(
     val coverUrl: String = "https://pic.weeabo0.xyz/${rjid}_img_main.jpg",
     val status: DownloadStatus = DownloadStatus.PENDING,
     val progress: Float = 0f,
-    val statusText: String = "Menunggu antrean",
+    val statusText: String = "",
     val speed: String = "-",
     val eta: String = "-",
     val downloadedSize: String = "-",

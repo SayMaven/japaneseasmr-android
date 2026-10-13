@@ -42,7 +42,7 @@ object AudioMerger {
         }
 
         return try {
-            onLog?.invoke("[+] Fast Remux: Menggabungkan ${trackFiles.size} track MP3 secara instan...")
+            onLog?.invoke(DownloadLogHelper.fastRemuxMp3Start(trackFiles.size))
 
             val slices = mutableListOf<TrackSlice>()
             var totalFrames = 0L
@@ -91,10 +91,10 @@ object AudioMerger {
             }
 
             val finalSizeMb = destFile.length() / (1024.0 * 1024.0)
-            onLog?.invoke("[+] Berhasil menggabungkan MP3: %.2f MB (Fast Remux Instan, total $totalFrames frame)".format(finalSizeMb))
+            onLog?.invoke(DownloadLogHelper.fastRemuxMp3Success(finalSizeMb, totalFrames))
             true
         } catch (e: Exception) {
-            onLog?.invoke("[!] Gagal menggabungkan file MP3: ${e.message}")
+            onLog?.invoke(DownloadLogHelper.fastRemuxMp3Fail(e.message))
             false
         }
     }
@@ -310,7 +310,7 @@ object AudioMerger {
             extractor0.release()
 
             if (audioFormat == null) {
-                onLog?.invoke("[!] Format audio M4A tidak terdeteksi.")
+                onLog?.invoke(DownloadLogHelper.fastRemuxM4aFormatFail())
                 return false
             }
 
@@ -372,10 +372,10 @@ object AudioMerger {
 
             muxer.stop()
             val finalSizeMb = destFile.length() / (1024.0 * 1024.0)
-            onLog?.invoke("[+] Berhasil menggabungkan M4A: %.2f MB (Fast Remux Instan)".format(finalSizeMb))
+            onLog?.invoke(DownloadLogHelper.fastRemuxM4aSuccess(finalSizeMb))
             true
         } catch (e: Exception) {
-            onLog?.invoke("[!] Gagal menggabungkan M4A: ${e.message}")
+            onLog?.invoke(DownloadLogHelper.fastRemuxM4aFail(e.message))
             false
         } finally {
             try { muxer?.release() } catch (e: Exception) {}
