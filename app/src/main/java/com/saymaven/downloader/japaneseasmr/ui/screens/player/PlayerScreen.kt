@@ -39,6 +39,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -689,13 +690,19 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
     // ================= 3. PLAYLIST BOTTOM SHEET =================
     if (showBottomSheet) {
+        val currentLocalConfig = LocalConfiguration.current
+        val currentLocalContext = LocalContext.current
         ModalBottomSheet(
             onDismissRequest = { showBottomSheet = false },
             sheetState = sheetState,
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            Column(
+            CompositionLocalProvider(
+                LocalConfiguration provides currentLocalConfig,
+                LocalContext provides currentLocalContext
+            ) {
+                Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.80f)
@@ -878,6 +885,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             }
         }
     }
+}
 
     if (showNewFolderDialog) {
         AlertDialog(
@@ -968,13 +976,19 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     }
 
     if (showSleepTimerSheet) {
+        val currentLocalConfig = LocalConfiguration.current
+        val currentLocalContext = LocalContext.current
         ModalBottomSheet(
             onDismissRequest = { showSleepTimerSheet = false },
             sheetState = sleepTimerSheetState,
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         ) {
-            Column(
+            CompositionLocalProvider(
+                LocalConfiguration provides currentLocalConfig,
+                LocalContext provides currentLocalContext
+            ) {
+                Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 8.dp)
@@ -1187,15 +1201,22 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             }
         }
     }
+}
 
     if (showChapterSheet) {
+        val currentLocalConfig = LocalConfiguration.current
+        val currentLocalContext = LocalContext.current
         ModalBottomSheet(
             onDismissRequest = { showChapterSheet = false },
             sheetState = chapterSheetState,
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            Column(
+            CompositionLocalProvider(
+                LocalConfiguration provides currentLocalConfig,
+                LocalContext provides currentLocalContext
+            ) {
+                Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.80f)
@@ -1444,6 +1465,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             }
         }
     }
+}
 }
 
 private val PlaylistItemCardShape = RoundedCornerShape(12.dp)

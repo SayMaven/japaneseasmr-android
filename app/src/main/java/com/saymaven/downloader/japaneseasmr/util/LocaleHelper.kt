@@ -43,6 +43,17 @@ object LocaleHelper {
             config.setLocales(LocaleList(targetLocale))
         }
         config.setLayoutDirection(targetLocale)
+
+        try {
+            @Suppress("DEPRECATION")
+            context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        } catch (_: Exception) {}
+
+        try {
+            @Suppress("DEPRECATION")
+            context.applicationContext?.resources?.updateConfiguration(config, context.applicationContext.resources.displayMetrics)
+        } catch (_: Exception) {}
+
         val configContext = context.createConfigurationContext(config)
         return LocalizedContext(context, configContext)
     }
