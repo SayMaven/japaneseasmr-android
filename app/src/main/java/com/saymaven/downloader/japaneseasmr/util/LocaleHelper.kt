@@ -2,10 +2,16 @@ package com.saymaven.downloader.japaneseasmr.util
 
 import android.app.LocaleManager
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.os.Build
 import android.os.LocaleList
 import java.util.Locale
+
+class LocalizedContext(base: Context, private val configContext: Context) : ContextWrapper(base) {
+    override fun getResources(): Resources = configContext.resources
+}
 
 object LocaleHelper {
 
@@ -46,7 +52,8 @@ object LocaleHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             config.setLocales(LocaleList(targetLocale))
         }
-        return context.createConfigurationContext(config)
+        val configContext = context.createConfigurationContext(config)
+        return LocalizedContext(context, configContext)
     }
 
     fun getLocalizedConfiguration(context: Context, langCode: String): Configuration {

@@ -108,10 +108,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         SettingsCategoryHeader(title = stringResource(R.string.settings_cat_general), icon = Icons.Default.Language)
 
         Card(
+            onClick = { showLanguageDialog = true },
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
             ListItem(
+                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                 headlineContent = { Text(stringResource(R.string.settings_lang_title), fontWeight = FontWeight.SemiBold) },
                 supportingContent = {
                     val langLabel = when (appLanguage) {
@@ -124,7 +127,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     Text(langLabel, style = MaterialTheme.typography.bodySmall)
                 },
                 leadingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                modifier = Modifier.clickable { showLanguageDialog = true }
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             )
         }
 
@@ -417,13 +426,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-                ListItem(
-                    headlineContent = { Text("Bahasa Aplikasi", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Bahasa Indonesia", style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-                )
             }
         }
 
@@ -829,6 +832,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             text = {
                 Column {
                     languages.forEach { (code, label) ->
+                        val isSelected = (appLanguage == code)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -837,21 +841,18 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                                     viewModel.setAppLanguage(code)
                                     showLanguageDialog = false
                                 }
-                                .padding(vertical = 8.dp)
+                                .padding(vertical = 10.dp, horizontal = 4.dp)
                         ) {
                             RadioButton(
-                                selected = appLanguage == code,
-                                onClick = {
-                                    viewModel.setAppLanguage(code)
-                                    showLanguageDialog = false
-                                }
+                                selected = isSelected,
+                                onClick = null
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 text = label,
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (appLanguage == code) FontWeight.Bold else FontWeight.Normal,
-                                color = if (appLanguage == code) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
