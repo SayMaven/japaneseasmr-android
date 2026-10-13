@@ -40,6 +40,7 @@ import com.saymaven.downloader.japaneseasmr.ui.screens.settings.SettingsScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.settings.SettingsViewModel
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.util.LocaleHelper
 import com.saymaven.downloader.japaneseasmr.ui.theme.JapaneseASMRTheme
 
@@ -194,9 +195,9 @@ class MainActivity : ComponentActivity() {
 
                                         if (!DownloadService.isDownloading.value) {
                                             DownloadService.startDownload(this@MainActivity)
-                                            Toast.makeText(this@MainActivity, "Memulai unduhan [${historyEntity.rjid}]...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(this@MainActivity, getString(R.string.player_toast_download_starting, historyEntity.rjid), Toast.LENGTH_SHORT).show()
                                         } else {
-                                            Toast.makeText(this@MainActivity, "[${historyEntity.rjid}] ditambahkan ke antrean unduh.", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(this@MainActivity, getString(R.string.player_toast_download_enqueued, historyEntity.rjid), Toast.LENGTH_SHORT).show()
                                         }
                                         currentTab = NavTab.QUEUE
                                     }

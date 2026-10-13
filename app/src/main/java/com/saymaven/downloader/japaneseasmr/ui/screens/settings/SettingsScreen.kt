@@ -86,7 +86,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             }
             val resolved = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, uri.toString()) ?: uri.toString()
             viewModel.setDownloadDir(resolved)
-            Toast.makeText(context, "Folder unduhan berhasil diubah!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.settings_folder_toast_changed), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -146,8 +146,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         ) {
             Column {
                 ListItem(
-                    headlineContent = { Text("Mode Eksklusif USB DAC", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Klaim hardware DAC langsung untuk output murni bit-perfect", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_dac_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_dac_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Usb, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Switch(
@@ -160,8 +160,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Fokus Audio Eksklusif", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Jeda otomatis jika aplikasi lain memutar audio", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_audio_focus_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_audio_focus_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Hearing, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Switch(
@@ -174,8 +174,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Jeda Saat Headset Dicabut", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Mencegah audio bocor ke speaker HP saat kabel/DAC lepas", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_pause_unplug_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_pause_unplug_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Switch(
@@ -188,8 +188,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Lewati Bagian Hening", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Otomatis mempercepat bagian tanpa suara", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_skip_silence_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_skip_silence_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Switch(
@@ -202,8 +202,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Layar Tetap Menyala (Keep Screen On)", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Mencegah layar tidur saat berada di tab Pemutar", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_keep_screen_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_keep_screen_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.StayCurrentPortrait, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Switch(
@@ -216,8 +216,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Lanjutkan Pemutaran", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Ingat posisi track, durasi, repeat, shuffle & status waktu saat buka ulang app", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_auto_resume_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_auto_resume_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Restore, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Switch(
@@ -230,12 +230,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Kecepatan Putar Default", fontWeight = FontWeight.SemiBold) },
+                    headlineContent = { Text(stringResource(R.string.settings_default_speed_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = {
                         val label = when (defaultSpeed) {
-                            1.0f -> "1.0x (Normal)"
-                            0.25f -> "0.25x (Paling Lambat)"
-                            2.0f -> "2.0x (Paling Cepat)"
+                            1.0f -> stringResource(R.string.settings_speed_normal)
+                            0.25f -> stringResource(R.string.settings_speed_min)
+                            2.0f -> stringResource(R.string.settings_speed_max)
                             else -> String.format(java.util.Locale.US, "%.2fx", defaultSpeed)
                         }
                         Text(label, style = MaterialTheme.typography.bodySmall)
@@ -250,11 +250,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Bahasa Terjemahan (ASMR Translator)", fontWeight = FontWeight.SemiBold) },
+                    headlineContent = { Text(stringResource(R.string.settings_target_lang_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = {
                         val langLabel = when (translationLanguage) {
-                            "en" -> "English (Inggris)"
-                            else -> "Bahasa Indonesia (Indonesia)"
+                            "en" -> stringResource(R.string.settings_trans_lang_en)
+                            else -> stringResource(R.string.settings_trans_lang_in)
                         }
                         Text(langLabel, style = MaterialTheme.typography.bodySmall)
                     },
@@ -265,7 +265,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         }
 
         // ================= 2. PENGATURAN UNDUHAN =================
-        SettingsCategoryHeader(title = "Pengunduhan", icon = Icons.Default.Download)
+        SettingsCategoryHeader(title = stringResource(R.string.settings_cat_download), icon = Icons.Default.Download)
 
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -273,7 +273,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         ) {
             Column {
                 ListItem(
-                    headlineContent = { Text("Folder Unduhan", fontWeight = FontWeight.SemiBold) },
+                    headlineContent = { Text(stringResource(R.string.settings_download_dir_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = {
                         val physicalPath = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, downloadDir)
                             ?: DownloadService.getDefaultDownloadDirectory().absolutePath
@@ -288,7 +288,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     leadingContent = { Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         FilledTonalButton(onClick = { dirPickerLauncher.launch(null) }) {
-                            Text("Ubah")
+                            Text(stringResource(R.string.action_change))
                         }
                     }
                 )
@@ -296,8 +296,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Jalur Unduhan", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("$parallelConn jalur simultan", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_threads_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_threads_desc, parallelConn), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable { showThreadDialog = true }
                 )
@@ -305,8 +305,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Deteksi Otomatis Clipboard", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Otomatis isi input jika ada kode RJ di clipboard", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_clipboard_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_clipboard_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Switch(
@@ -319,8 +319,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Nama File Lengkap", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Sertakan judul karya pada nama file audio", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_detailed_filename_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_detailed_filename_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Switch(
@@ -332,11 +332,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-
-
                 ListItem(
-                    headlineContent = { Text("Hasilkan CUE Sheet (.cue)", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Simpan file .cue eksternal di folder unduhan (hanya untuk player pihak ketiga, player internal JapaneseASMR otomatis membaca bab tanpa berkas ini)", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_cue_sheet_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_cue_sheet_detailed_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.LibraryMusic, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         Switch(
@@ -349,7 +347,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         }
 
         // ================= 3. TAMPILAN & TEMA (DENGAN 36 COLOR PALETTE PREVIEWS) =================
-        SettingsCategoryHeader(title = "Tampilan & Warna", icon = Icons.Default.Palette)
+        SettingsCategoryHeader(title = stringResource(R.string.settings_cat_appearance), icon = Icons.Default.Palette)
 
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -357,13 +355,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         ) {
             Column {
                 ListItem(
-                    headlineContent = { Text("Mode Tema", fontWeight = FontWeight.SemiBold) },
+                    headlineContent = { Text(stringResource(R.string.settings_theme_mode_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = {
                         Text(
                             when (themeMode) {
-                                ThemeMode.DARK -> "Gelap (Dark Mode)"
-                                ThemeMode.LIGHT -> "Terang (Light Mode)"
-                                ThemeMode.SYSTEM -> "Mengikuti Sistem"
+                                ThemeMode.DARK -> stringResource(R.string.settings_theme_mode_dark)
+                                ThemeMode.LIGHT -> stringResource(R.string.settings_theme_mode_light)
+                                ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_mode_system)
                             },
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -376,8 +374,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                     ListItem(
-                        headlineContent = { Text("Warna Dinamis (Material You)", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Warna aksen menyesuaikan wallpaper HP Android", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_dynamic_color_title), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_dynamic_color_desc), style = MaterialTheme.typography.bodySmall) },
                         leadingContent = { Icon(Icons.Default.ColorLens, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingContent = {
                             Switch(
@@ -404,7 +402,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Palet Warna Aplikasi (36 Warna)",
+                                text = stringResource(R.string.settings_palette_title),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -425,13 +423,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         )
                     }
                 }
-
-
             }
         }
 
         // ================= 4. TENTANG & INFORMASI =================
-        SettingsCategoryHeader(title = "Tentang Aplikasi", icon = Icons.Default.Info)
+        SettingsCategoryHeader(title = stringResource(R.string.settings_cat_about), icon = Icons.Default.Info)
 
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -439,8 +435,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         ) {
             Column {
                 ListItem(
-                    headlineContent = { Text("Pengembang", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("SayMaven (GitHub)", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_dev_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_dev_name), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/SayMaven"))
@@ -451,24 +447,24 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Arsitektur", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("High-Speed Native Engine & Jetpack Media3", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_arch_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_arch_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Memory, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                 )
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Versi Aplikasi", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_app_version, BuildConfig.VERSION_NAME), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text("Build ${BuildConfig.VERSION_CODE}", style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
                 )
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Catatan Rilis (Changelog)", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Riwayat pembaruan & fitur baru", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_changelog_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_changelog_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.HistoryEdu, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable { showChangelogDialog = true }
                 )
@@ -476,8 +472,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Panduan Penggunaan", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Cara penggunaan & tips fitur", style = MaterialTheme.typography.bodySmall) },
+                    headlineContent = { Text(stringResource(R.string.settings_user_guide_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_user_guide_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable { showGuideDialog = true }
                 )
@@ -485,7 +481,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Laporkan Masalah / Bug", fontWeight = FontWeight.SemiBold) },
+                    headlineContent = { Text(stringResource(R.string.settings_report_bug_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = { Text("GitHub Issues", style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.BugReport, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable {
@@ -497,7 +493,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text("Repository GitHub", fontWeight = FontWeight.SemiBold) },
+                    headlineContent = { Text(stringResource(R.string.settings_github_repo_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = { Text("SayMaven/japaneseasmr-android", style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Code, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable {
@@ -513,7 +509,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     if (showThemeDialog) {
         AlertDialog(
             onDismissRequest = { showThemeDialog = false },
-            title = { Text("Pilih Mode Tema") },
+            title = { Text(stringResource(R.string.settings_dialog_theme_title)) },
             text = {
                 Column {
                     ThemeMode.values().forEach { mode ->
@@ -531,9 +527,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 when (mode) {
-                                    ThemeMode.DARK -> "Gelap (Dark Mode)"
-                                    ThemeMode.LIGHT -> "Terang (Light Mode)"
-                                    ThemeMode.SYSTEM -> "Mengikuti Sistem"
+                                    ThemeMode.DARK -> stringResource(R.string.settings_theme_mode_dark)
+                                    ThemeMode.LIGHT -> stringResource(R.string.settings_theme_mode_light)
+                                    ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_mode_system)
                                 }
                             )
                         }
@@ -541,7 +537,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showThemeDialog = false }) { Text("Tutup") }
+                TextButton(onClick = { showThemeDialog = false }) { Text(stringResource(R.string.action_close)) }
             }
         )
     }
@@ -558,7 +554,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Kecepatan Putar Default")
+                    Text(stringResource(R.string.settings_speed_dialog_title))
                 }
             },
             text = {
@@ -585,9 +581,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                                 color = MaterialTheme.colorScheme.primary
                             )
                             val statusText = when {
-                                draftSpeed == 1.0f -> "Kecepatan Normal"
-                                draftSpeed < 1.0f -> "Lebih Lambat"
-                                else -> "Lebih Cepat"
+                                draftSpeed == 1.0f -> stringResource(R.string.settings_speed_normal)
+                                draftSpeed < 1.0f -> stringResource(R.string.settings_speed_min)
+                                else -> stringResource(R.string.settings_speed_max)
                             }
                             Text(
                                 text = statusText,
@@ -612,15 +608,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("0.25x (Min)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("1.00x (Normal)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("2.00x (Maks)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.settings_speed_min), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.settings_speed_normal), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.settings_speed_max), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     Spacer(modifier = Modifier.height(18.dp))
 
                     Text(
-                        text = "Pilihan Cepat",
+                        text = stringResource(R.string.player_timer_quick_choice),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.align(Alignment.Start)
@@ -692,12 +688,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     viewModel.setDefaultSpeed(draftSpeed)
                     showSpeedDialog = false
                 }) {
-                    Text("Simpan")
+                    Text(stringResource(R.string.action_save))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSpeedDialog = false }) {
-                    Text("Batal")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -705,8 +701,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
     if (showTranslationLangDialog) {
         val langOptions = listOf(
-            "id" to "Bahasa Indonesia (Indonesia)",
-            "en" to "English (Inggris)"
+            "id" to stringResource(R.string.settings_trans_lang_in),
+            "en" to stringResource(R.string.settings_trans_lang_en)
         )
         AlertDialog(
             onDismissRequest = { showTranslationLangDialog = false },
@@ -719,13 +715,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Pilih Bahasa Terjemahan")
+                    Text(stringResource(R.string.settings_dialog_trans_lang_title))
                 }
             },
             text = {
                 Column {
                     Text(
-                        text = "Bahasa target untuk menerjemahkan judul karya dan daftar bab ASMR.",
+                        text = stringResource(R.string.settings_target_lang_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -762,7 +758,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             },
             confirmButton = {
                 TextButton(onClick = { showTranslationLangDialog = false }) {
-                    Text("Tutup")
+                    Text(stringResource(R.string.action_close))
                 }
             }
         )
@@ -778,11 +774,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         )
         AlertDialog(
             onDismissRequest = { showThreadDialog = false },
-            title = { Text("Jalur Unduhan") },
+            title = { Text(stringResource(R.string.settings_threads_dialog_title)) },
             text = {
                 Column {
                     Text(
-                        text = "Membagi file unduhan menjadi beberapa bagian agar lebih cepat.",
+                        text = stringResource(R.string.settings_threads_desc, parallelConn),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -811,20 +807,18 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showThreadDialog = false }) { Text("Tutup") }
+                TextButton(onClick = { showThreadDialog = false }) { Text(stringResource(R.string.action_close)) }
             }
         )
     }
 
-
-
     if (showLanguageDialog) {
         val languages = listOf(
             "system" to stringResource(R.string.settings_lang_system),
-            "en" to "English",
-            "in" to "Bahasa Indonesia",
-            "ja" to "日本語",
-            "zh" to "简体中文"
+            "en" to stringResource(R.string.settings_lang_en),
+            "in" to stringResource(R.string.settings_lang_in),
+            "ja" to stringResource(R.string.settings_lang_ja),
+            "zh" to stringResource(R.string.settings_lang_zh)
         )
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
@@ -907,7 +901,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showChangelogDialog = false }) { Text("Tutup") }
+                TextButton(onClick = { showChangelogDialog = false }) { Text(stringResource(R.string.action_close)) }
             }
         )
     }
@@ -915,27 +909,27 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     if (showGuideDialog) {
         AlertDialog(
             onDismissRequest = { showGuideDialog = false },
-            title = { Text("Panduan Penggunaan") },
+            title = { Text(stringResource(R.string.settings_user_guide_title)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text("1. Mengunduh Karya (Tab Unduhan):", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Masukkan kode RJ (misal RJ123456) di kolom input, lalu tekan Unduh atau + Antrean untuk proses otomatis berkelanjutan.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_guide_step1_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_guide_step1_desc), style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("2. Memutar & Mengelola Koleksi (Tab Home & Riwayat):", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Tekan karya di tab Riwayat untuk mulai mendengarkan di tab Home. Di tab Home, tekan ikon playlist untuk melihat koleksi, menyaring subfolder, mengatur urutan (drag & drop), atau memindahkan audio antar folder.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_guide_step2_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_guide_step2_desc), style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("3. Floating Mini Player:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Saat audio diputar dan Anda membuka tab Unduhan, Riwayat, atau Pengaturan, Mini Player akan melayang di atas navigasi bawah untuk kontrol cepat.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_guide_step3_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_guide_step3_desc), style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("4. Pengatur Waktu Tidur (Sleep Timer):", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Di layar pemutar (Home), tekan ikon bulan untuk menyetel timer. Hitung mundur akan otomatis dijeda saat audio dihentikan sementara.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_guide_step4_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_guide_step4_desc), style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("5. Pengaturan Audio & USB DAC:", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text("Gunakan tab Pengaturan untuk mengatur jalur unduhan (multithread), kecepatan putar default, folder penyimpanan, serta mode bit-perfect USB DAC eksklusif.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_guide_step5_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_guide_step5_desc), style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showGuideDialog = false }) { Text("Tutup") }
+                TextButton(onClick = { showGuideDialog = false }) { Text(stringResource(R.string.action_close)) }
             }
         )
     }

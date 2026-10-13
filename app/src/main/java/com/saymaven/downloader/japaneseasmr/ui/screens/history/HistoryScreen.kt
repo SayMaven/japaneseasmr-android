@@ -22,6 +22,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import androidx.compose.ui.res.stringResource
+import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,7 +64,7 @@ fun HistoryScreen(
                 IconButton(onClick = { showMenu = true }) {
                     Icon(
                         Icons.Default.MoreVert,
-                        contentDescription = "Opsi Riwayat",
+                        contentDescription = stringResource(R.string.history_menu_options),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -73,24 +75,24 @@ fun HistoryScreen(
                 ) {
                     if (hasMissingFiles) {
                         DropdownMenuItem(
-                            text = { Text("Bersihkan File Hilang") },
+                            text = { Text(stringResource(R.string.history_menu_clean_missing)) },
                             leadingIcon = { Icon(Icons.Default.CleaningServices, contentDescription = null) },
                             onClick = {
                                 showMenu = false
                                 viewModel.cleanMissingFiles()
-                                Toast.makeText(context, "File hilang dibersihkan dari riwayat.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.history_toast_missing_cleaned), Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
 
                     if (historyUiList.isNotEmpty()) {
                         DropdownMenuItem(
-                            text = { Text("Hapus Semua Riwayat", color = MaterialTheme.colorScheme.error) },
+                            text = { Text(stringResource(R.string.history_menu_clear_all), color = MaterialTheme.colorScheme.error) },
                             leadingIcon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                             onClick = {
                                 showMenu = false
                                 viewModel.clearAllHistory()
-                                Toast.makeText(context, "Semua riwayat dihapus.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.history_toast_all_cleared), Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
@@ -104,7 +106,7 @@ fun HistoryScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { viewModel.onSearchQueryChanged(it) },
-            label = { Text("Cari karya, CV, atau circle...") },
+            label = { Text(stringResource(R.string.history_search_hint)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -127,7 +129,7 @@ fun HistoryScreen(
                 onClick = { viewModel.toggleSortByDate() },
                 label = {
                     Text(
-                        text = if (sortOrder == HistorySortOrder.DATE_ASC) "Waktu (Terlama \u2191)" else "Waktu (Terbaru \u2193)",
+                        text = if (sortOrder == HistorySortOrder.DATE_ASC) stringResource(R.string.history_sort_date_asc) else stringResource(R.string.history_sort_date_desc),
                         style = MaterialTheme.typography.labelMedium
                     )
                 },
@@ -146,7 +148,7 @@ fun HistoryScreen(
                 onClick = { viewModel.toggleSortByTitle() },
                 label = {
                     Text(
-                        text = if (sortOrder == HistorySortOrder.TITLE_DESC) "Nama (Z - A \u2191)" else "Nama (A - Z \u2193)",
+                        text = if (sortOrder == HistorySortOrder.TITLE_DESC) stringResource(R.string.history_sort_title_desc) else stringResource(R.string.history_sort_title_asc),
                         style = MaterialTheme.typography.labelMedium
                     )
                 },
@@ -171,7 +173,7 @@ fun HistoryScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (searchQuery.isBlank()) "Belum ada riwayat unduhan." else "Tidak ada karya yang cocok.",
+                    text = if (searchQuery.isBlank()) stringResource(R.string.history_empty_title) else stringResource(R.string.history_no_matching_works),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -211,10 +213,10 @@ fun HistoryScreen(
 
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
-            title = { Text("Hapus Riwayat") },
+            title = { Text(stringResource(R.string.history_dialog_delete_title)) },
             text = {
                 Column {
-                    Text("Hapus [${item.rjid}] ${item.title} dari riwayat koleksi?")
+                    Text(stringResource(R.string.history_dialog_delete_msg_format, item.rjid, item.title))
                     if (item.isPresent) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
@@ -226,7 +228,7 @@ fun HistoryScreen(
                                 onCheckedChange = { alsoDeleteLocalFile = it }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Hapus juga file audio dari memori HP", style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(R.string.history_dialog_also_delete_file), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -236,15 +238,15 @@ fun HistoryScreen(
                     onClick = {
                         viewModel.deleteHistory(item.entity, deleteFile = alsoDeleteLocalFile)
                         itemToDelete = null
-                        Toast.makeText(context, "Riwayat dihapus", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.history_toast_item_deleted), Toast.LENGTH_SHORT).show()
                     }
                 ) {
-                    Text("Hapus", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { itemToDelete = null }) {
-                    Text("Batal")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -270,7 +272,7 @@ fun HistoryItemCard(
                 if (item.isPresent) {
                     onPlay(item.entity)
                 } else {
-                    Toast.makeText(context, "File audio tidak ditemukan. Silakan unduh ulang.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.history_toast_file_not_found), Toast.LENGTH_SHORT).show()
                 }
             },
         shape = HistoryCardShape,
@@ -337,7 +339,7 @@ fun HistoryItemCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (item.isPresent) "${item.downloadDate} \u2022 ${item.fileSize}" else "File belum diunduh / hilang",
+                    text = if (item.isPresent) "${item.downloadDate} \u2022 ${item.fileSize}" else stringResource(R.string.history_status_missing),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (item.isPresent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 )
@@ -350,7 +352,7 @@ fun HistoryItemCard(
                     IconButton(onClick = { onPlay(item.entity) }) {
                         Icon(
                             Icons.Default.PlayArrow,
-                            contentDescription = "Putar",
+                            contentDescription = stringResource(R.string.history_action_play),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -358,7 +360,7 @@ fun HistoryItemCard(
                     IconButton(onClick = { onRedownload(item.entity) }) {
                         Icon(
                             Icons.Default.Download,
-                            contentDescription = "Unduh Ulang",
+                            contentDescription = stringResource(R.string.history_action_redownload),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -367,7 +369,7 @@ fun HistoryItemCard(
                 IconButton(onClick = { onDelete(item) }) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "Hapus Riwayat",
+                        contentDescription = stringResource(R.string.history_action_delete_file),
                         tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                     )
                 }

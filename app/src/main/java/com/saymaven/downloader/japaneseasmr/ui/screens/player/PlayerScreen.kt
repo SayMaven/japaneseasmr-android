@@ -51,6 +51,8 @@ import androidx.media3.common.Player
 import androidx.compose.foundation.BorderStroke
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import androidx.compose.ui.res.stringResource
+import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
 import kotlinx.coroutines.delay
@@ -215,7 +217,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             } else cleanOriginalTitle
 
             Text(
-                text = displayTitle.ifBlank { "Belum ada audio diputar" },
+                text = displayTitle.ifBlank { stringResource(R.string.player_no_track) },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -284,14 +286,14 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         Spacer(modifier = Modifier.width(6.dp))
                         if (isLoadingChapters) {
                             Text(
-                                text = "Memindai bab...",
+                                text = stringResource(R.string.player_scanning_chapters),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         } else {
                             val activeChapTitle = if (isTranslationActive && activeChapterIndex in translatedChapters.indices) {
                                 translatedChapters[activeChapterIndex].title
-                            } else activeChapter?.title ?: "Daftar Bab (${chapters.size})"
+                            } else activeChapter?.title ?: stringResource(R.string.player_chapter_detected, chapters.size)
 
                             Text(
                                 text = activeChapTitle,
@@ -421,7 +423,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
             ) {
                 if (dacState.isExclusiveActive) {
                     Text(
-                        text = "DAC Eksklusif: ${dacState.dacName}",
+                        text = stringResource(R.string.player_dac_label_format, dacState.dacName),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -456,7 +458,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             Player.REPEAT_MODE_ALL -> Icons.Default.Repeat
                             else -> Icons.Default.Repeat
                         },
-                        contentDescription = "Repeat",
+                        contentDescription = stringResource(R.string.player_action_repeat),
                         tint = when (repeatMode) {
                             Player.REPEAT_MODE_OFF -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                             else -> MaterialTheme.colorScheme.primary
@@ -477,7 +479,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.Bedtime,
-                            contentDescription = "Sleep Timer",
+                            contentDescription = stringResource(R.string.player_timer_dialog_title),
                             tint = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                             modifier = Modifier.size(20.dp)
                         )
@@ -509,7 +511,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.Bookmarks,
-                            contentDescription = "Bab Audio",
+                            contentDescription = stringResource(R.string.player_action_chapters),
                             tint = if (chapters.isNotEmpty()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                             modifier = Modifier.size(20.dp)
                         )
@@ -546,7 +548,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Translate,
-                                contentDescription = "Terjemahkan Judul & Bab",
+                                contentDescription = stringResource(R.string.player_action_translate),
                                 tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                                 modifier = Modifier.size(20.dp)
                             )
@@ -567,7 +569,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 IconButton(onClick = { viewModel.toggleShuffleMode() }) {
                     Icon(
                         imageVector = Icons.Default.Shuffle,
-                        contentDescription = "Shuffle",
+                        contentDescription = stringResource(R.string.player_action_shuffle),
                         tint = if (shuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                     )
                 }
@@ -588,7 +590,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Sebelumnya",
+                        contentDescription = stringResource(R.string.player_action_prev),
                         modifier = Modifier.size(30.dp)
                     )
                 }
@@ -600,7 +602,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 ) {
                     Icon(
                         imageVector = Icons.Default.Replay10,
-                        contentDescription = "Mundur 10 Detik",
+                        contentDescription = stringResource(R.string.player_action_replay10),
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -613,7 +615,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        contentDescription = if (isPlaying) stringResource(R.string.player_action_pause) else stringResource(R.string.player_action_play),
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(36.dp)
                     )
@@ -626,7 +628,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 ) {
                     Icon(
                         imageVector = Icons.Default.Forward10,
-                        contentDescription = "Maju 10 Detik",
+                        contentDescription = stringResource(R.string.player_action_forward10),
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -638,7 +640,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Berikutnya",
+                        contentDescription = stringResource(R.string.player_action_next),
                         modifier = Modifier.size(30.dp)
                     )
                 }
@@ -669,7 +671,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "BERIKUTNYA • DAFTAR PUTAR (${playlist.size})",
+                            text = stringResource(R.string.player_playlist_next_title, playlist.size),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -677,7 +679,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowUp,
-                        contentDescription = "Buka Daftar Putar",
+                        contentDescription = stringResource(R.string.player_action_open_playlist),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -708,7 +710,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Daftar Putar Koleksi (${filteredPlaylist.size})",
+                        text = stringResource(R.string.player_playlist_sheet_header, filteredPlaylist.size),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -723,7 +725,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = "Tutup",
+                            contentDescription = stringResource(R.string.action_close),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.size(20.dp)
                         )
@@ -757,7 +759,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 newFolderNameInput = ""
                                 showNewFolderDialog = true
                             },
-                            label = { Text("+ Folder", style = MaterialTheme.typography.labelMedium) },
+                            label = { Text(stringResource(R.string.player_folder_new), style = MaterialTheme.typography.labelMedium) },
                             leadingIcon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(16.dp)) }
                         )
                     }
@@ -773,7 +775,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (selectedFolder == "Semua") "Belum ada audio di koleksi. Unduh kode RJ terlebih dahulu." else "Folder '$selectedFolder' masih kosong.",
+                            text = if (selectedFolder == "Semua" || selectedFolder == stringResource(R.string.player_folder_all)) {
+                                stringResource(R.string.player_folder_all_empty)
+                            } else {
+                                stringResource(R.string.player_folder_empty_format, selectedFolder)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -870,15 +876,15 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
     if (showNewFolderDialog) {
         AlertDialog(
             onDismissRequest = { showNewFolderDialog = false },
-            title = { Text("Buat Folder Baru") },
+            title = { Text(stringResource(R.string.player_folder_create_title)) },
             text = {
                 Column {
-                    Text("Masukkan nama folder untuk mengelompokkan koleksi audio:", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.player_folder_create_desc), style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = newFolderNameInput,
                         onValueChange = { newFolderNameInput = it },
-                        placeholder = { Text("Contoh: Bangdream, Hololive, dll") },
+                        placeholder = { Text(stringResource(R.string.player_folder_create_hint)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -891,11 +897,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         showNewFolderDialog = false
                     }
                 }) {
-                    Text("Buat")
+                    Text(stringResource(R.string.action_create))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showNewFolderDialog = false }) { Text("Batal") }
+                TextButton(onClick = { showNewFolderDialog = false }) { Text(stringResource(R.string.action_cancel)) }
             }
         )
     }
@@ -906,11 +912,13 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 showMoveDialog = false
                 itemToMove = null
             },
-            title = { Text("Pindahkan Audio ke Folder") },
+            title = { Text(stringResource(R.string.player_folder_move_title)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    val targetFolders = availableFolders.filter { it != "Semua" }
-                    Text("Pilih folder tujuan untuk [${itemToMove?.rjid}] ${itemToMove?.title}:", style = MaterialTheme.typography.bodySmall)
+                    val allFolderLabel = stringResource(R.string.player_folder_all)
+                    val targetFolders = availableFolders.filter { it != "Semua" && it != allFolderLabel }
+                    val workTitle = "[${itemToMove?.rjid ?: ""}] ${itemToMove?.title ?: ""}"
+                    Text(stringResource(R.string.player_folder_move_desc, workTitle), style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(10.dp))
                     targetFolders.forEach { folder ->
                         Surface(
@@ -946,7 +954,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     showMoveDialog = false
                     itemToMove = null
                 }) {
-                    Text("Tutup")
+                    Text(stringResource(R.string.action_close))
                 }
             }
         )
@@ -980,7 +988,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Pengatur Waktu Tidur",
+                            text = stringResource(R.string.player_timer_dialog_title),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -990,10 +998,10 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         TextButton(
                             onClick = {
                                 viewModel.stopSleepTimer()
-                                Toast.makeText(context, "Sleep Timer dimatikan", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.player_timer_toast_off), Toast.LENGTH_SHORT).show()
                             }
                         ) {
-                            Text("Matikan", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.player_timer_turn_off), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1005,9 +1013,9 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         val totalSecs = (sleepTimerRemainingMs!! / 1000).coerceAtLeast(0)
                         val m = totalSecs / 60
                         val s = totalSecs % 60
-                        "Timer aktif: ${String.format("%02d:%02d", m, s)} tersisa sebelum audio berhenti otomatis."
+                        stringResource(R.string.player_timer_active_desc, m, s)
                     } else {
-                        "Pilih durasi tidur untuk menghentikan pemutaran audio secara otomatis."
+                        stringResource(R.string.player_timer_inactive_desc)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1040,7 +1048,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             },
                             modifier = Modifier.size(44.dp)
                         ) {
-                            Icon(Icons.Default.Remove, contentDescription = "Kurang 5 Menit")
+                            Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.player_timer_minus5))
                         }
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1050,13 +1058,13 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 draftTimerMinutes
                             }
                             Text(
-                                text = "$displayMinutes Menit",
+                                text = stringResource(R.string.player_timer_minutes_format, displayMinutes),
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Kelipatan 5 menit",
+                                text = stringResource(R.string.player_timer_step_desc),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1073,7 +1081,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             },
                             modifier = Modifier.size(44.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Tambah 5 Menit")
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.player_timer_plus5))
                         }
                     }
                 }
@@ -1081,7 +1089,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "Pilihan Cepat:",
+                    text = stringResource(R.string.player_timer_quick_choice),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -1092,12 +1100,12 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
                 // Presets Grid: 5m, 10m, 15m, 30m, 1 jam (60m), 2 jam (120m)
                 val presets = listOf(
-                    5 to "5 Menit",
-                    10 to "10 Menit",
-                    15 to "15 Menit",
-                    30 to "30 Menit",
-                    60 to "1 Jam",
-                    120 to "2 Jam"
+                    5 to stringResource(R.string.player_timer_5min),
+                    10 to stringResource(R.string.player_timer_10min),
+                    15 to stringResource(R.string.player_timer_15min),
+                    30 to stringResource(R.string.player_timer_30min),
+                    60 to stringResource(R.string.player_timer_1hour),
+                    120 to stringResource(R.string.player_timer_2hours)
                 )
 
                 Row(
@@ -1110,7 +1118,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 draftTimerMinutes = mins
                                 viewModel.startSleepTimer(mins)
                                 showSleepTimerSheet = false
-                                Toast.makeText(context, "Sleep Timer disetel: $label", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.player_timer_toast_set, label), Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
@@ -1132,7 +1140,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                 draftTimerMinutes = mins
                                 viewModel.startSleepTimer(mins)
                                 showSleepTimerSheet = false
-                                Toast.makeText(context, "Sleep Timer disetel: $label", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.player_timer_toast_set, label), Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp)
@@ -1149,7 +1157,8 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     onClick = {
                         viewModel.startSleepTimer(draftTimerMinutes)
                         showSleepTimerSheet = false
-                        Toast.makeText(context, "Sleep Timer disetel: $draftTimerMinutes menit", Toast.LENGTH_SHORT).show()
+                        val minFormatted = context.getString(R.string.player_timer_minutes_format, draftTimerMinutes)
+                        Toast.makeText(context, context.getString(R.string.player_timer_toast_set, minFormatted), Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1157,7 +1166,11 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(
-                        text = if (sleepTimerRemainingMs != null) "Perbarui Timer ($draftTimerMinutes Menit)" else "Mulai Sleep Timer ($draftTimerMinutes Menit)",
+                        text = if (sleepTimerRemainingMs != null) {
+                            stringResource(R.string.player_timer_btn_update, draftTimerMinutes)
+                        } else {
+                            stringResource(R.string.player_timer_btn_start, draftTimerMinutes)
+                        },
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -1192,13 +1205,13 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Daftar Bab & Tracklist",
+                            text = stringResource(R.string.player_chapter_sheet_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = if (chapters.isNotEmpty()) "${chapters.size} Bab terdeteksi (CUE Sheet)" else "Sinkronisasi bab audio",
+                            text = if (chapters.isNotEmpty()) stringResource(R.string.player_chapter_detected, chapters.size) else stringResource(R.string.player_chapter_sync),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1218,7 +1231,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         } else {
                             Icon(
                                 Icons.Default.Translate,
-                                contentDescription = "Terjemahkan Bab",
+                                contentDescription = stringResource(R.string.player_action_translate),
                                 tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             )
                         }
@@ -1231,7 +1244,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             if (isTranslationActive) {
                                 viewModel.loadOrFetchTranslations(forceOnline = true)
                             }
-                            Toast.makeText(context, "Memindai & menerjemahkan ulang bab...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.player_chapter_resync_toast), Toast.LENGTH_SHORT).show()
                         },
                         enabled = !isLoadingChapters && !isTranslating
                     ) {
@@ -1244,7 +1257,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                         } else {
                             Icon(
                                 Icons.Default.Refresh,
-                                contentDescription = "Sinkron Ulang Bab",
+                                contentDescription = stringResource(R.string.action_refresh),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -1260,7 +1273,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = "Tutup",
+                            contentDescription = stringResource(R.string.action_close),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.size(20.dp)
                         )
@@ -1288,14 +1301,14 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Belum Ada Bab Terdeteksi",
+                                text = stringResource(R.string.player_chapter_none_title),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Audio ini belum memiliki berkas .cue pendamping atau penanda waktu internal.",
+                                text = stringResource(R.string.player_chapter_none_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
@@ -1309,7 +1322,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                             ) {
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Cari Bab Online (JapaneseASMR / asmr.one)")
+                                Text(stringResource(R.string.player_chapter_search_online))
                             }
                         }
                     }
@@ -1366,7 +1379,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                     // Title & Time Range
                                     Column(modifier = Modifier.weight(1f)) {
                                         val translatedChapterTitle = if (isTranslationActive && idx in translatedChapters.indices) {
-                                            translatedChapters[idx].title
+                                             translatedChapters[idx].title
                                         } else null
 
                                         Text(
@@ -1393,7 +1406,7 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                                             val m = durSec / 60
                                             val s = durSec % 60
                                             Text(
-                                                text = "Durasi: ${String.format(Locale.US, "%02d:%02d", m, s)}",
+                                                text = stringResource(R.string.player_chapter_duration_format, String.format(Locale.US, "%02d:%02d", m, s)),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -1546,7 +1559,7 @@ fun PlaylistItemCard(
             } else {
                 Icon(
                     Icons.Default.PlayArrow,
-                    contentDescription = "Play",
+                    contentDescription = stringResource(R.string.player_action_play),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.size(24.dp)
                 )
@@ -1561,7 +1574,7 @@ fun PlaylistItemCard(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
-                    contentDescription = "Pindah Folder",
+                    contentDescription = stringResource(R.string.player_action_move_folder),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(20.dp)
                 )
@@ -1587,7 +1600,7 @@ fun PlaylistItemCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.DragHandle,
-                    contentDescription = "Atur Urutan",
+                    contentDescription = stringResource(R.string.player_action_reorder),
                     tint = if (isDragged) {
                         MaterialTheme.colorScheme.primary
                     } else {

@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import androidx.compose.ui.res.stringResource
+import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlayerViewModel
 
 @Composable
@@ -137,7 +139,7 @@ fun MiniPlayer(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (currentArtist.isNotBlank() && currentArtist != "-") "CV: $currentArtist" else "Pemutar Audio",
+                            text = if (currentArtist.isNotBlank() && currentArtist != "-") "CV: $currentArtist" else stringResource(R.string.player_audio_player),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

@@ -33,6 +33,8 @@ import coil.compose.AsyncImage
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadStatus
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
+import androidx.compose.ui.res.stringResource
+import com.saymaven.downloader.japaneseasmr.R
 
 @Composable
 fun QueueScreen(viewModel: QueueViewModel) {
@@ -127,7 +129,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Tambah Unduhan",
+                        text = stringResource(R.string.queue_section_add),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -138,11 +140,11 @@ fun QueueScreen(viewModel: QueueViewModel) {
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { viewModel.onInputChanged(it) },
-                        label = { Text("Kode RJ atau Tautan (misal: RJ337874)") },
+                        label = { Text(stringResource(R.string.queue_input_hint)) },
                         placeholder = { Text("RJ337874") },
                         trailingIcon = {
                             IconButton(onClick = { viewModel.pasteFromClipboard(context) }) {
-                                Icon(Icons.Default.ContentPaste, contentDescription = "Tempel Clipboard", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.queue_paste_clipboard), tint = MaterialTheme.colorScheme.primary)
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -214,13 +216,13 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         OutlinedButton(
                             onClick = {
                                 if (inputText.isBlank()) {
-                                    Toast.makeText(context, "Masukkan kode RJ terlebih dahulu", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.queue_toast_empty_input), Toast.LENGTH_SHORT).show()
                                 } else {
                                     val added = viewModel.addToQueue()
                                     if (added) {
-                                        Toast.makeText(context, "Berhasil ditambahkan ke antrean", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.queue_toast_added), Toast.LENGTH_SHORT).show()
                                     } else {
-                                        Toast.makeText(context, "Format kode RJ tidak valid", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.queue_toast_invalid_rj), Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
@@ -233,7 +235,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Antrean",
+                                text = stringResource(R.string.queue_btn_enqueue),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
@@ -243,13 +245,13 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         Button(
                             onClick = {
                                 if (inputText.isBlank() && queue.isEmpty()) {
-                                    Toast.makeText(context, "Masukkan kode RJ terlebih dahulu", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.queue_toast_empty_input), Toast.LENGTH_SHORT).show()
                                 } else {
                                     val added = viewModel.addToQueue()
                                     if (added || queue.isNotEmpty()) {
                                         viewModel.startDownload(context)
                                     } else {
-                                        Toast.makeText(context, "Format kode RJ tidak valid", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.queue_toast_invalid_rj), Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
@@ -266,7 +268,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Unduh",
+                                text = stringResource(R.string.queue_btn_download),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
@@ -339,7 +341,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                         ) {
                             Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Bersihkan", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.action_clear), style = MaterialTheme.typography.labelMedium)
                         }
 
                         if (!isDownloading) {
@@ -350,7 +352,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                             ) {
                                 Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Mulai", style = MaterialTheme.typography.labelMedium)
+                                Text(stringResource(R.string.action_start), style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }
@@ -459,7 +461,7 @@ fun QueueScreen(viewModel: QueueViewModel) {
                                         ) {
                                             Icon(Icons.Default.ClearAll, contentDescription = null, modifier = Modifier.size(14.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Bersihkan Log", style = MaterialTheme.typography.labelSmall)
+                                            Text(stringResource(R.string.queue_console_clear), style = MaterialTheme.typography.labelSmall)
                                         }
                                     }
                                 }
@@ -500,7 +502,8 @@ fun QueueItemCard(
 
                 Column(modifier = Modifier.weight(1f)) {
                     val hasTranslation = !item.translatedTitle.isNullOrBlank()
-                    val mainTitle = if (hasTranslation) item.translatedTitle!! else item.title.ifBlank { "Mengambil info..." }
+                    val fetchingPlaceholder = stringResource(R.string.queue_fetching_info)
+                    val mainTitle = if (hasTranslation) item.translatedTitle!! else item.title.ifBlank { fetchingPlaceholder }
 
                     Text(
                         text = "[${item.rjid}] $mainTitle",
@@ -555,7 +558,7 @@ fun QueueItemCard(
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = "Hapus Antrean",
+                            contentDescription = stringResource(R.string.queue_remove_item),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             modifier = Modifier.size(18.dp)
                         )
