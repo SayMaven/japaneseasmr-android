@@ -60,6 +60,20 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ -> }
 
+    override fun attachBaseContext(newBase: Context?) {
+        if (newBase == null) {
+            super.attachBaseContext(null)
+            return
+        }
+        val initialLang = com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager.getFastCachedLanguage(newBase)
+        val localizedContext = LocaleHelper.applyLocale(newBase, initialLang)
+        super.attachBaseContext(localizedContext)
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)

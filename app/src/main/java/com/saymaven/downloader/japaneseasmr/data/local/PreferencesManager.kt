@@ -45,6 +45,15 @@ class PreferencesManager(private val context: Context) {
         val KEY_REPEAT_MODE = intPreferencesKey("repeat_mode")
         val KEY_SHUFFLE_MODE = booleanPreferencesKey("shuffle_mode")
         val KEY_SHOW_REMAINING_TIME = booleanPreferencesKey("show_remaining_time")
+
+        fun getFastCachedLanguage(context: Context): String {
+            return try {
+                val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+                sp.getString("cached_app_language", "system") ?: "system"
+            } catch (e: Exception) {
+                "system"
+            }
+        }
     }
 
     fun getInitialThemeMode(): ThemeMode {
@@ -68,7 +77,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     fun getInitialAppLanguage(): String {
-        return fastSp.getString("cached_app_language", "system") ?: "system"
+        return getFastCachedLanguage(context)
     }
 
     val appLanguageFlow: Flow<String> = context.dataStore.data.map { preferences ->
