@@ -32,6 +32,7 @@ class PreferencesManager(private val context: Context) {
 
         // Audio Player Settings
         val KEY_EXCLUSIVE_USB_DAC = booleanPreferencesKey("exclusive_usb_dac")
+        val KEY_EXCLUSIVE_USB_VOLUME = floatPreferencesKey("exclusive_usb_volume")
         val KEY_EXCLUSIVE_AUDIO_FOCUS = booleanPreferencesKey("exclusive_audio_focus")
         val KEY_PAUSE_ON_UNPLUG = booleanPreferencesKey("pause_on_unplug")
         val KEY_SKIP_SILENCE = booleanPreferencesKey("skip_silence")
@@ -39,12 +40,31 @@ class PreferencesManager(private val context: Context) {
         val KEY_AUTO_RESUME = booleanPreferencesKey("auto_resume")
         val KEY_DEFAULT_SPEED = floatPreferencesKey("default_speed")
 
+        const val PREF_KEY_USB_VOLUME = "cached_exclusive_usb_volume"
+        const val DEFAULT_USB_VOLUME = 0.25f
+
         // Playback State Persistence
         val KEY_LAST_PLAYED_RJID = stringPreferencesKey("last_played_rjid")
         val KEY_LAST_POSITION_MS = longPreferencesKey("last_position_ms")
         val KEY_REPEAT_MODE = intPreferencesKey("repeat_mode")
         val KEY_SHUFFLE_MODE = booleanPreferencesKey("shuffle_mode")
         val KEY_SHOW_REMAINING_TIME = booleanPreferencesKey("show_remaining_time")
+
+        fun getFastCachedUsbVolume(context: Context): Float {
+            return try {
+                val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+                sp.getFloat(PREF_KEY_USB_VOLUME, DEFAULT_USB_VOLUME)
+            } catch (e: Exception) {
+                DEFAULT_USB_VOLUME
+            }
+        }
+
+        fun setFastCachedUsbVolume(context: Context, volume: Float) {
+            try {
+                val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+                sp.edit().putFloat(PREF_KEY_USB_VOLUME, volume.coerceIn(0.0f, 1.0f)).apply()
+            } catch (ignored: Exception) {}
+        }
 
         fun getFastCachedLanguage(context: Context): String {
             return try {
@@ -148,6 +168,10 @@ class PreferencesManager(private val context: Context) {
     // Audio Player Settings Flows
     val exclusiveUsbDacFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_EXCLUSIVE_USB_DAC] ?: false
+    }
+
+    val exclusiveUsbVolumeFlow: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[KEY_EXCLUSIVE_USB_VOLUME] ?: DEFAULT_USB_VOLUME
     }
 
     val exclusiveAudioFocusFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -282,6 +306,14 @@ class PreferencesManager(private val context: Context) {
     suspend fun setExclusiveUsbDac(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_EXCLUSIVE_USB_DAC] = enabled
+        }
+    }
+
+    suspend fun setExclusiveUsbVolume(volume: Float) {
+        val clamped = volume.coerceIn(0.0f, 1.0f)
+        setFastCachedUsbVolume(context, clamped)
+        context.dataStore.edit { preferences ->
+            preferences[KEY_EXCLUSIVE_USB_VOLUME] = clamped
         }
     }
 

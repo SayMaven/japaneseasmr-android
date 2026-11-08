@@ -22,12 +22,22 @@ android {
         applicationId = "com.saymaven.downloader.japaneseasmr"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.3.1"
+        versionCode = 7
+        versionName = "1.3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags += listOf("-std=c++17", "-O3", "-frtti", "-fexceptions")
+                arguments += listOf("-DANDROID_STL=c++_shared")
+            }
+        }
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 
@@ -70,6 +80,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        prefab = true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
     packaging {
         resources {
@@ -116,6 +134,9 @@ dependencies {
 
     // Image loading with Coil
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Google Oboe Native Audio
+    implementation("com.google.oboe:oboe:1.9.0")
 
     // Media3 ExoPlayer for Audio Playback & MediaSession
     val media3Version = "1.5.0"

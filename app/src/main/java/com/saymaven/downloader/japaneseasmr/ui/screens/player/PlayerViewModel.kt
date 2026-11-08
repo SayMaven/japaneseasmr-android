@@ -172,7 +172,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         viewModelScope.launch {
-            delay(1500)
             withContext(Dispatchers.IO) {
                 resolveAndPreloadInitialCover()
             }
@@ -552,6 +551,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 MediaItem.Builder()
                     .setUri(Uri.fromFile(file))
+                    .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(file)).build())
                     .setMediaId(item.rjid)
                     .setMediaMetadata(metaBuilder.build())
                     .build()
@@ -756,6 +756,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 MediaItem.Builder()
                     .setUri(Uri.fromFile(file))
+                    .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(file)).build())
                     .setMediaId(item.rjid)
                     .setMediaMetadata(metaBuilder.build())
                     .build()
@@ -790,7 +791,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     try {
                         retriever.setDataSource(f.absolutePath)
                         val pic = retriever.embeddedPicture
-                        if (pic != null && pic.isNotEmpty()) return@withContext pic
+                        if (pic != null && pic.isNotEmpty() && pic.size <= 256 * 1024) return@withContext pic
                     } catch (e: Exception) {
                     } finally {
                         try { retriever.release() } catch (e: Exception) {}
@@ -800,41 +801,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         } catch (e: Exception) {
         }
         return@withContext null
-    }
-
-    fun streamOnline(rawRjId: String) {
-        viewModelScope.launch {
-            val meta = DLsiteScraper.fetchMetadata(rawRjId)
-            val tracks = TrackDiscoveryService.discoverAllTracks(rawRjId)
-            val trackUrl = tracks.firstOrNull()?.url ?: return@launch
-
-            _currentRjId.value = meta.rjid
-            val p = player ?: return@launch
-            val coverBytes = loadArtworkBytes(null, meta.coverUrl)
-
-            _audioSpecs.value = "44.1kHz | 16bits | 320kbps"
-
-            val metaBuilder = MediaMetadata.Builder()
-                .setTitle("[${meta.rjid}] ${meta.title}")
-                .setArtist(meta.cv)
-                .setAlbumTitle(meta.circle)
-                .setArtworkUri(Uri.parse(meta.coverUrl ?: ""))
-
-            if (coverBytes != null) {
-                metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-            }
-
-            val mediaItem = MediaItem.Builder()
-                .setUri(Uri.parse(trackUrl))
-                .setMediaId(meta.rjid)
-                .setMediaMetadata(metaBuilder.build())
-                .build()
-
-            p.setMediaItem(mediaItem)
-            p.prepare()
-            p.play()
-            saveCurrentState()
-        }
     }
 
     fun togglePlayPause() {
@@ -1158,7 +1124,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 .putInt("cached_repeat", _repeatMode.value)
                 .putBoolean("cached_shuffle", _shuffleMode.value)
                 .putBoolean("cached_show_remaining", _showRemainingTime.value)
-                .commit()
+                .apply()
         }
     }
 

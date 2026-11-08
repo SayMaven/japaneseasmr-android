@@ -11,11 +11,19 @@ import android.hardware.usb.UsbManager
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import com.saymaven.downloader.japaneseasmr.service.usb.UsbAudioEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class UsbDacInfo(
     val isConnected: Boolean = false,
@@ -27,7 +35,11 @@ data class UsbDacInfo(
 
 object UsbDacManager {
 
+    private const val TAG = "UsbDacManager"
     private const val ACTION_USB_PERMISSION = "com.saymaven.downloader.japaneseasmr.USB_PERMISSION"
+
+    private val dacScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var checkJob: Job? = null
 
     private val _dacState = MutableStateFlow(UsbDacInfo())
     val dacState = _dacState.asStateFlow()
@@ -48,23 +60,24 @@ object UsbDacManager {
     private var lastDeviceIdentifier: String? = null
 
     fun init(context: Context, exclusiveSetting: Boolean) {
+        val appContext = context.applicationContext
         isExclusiveEnabledSetting = exclusiveSetting
         if (isInitialized) {
-            checkCurrentDevices(context)
+            checkCurrentDevices(appContext)
             return
         }
         isInitialized = true
 
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             audioManager.registerAudioDeviceCallback(object : android.media.AudioDeviceCallback() {
                 override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
-                    checkCurrentDevices(context)
+                    checkCurrentDevices(appContext)
                 }
 
                 override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
-                    checkCurrentDevices(context)
+                    checkCurrentDevices(appContext)
                 }
             }, null)
         }
@@ -89,41 +102,51 @@ object UsbDacManager {
                     val permissionGranted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
                     if (permissionGranted && device != null) {
                         userDeniedPermission = false
-                        claimUsbDevice(c, device)
+                        dacScope.launch {
+                            claimUsbDevice(appContext, device)
+                            checkCurrentDevices(appContext)
+                        }
                     } else {
                         userDeniedPermission = true
+                        checkCurrentDevices(appContext)
                     }
                 } else if (action == UsbManager.ACTION_USB_DEVICE_DETACHED) {
                     hasRequestedPermission = false
                     userDeniedPermission = false
                     lastDeviceIdentifier = null
-                    UsbAudioEngine.release()
+                    dacScope.launch {
+                        UsbAudioEngine.release()
+                        checkCurrentDevices(appContext)
+                    }
+                } else {
+                    checkCurrentDevices(appContext)
                 }
-                checkCurrentDevices(c)
             }
         }
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+                appContext.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
             } else {
-                context.registerReceiver(receiver, filter)
+                appContext.registerReceiver(receiver, filter)
             }
         } catch (e: Exception) {
             try {
-                context.registerReceiver(receiver, filter)
+                appContext.registerReceiver(receiver, filter)
             } catch (ignored: Exception) {}
         }
 
-        checkCurrentDevices(context)
+        checkCurrentDevices(appContext)
     }
 
     fun setExclusiveSetting(context: Context, enabled: Boolean) {
+        val appContext = context.applicationContext
         isExclusiveEnabledSetting = enabled
+        NativeAudioPlayer.setExclusiveMode(enabled)
         if (!enabled) {
             UsbAudioEngine.release()
         }
-        checkCurrentDevices(context)
+        checkCurrentDevices(appContext)
     }
 
     fun setHardwareVolume(percent: Float) {
@@ -143,7 +166,20 @@ object UsbDacManager {
         UsbAudioEngine.claimAndInitialize(context, device)
     }
 
+    /**
+     * Debounced, non-blocking device check dispatched to background IO thread.
+     * Prevents ANR and UI frame skips when DAC is attached.
+     */
     fun checkCurrentDevices(context: Context) {
+        val appContext = context.applicationContext
+        checkJob?.cancel()
+        checkJob = dacScope.launch {
+            delay(150L) // Debounce rapid simultaneous broadcast & audio callback triggers
+            performDeviceCheckInternal(appContext)
+        }
+    }
+
+    private suspend fun performDeviceCheckInternal(context: Context) {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
@@ -151,7 +187,7 @@ object UsbDacManager {
         var targetAudioDeviceInfo: AudioDeviceInfo? = null
         var targetUsbDevice: UsbDevice? = null
 
-        // 1. Scan via UsbManager
+        // 1. Scan via UsbManager in IO thread
         try {
             val deviceList = usbManager.deviceList
             for (dev in deviceList.values) {
@@ -172,9 +208,10 @@ object UsbDacManager {
                 }
             }
         } catch (e: Exception) {
+            Log.w(TAG, "Error querying USB devices", e)
         }
 
-        // 2. Scan via AudioManager
+        // 2. Scan via AudioManager in IO thread
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             for (dev in devices) {
@@ -227,6 +264,51 @@ object UsbDacManager {
         val isActuallyClaimed = UsbAudioEngine.isClaimedAndActive.value
         val exclusiveActive = isConnectedNow && isExclusiveEnabledSetting && isActuallyClaimed
 
+        // Synchronize NativeAudioPlayer with device ID and exclusive mode
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && targetAudioDeviceInfo != null) {
+            NativeAudioPlayer.setPreferredDeviceId(targetAudioDeviceInfo.id)
+        } else {
+            NativeAudioPlayer.setPreferredDeviceId(0)
+        }
+        NativeAudioPlayer.setExclusiveMode(isExclusiveEnabledSetting)
+
+        // Android 14+ (API 34+) Hardware Bit-Perfect Exclusive Mixer Lockout
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && targetAudioDeviceInfo != null) {
+            try {
+                val mediaAttr = android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+
+                if (exclusiveActive) {
+                    val supported = audioManager.getSupportedMixerAttributes(targetAudioDeviceInfo)
+                    Log.i(TAG, "Supported Mixer Attributes count: ${supported.size}")
+                    var bitPerfectAttr: android.media.AudioMixerAttributes? = null
+                    for (attr in supported) {
+                        Log.i(TAG, "Available MixerAttr: behavior=${attr.mixerBehavior}, format=${attr.format}")
+                        if (attr.mixerBehavior == android.media.AudioMixerAttributes.MIXER_BEHAVIOR_BIT_PERFECT) {
+                            bitPerfectAttr = attr
+                            break
+                        }
+                    }
+                    if (bitPerfectAttr == null && supported.isNotEmpty()) {
+                        bitPerfectAttr = android.media.AudioMixerAttributes.Builder(supported[0].format)
+                            .setMixerBehavior(android.media.AudioMixerAttributes.MIXER_BEHAVIOR_BIT_PERFECT)
+                            .build()
+                    }
+                    if (bitPerfectAttr != null) {
+                        val setRes = audioManager.setPreferredMixerAttributes(mediaAttr, targetAudioDeviceInfo, bitPerfectAttr)
+                        Log.i(TAG, "setPreferredMixerAttributes (BIT_PERFECT) result: $setRes")
+                    }
+                } else {
+                    audioManager.clearPreferredMixerAttributes(mediaAttr, targetAudioDeviceInfo)
+                    Log.i(TAG, "Cleared preferred mixer attributes on USB DAC")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error configuring Bit-Perfect mixer attributes", e)
+            }
+        }
+
         val newState = UsbDacInfo(
             isConnected = isConnectedNow,
             dacName = if (foundDacName.isBlank()) "USB Audio DAC" else foundDacName,
@@ -237,22 +319,23 @@ object UsbDacManager {
 
         _dacState.value = newState
 
-        if (!wasExclusiveActive && exclusiveActive) {
-            Toast.makeText(
-                context,
-                "Mode Eksklusif Aktif: Terhubung ke ${newState.dacName}",
-                Toast.LENGTH_LONG
-            ).show()
-        } else if (wasConnected && !isConnectedNow) {
-            UsbAudioEngine.release()
-            hasRequestedPermission = false
-            userDeniedPermission = false
-            Toast.makeText(
-                context,
-                "USB DAC Terputus. Mode Eksklusif dinonaktifkan.",
-                Toast.LENGTH_SHORT
-            ).show()
+        withContext(Dispatchers.Main) {
+            if (!wasExclusiveActive && exclusiveActive) {
+                Toast.makeText(
+                    context,
+                    "Mode Eksklusif Aktif: Terhubung ke ${newState.dacName}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } else if (wasConnected && !isConnectedNow) {
+                UsbAudioEngine.release()
+                hasRequestedPermission = false
+                userDeniedPermission = false
+                Toast.makeText(
+                    context,
+                    "USB DAC Terputus. Mode Eksklusif dinonaktifkan.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 }
-

@@ -249,7 +249,13 @@
     <string name="settings_threads_opt_16">16 Jalur (Rekomendasi)</string>
     <string name="settings_threads_opt_24">24 Jalur (Cepat)</string>
     <string name="settings_threads_opt_32">32 Jalur (Maksimum)</string>
-    <string name="settings_changelog_v131_title">Versi 1.3.1 (Terbaru)</string>
+    <string name="settings_changelog_v132_title">Versi 1.3.2 (Terbaru)</string>
+    <string name="settings_changelog_v132_item1">• Engine Audio Native C++: Dukungan Google Oboe Exclusive MMAP &amp; miniaudio untuk streaming DAC bit-perfect.</string>
+    <string name="settings_changelog_v132_item2">• True Bit-Perfect USB Mode: Bypass mixer sistem Android langsung ke DAC eksternal tanpa resampling OS.</string>
+    <string name="settings_changelog_v132_item3">• Zero-Jank UI &amp; Anti-ANR: Pemindaian USB DAC asinkron penuh di latar belakang dan bebas blocking storage I/O.</string>
+    <string name="settings_changelog_v132_item4">• Proteksi Hot-Unplug Aman: Pemutaran otomatis di-pause jika USB DAC atau headphone terlepas mendadak.</string>
+    <string name="settings_changelog_v132_item5">• Anti-Redaman Ganda: Pengaturan volume hardware langsung menggerakkan amplifier DAC dengan output PCM 100% utuh.</string>
+    <string name="settings_changelog_v131_title">Versi 1.3.1</string>
     <string name="settings_changelog_v131_item1">• Multi-Bahasa Antarmuka (UI Localization): Dukungan penuh bahasa Indonesia, English, 日本語 (Jepang), dan 简体中文 (Mandarin).</string>
     <string name="settings_changelog_v131_item2">• Deteksi Bahasa Sistem Otomatis: Aplikasi menyesuaikan bahasa tampilan mengikuti pengaturan perangkat pengguna secara otomatis.</string>
     <string name="settings_changelog_v131_item3">• Pemilih Bahasa Manual di Pengaturan: Pengguna dapat bebas memilih bahasa aplikasi tanpa mengubah bahasa sistem ponsel.</string>

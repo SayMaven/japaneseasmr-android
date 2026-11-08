@@ -249,7 +249,13 @@
     <string name="settings_threads_opt_16">16 线程 (推荐)</string>
     <string name="settings_threads_opt_24">24 线程 (快速)</string>
     <string name="settings_threads_opt_32">32 线程 (极致)</string>
-    <string name="settings_changelog_v131_title">版本 1.3.1 (最新)</string>
+    <string name="settings_changelog_v132_title">版本 1.3.2 (最新)</string>
+    <string name="settings_changelog_v132_item1">• 原生 C++ 音频引擎: 结合 Google Oboe 独占 MMAP 与 miniaudio 实现无损源码率直通输出。</string>
+    <string name="settings_changelog_v132_item2">• 真正的 USB DAC 独占模式: 彻底绕过系统混音器重采样限制。</string>
+    <string name="settings_changelog_v132_item3">• 零卡顿界面 &amp; 防止 ANR: 全后台异步 USB 设备探测，移除所有阻塞式 I/O 写入。</string>
+    <string name="settings_changelog_v132_item4">• 意外断开保护: USB DAC 或耳机意外拔出时自动暂停播放，杜绝外放尴尬。</string>
+    <string name="settings_changelog_v132_item5">• 消除双重音量衰减: 硬件音量直接驱动 DAC 放大器，PCM 数字增益保持无损满幅。</string>
+    <string name="settings_changelog_v131_title">版本 1.3.1</string>
     <string name="settings_changelog_v131_item1">• 全界面多语言支持: 完整支持简体中文、英语、印尼语以及日语 (日本語)。</string>
     <string name="settings_changelog_v131_item2">• 自动系统语言检测: 应用界面会根据设备系统语言设置自动切换。</string>
     <string name="settings_changelog_v131_item3">• 应用内手动语言切换: 用户可在设置中自由切换应用语言，无需更改系统语言。</string>

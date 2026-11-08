@@ -18,6 +18,8 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
     companion object {
         lateinit var instance: JapaneseAsmrApp
             private set
+        val instanceOrNull: JapaneseAsmrApp?
+            get() = if (::instance.isInitialized) instance else null
         const val CHANNEL_DOWNLOAD_ID = "japaneseasmr_download_channel"
         const val CHANNEL_DOWNLOAD_NAME = "JapaneseASMR Downloads"
         const val CHANNEL_PLAYBACK_ID = "japaneseasmr_playback_channel"

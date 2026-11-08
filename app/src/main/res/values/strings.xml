@@ -249,7 +249,13 @@
     <string name="settings_threads_opt_16">16 Threads (Recommended)</string>
     <string name="settings_threads_opt_24">24 Threads (Fast)</string>
     <string name="settings_threads_opt_32">32 Threads (Maximum)</string>
-    <string name="settings_changelog_v131_title">Version 1.3.1 (Latest)</string>
+    <string name="settings_changelog_v132_title">Version 1.3.2 (Latest)</string>
+    <string name="settings_changelog_v132_item1">• Native C++ Audio Engine: Google Oboe Exclusive MMAP &amp; miniaudio bit-perfect DAC streaming.</string>
+    <string name="settings_changelog_v132_item2">• True Bit-Perfect USB Mode: Direct hardware bypass for external DACs without OS mixer resampling.</string>
+    <string name="settings_changelog_v132_item3">• Zero-Jank UI &amp; ANR Prevention: Fully asynchronous background USB device discovery and non-blocking state cache.</string>
+    <string name="settings_changelog_v132_item4">• Hot-Unplug Protection: Auto-pause playback safely when USB DAC or headphones are disconnected.</string>
+    <string name="settings_changelog_v132_item5">• No Double Attenuation: Hardware volume control directly drives DAC amplifier with full-scale PCM output.</string>
+    <string name="settings_changelog_v131_title">Version 1.3.1</string>
     <string name="settings_changelog_v131_item1">• Full UI Localization: Complete support for English, Indonesian, Japanese (日本語), and Simplified Chinese (简体中文).</string>
     <string name="settings_changelog_v131_item2">• Automatic System Language Detection: App automatically matches your device\'s default locale.</string>
     <string name="settings_changelog_v131_item3">• In-App Language Selector: Switch language anytime in Settings without changing phone system language.</string>
