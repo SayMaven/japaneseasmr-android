@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.3.1-blue?style=for-the-badge" alt="Versi v1.3.1" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.4.0-blue?style=for-the-badge" alt="Versi v1.4.0" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/Lisensi-GPL%20v3.0-10b981?style=for-the-badge" alt="Lisensi GPL v3.0" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Bahasa-Kotlin-7c3aed?style=for-the-badge" alt="Bahasa" />
@@ -29,6 +29,9 @@
 </div>
 
 ---
+
+> [!NOTE]
+> Aplikasi ini awalnya dibuat untuk pemakaian pribadi dan saat ini mungkin masih ada beberapa bug. Terima kasih buat yang sudah download! Saya akan perbaiki pelan-pelan kalau ada waktu luang. Feel free to open an issue or PR!
 
 ## Gambaran Umum
 
