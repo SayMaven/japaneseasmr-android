@@ -40,8 +40,8 @@ private:
     int mClockSourceId = 6;
     uint32_t mSampleRate = 44100;
 
-    static constexpr int NUM_URBS = 16;
-    static constexpr int PACKETS_PER_URB = 16; // 16 microframes = 2 milliseconds per URB (Total 32ms hardware queue)
+    static constexpr int NUM_URBS = 32;
+    static constexpr int PACKETS_PER_URB = 32; // 32 microframes = 4 milliseconds per URB (Total 128ms hardware queue)
     static constexpr int MAX_PACKET_SIZE = 196;
     static constexpr int URB_BUF_SIZE = PACKETS_PER_URB * MAX_PACKET_SIZE;
 

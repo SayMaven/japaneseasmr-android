@@ -63,6 +63,9 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
 
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
+            .allowHardware(true)
+            .fetcherDispatcher(Dispatchers.IO.limitedParallelism(3))
+            .decoderDispatcher(Dispatchers.Default.limitedParallelism(3))
             .memoryCache {
                 MemoryCache.Builder(this)
                     .maxSizePercent(0.35)

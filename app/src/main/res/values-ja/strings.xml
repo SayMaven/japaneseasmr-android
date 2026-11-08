@@ -2,7 +2,7 @@
     <string name="app_name">JapaneseASMR</string>
 
     <!-- ナビゲーションタブ -->
-    <string name="tab_player">プレーヤー</string>
+    <string name="tab_player">ホーム</string>
     <string name="tab_queue">ダウンロード</string>
     <string name="tab_history">ライブラリ</string>
     <string name="tab_settings">設定</string>
@@ -170,6 +170,11 @@
     <string name="player_folder_empty_format">フォルダ「%1$s」は空です。</string>
     <string name="player_playlist_next_title">再生リスト (%1$d)</string>
     <string name="player_playlist_sheet_header">コレクション再生リスト (%1$d)</string>
+    <string name="playlist_sort_custom">カスタム</string>
+    <string name="playlist_sort_date">日付</string>
+    <string name="playlist_sort_title">タイトル</string>
+    <string name="playlist_sort_duration">再生時間</string>
+    <string name="playlist_sort_rj">RJ番号</string>
     <string name="player_action_open_playlist">再生リストを開く</string>
     <string name="player_action_move_folder">フォルダ移動</string>
     <string name="player_action_reorder">並び替え</string>
@@ -249,7 +254,15 @@
     <string name="settings_threads_opt_16">16スレッド (推奨)</string>
     <string name="settings_threads_opt_24">24スレッド (高速)</string>
     <string name="settings_threads_opt_32">32スレッド (最大)</string>
-    <string name="settings_changelog_v132_title">バージョン 1.3.2 (最新)</string>
+    <string name="settings_changelog_v140_title">バージョン 1.4.0 (最新)</string>
+    <string name="settings_changelog_v140_item1">• アプリ内自動更新: Smart Dual-Channel Matching (デバッグ/リリース) を備えたGitHub Releases経由の直接更新。</string>
+    <string name="settings_changelog_v140_item2">• HiByスタイルUIリニューアル: 起動時にコレクションプレイリストを直接表示。</string>
+    <string name="settings_changelog_v140_item3">• マルチフィールドソートバー: カスタム、日付、タイトル、再生時間、RJコード別ソート（昇順/降順トグル対応）。</string>
+    <string name="settings_changelog_v140_item4">• 超スムーズなドラッグ並び替え: 衝突判定とバネアニメーション、触覚フィードバックによる滑らかな曲順移動。</string>
+    <string name="settings_changelog_v140_item5">• ビットパーフェクトUSB DACバッファ拡張: 128msカーネルURBと13万フレームリングバッファでスクロール時のノイズを解消。</string>
+    <string name="settings_changelog_v140_item6">• 0ms高速コールド起動: 同期プレイリストキャッシュにより起動直後の遅延をゼロ化。</string>
+    <string name="settings_changelog_v140_item7">• プレイヤー操作性向上: 再生ボタン位置を44dp上げて片手操作を快適化し、重複RJバッジを修正。</string>
+    <string name="settings_changelog_v132_title">バージョン 1.3.2</string>
     <string name="settings_changelog_v132_item1">• ネイティブC++オーディオエンジン: Google Oboe Exclusive MMAPとminiaudioによるビットパーフェクト再生。</string>
     <string name="settings_changelog_v132_item2">• 完全USB DAC排他モード: OSミキサーのリサンプリングを完全にバイパス。</string>
     <string name="settings_changelog_v132_item3">• UIスタッター解消 &amp; ANR防止: USBデバイス検出の完全非同期化とブロッキングI/Oの排除。</string>
@@ -283,4 +296,24 @@
     <string name="queue_status_fetching">作品情報を取得中…</string>
     <string name="queue_status_processing">音声を結合しメタデータを埋め込み中…</string>
     <string name="queue_status_cancelled">キャンセル済み</string>
+
+    <!-- Auto Updater Strings -->
+    <string name="settings_check_update_title">アップデートを確認</string>
+    <string name="settings_check_update_desc">現在のバージョン: v%1$s (ビルド %2$d)</string>
+    <string name="settings_checking_updates">最新リリースを確認中…</string>
+    <string name="settings_no_update_toast">最新バージョンを使用しています (v%1$s)</string>
+    <string name="settings_update_available_title">新しいアップデートがあります</string>
+    <string name="settings_update_version_badge">バージョン %1$s</string>
+    <string name="settings_update_channel_debug">デバッグチャンネル</string>
+    <string name="settings_update_channel_release">リリースチャンネル</string>
+    <string name="settings_update_debug_tip">デバッグビルドを検出: 署名競合を防ぎデータを保持するためデバッグAPKを適用します。</string>
+    <string name="settings_update_download_btn">ダウンロードして更新</string>
+    <string name="settings_update_downloading_title">アップデートをダウンロード中…</string>
+    <string name="settings_update_ready_title">ダウンロード完了</string>
+    <string name="settings_update_ready_desc">アップデートパッケージの準備が整いました。下のボタンをタップしてインストールしてください。</string>
+    <string name="settings_update_install_btn">アップデートをインストール</string>
+    <string name="settings_update_later_btn">後で</string>
+    <string name="settings_update_dev_header">開発者テストオプション</string>
+    <string name="settings_update_dev_test_apk">ローカルAPKをテストインストール</string>
+    <string name="settings_update_dev_channel_toggle">デバッグチャンネルを使用</string>
 </resources>

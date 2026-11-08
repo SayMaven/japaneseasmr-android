@@ -38,8 +38,11 @@ import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.BuildConfig
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
+import com.saymaven.downloader.japaneseasmr.data.model.UpdateInfo
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
+import com.saymaven.downloader.japaneseasmr.service.UpdateManager
 import kotlinx.coroutines.launch
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +68,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val defaultSpeed by viewModel.defaultSpeed.collectAsState()
     val translationLanguage by viewModel.translationLanguage.collectAsState()
     val appLanguage by viewModel.appLanguage.collectAsState()
+    val updateUiState by viewModel.updateUiState.collectAsState()
+    val targetDebugChannel by viewModel.targetDebugChannel.collectAsState()
 
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -455,10 +460,58 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_app_version, BuildConfig.VERSION_NAME), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Build ${BuildConfig.VERSION_CODE}", style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                    headlineContent = { Text(stringResource(R.string.settings_check_update_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = {
+                        if (updateUiState is UpdateUiState.Checking) {
+                            Text(stringResource(R.string.settings_checking_updates), style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Text(
+                                stringResource(R.string.settings_check_update_desc, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    },
+                    leadingContent = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = {
+                        if (updateUiState is UpdateUiState.Checking) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        } else {
+                            FilledTonalButton(
+                                onClick = { viewModel.checkForUpdate() },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Text(stringResource(R.string.action_refresh))
+                            }
+                        }
+                    },
+                    modifier = Modifier.clickable {
+                        if (updateUiState !is UpdateUiState.Checking) {
+                            viewModel.checkForUpdate()
+                        }
+                    }
                 )
+
+                if (BuildConfig.DEBUG) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.settings_update_dev_channel_toggle), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = {
+                            Text(
+                                if (targetDebugChannel) stringResource(R.string.settings_update_channel_debug)
+                                else stringResource(R.string.settings_update_channel_release),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = { Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+                        trailingContent = {
+                            Switch(
+                                checked = targetDebugChannel,
+                                onCheckedChange = { viewModel.setTargetDebugChannel(it) }
+                            )
+                        }
+                    )
+                }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
@@ -506,6 +559,228 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     }
 
     // Dialogs
+    when (val state = updateUiState) {
+        is UpdateUiState.NoUpdateAvailable -> {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissUpdateDialog() },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.settings_check_update_title))
+                    }
+                },
+                text = {
+                    Text(stringResource(R.string.settings_no_update_toast, state.currentVersion))
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
+                        Text(stringResource(R.string.action_confirm))
+                    }
+                }
+            )
+        }
+        is UpdateUiState.UpdateAvailable -> {
+            val info = state.info
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissUpdateDialog() },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.settings_update_available_title))
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    stringResource(R.string.settings_update_version_badge, info.versionName),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            Surface(
+                                color = if (info.isDebugAsset) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    if (info.isDebugAsset) stringResource(R.string.settings_update_channel_debug) else stringResource(R.string.settings_update_channel_release),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (info.isDebugAsset) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+
+                        if (BuildConfig.DEBUG && info.isDebugAsset) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Text(
+                                    stringResource(R.string.settings_update_debug_tip),
+                                    modifier = Modifier.padding(8.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        if (info.fileSize > 0) {
+                            val mb = String.format(java.util.Locale.US, "%.1f MB", info.fileSize / (1024.0 * 1024.0))
+                            Text(
+                                text = "${info.fileName} ($mb)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (info.releaseNotes.isNotBlank()) {
+                            Text(
+                                stringResource(R.string.settings_changelog_title),
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 240.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    info.releaseNotes,
+                                    modifier = Modifier
+                                        .padding(10.dp)
+                                        .verticalScroll(rememberScrollState()),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { viewModel.startDownload(info) }) {
+                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(stringResource(R.string.settings_update_download_btn))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
+                        Text(stringResource(R.string.settings_update_later_btn))
+                    }
+                }
+            )
+        }
+        is UpdateUiState.Downloading -> {
+            val downState = state
+            AlertDialog(
+                onDismissRequest = { /* Jangan tutup sembarangan saat mengunduh */ },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(stringResource(R.string.settings_update_downloading_title))
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LinearProgressIndicator(
+                            progress = { downState.progress.coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            val percent = (downState.progress * 100).toInt()
+                            Text("$percent%", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            if (downState.totalBytes > 0) {
+                                val dlMb = String.format(java.util.Locale.US, "%.1f", downState.downloadedBytes / (1024.0 * 1024.0))
+                                val totMb = String.format(java.util.Locale.US, "%.1f MB", downState.totalBytes / (1024.0 * 1024.0))
+                                Text("$dlMb / $totMb", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                }
+            )
+        }
+        is UpdateUiState.ReadyToInstall -> {
+            val apkFile = state.apkFile
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissUpdateDialog() },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.settings_update_ready_title))
+                    }
+                },
+                text = {
+                    Text(stringResource(R.string.settings_update_ready_desc))
+                },
+                confirmButton = {
+                    Button(onClick = { viewModel.installApk(context, apkFile) }) {
+                        Icon(Icons.Default.InstallMobile, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(stringResource(R.string.settings_update_install_btn))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
+                        Text(stringResource(R.string.action_close))
+                    }
+                }
+            )
+        }
+        is UpdateUiState.Error -> {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissUpdateDialog() },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Error")
+                    }
+                },
+                text = {
+                    Text(state.message)
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.dismissUpdateDialog() }) {
+                        Text(stringResource(R.string.action_close))
+                    }
+                }
+            )
+        }
+        else -> Unit
+    }
     if (showThemeDialog) {
         AlertDialog(
             onDismissRequest = { showThemeDialog = false },
@@ -866,6 +1141,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text(stringResource(R.string.settings_changelog_title)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(stringResource(R.string.settings_changelog_v140_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_changelog_v140_item1), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v140_item2), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v140_item3), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v140_item4), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v140_item5), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v140_item6), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v140_item7), style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(stringResource(R.string.settings_changelog_v132_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text(stringResource(R.string.settings_changelog_v132_item1), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.settings_changelog_v132_item2), style = MaterialTheme.typography.bodySmall)

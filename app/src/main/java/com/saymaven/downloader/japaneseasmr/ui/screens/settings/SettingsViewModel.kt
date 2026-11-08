@@ -1,15 +1,22 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.settings
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.saymaven.downloader.japaneseasmr.BuildConfig
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
+import com.saymaven.downloader.japaneseasmr.data.model.UpdateInfo
+import com.saymaven.downloader.japaneseasmr.service.UpdateManager
 import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -230,4 +237,76 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             preferencesManager.setDefaultSpeed(speed)
         }
     }
+
+    // ================= Auto Updater State & Actions =================
+    private val _updateUiState = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
+    val updateUiState = _updateUiState.asStateFlow()
+
+    private val _targetDebugChannel = MutableStateFlow(BuildConfig.DEBUG)
+    val targetDebugChannel = _targetDebugChannel.asStateFlow()
+
+    fun setTargetDebugChannel(enabled: Boolean) {
+        _targetDebugChannel.value = enabled
+    }
+
+    fun checkForUpdate() {
+        if (_updateUiState.value is UpdateUiState.Checking) return
+        _updateUiState.value = UpdateUiState.Checking
+        viewModelScope.launch {
+            val result = UpdateManager.checkForUpdate(targetChannelDebug = _targetDebugChannel.value)
+            result.onSuccess { info ->
+                if (info != null) {
+                    _updateUiState.value = UpdateUiState.UpdateAvailable(info)
+                } else {
+                    _updateUiState.value = UpdateUiState.NoUpdateAvailable(BuildConfig.VERSION_NAME)
+                }
+            }.onFailure { err ->
+                _updateUiState.value = UpdateUiState.Error(err.message ?: "Gagal memeriksa pembaruan")
+            }
+        }
+    }
+
+    fun startDownload(info: UpdateInfo) {
+        _updateUiState.value = UpdateUiState.Downloading(0f, 0L, info.fileSize)
+        viewModelScope.launch {
+            val result = UpdateManager.downloadUpdate(
+                context = getApplication(),
+                downloadUrl = info.downloadUrl,
+                fileName = info.fileName
+            ) { progress, downloaded, total ->
+                _updateUiState.value = UpdateUiState.Downloading(progress, downloaded, total)
+            }
+
+            result.onSuccess { apkFile ->
+                _updateUiState.value = UpdateUiState.ReadyToInstall(apkFile)
+            }.onFailure { err ->
+                _updateUiState.value = UpdateUiState.Error(err.message ?: "Gagal mengunduh berkas pembaruan")
+            }
+        }
+    }
+
+    fun installApk(context: Context, apkFile: File) {
+        if (!UpdateManager.canRequestPackageInstalls(context)) {
+            UpdateManager.openInstallPermissionSettings(context)
+            return
+        }
+        val res = UpdateManager.installApk(context, apkFile)
+        if (res.isFailure) {
+            _updateUiState.value = UpdateUiState.Error(res.exceptionOrNull()?.message ?: "Gagal memulai pemasangan APK")
+        }
+    }
+
+    fun dismissUpdateDialog() {
+        _updateUiState.value = UpdateUiState.Idle
+    }
+}
+
+sealed interface UpdateUiState {
+    object Idle : UpdateUiState
+    object Checking : UpdateUiState
+    data class NoUpdateAvailable(val currentVersion: String) : UpdateUiState
+    data class UpdateAvailable(val info: UpdateInfo) : UpdateUiState
+    data class Downloading(val progress: Float, val downloadedBytes: Long, val totalBytes: Long) : UpdateUiState
+    data class ReadyToInstall(val apkFile: File) : UpdateUiState
+    data class Error(val message: String) : UpdateUiState
 }

@@ -2,7 +2,7 @@
     <string name="app_name">JapaneseASMR</string>
 
     <!-- Navigation Tabs -->
-    <string name="tab_player">Player</string>
+    <string name="tab_player">Home</string>
     <string name="tab_queue">Queue</string>
     <string name="tab_history">Library</string>
     <string name="tab_settings">Settings</string>
@@ -170,6 +170,11 @@
     <string name="player_folder_empty_format">Folder \'%1$s\' is empty.</string>
     <string name="player_playlist_next_title">UP NEXT • PLAYLIST (%1$d)</string>
     <string name="player_playlist_sheet_header">Collection Playlist (%1$d)</string>
+    <string name="playlist_sort_custom">Custom</string>
+    <string name="playlist_sort_date">Date</string>
+    <string name="playlist_sort_title">Title</string>
+    <string name="playlist_sort_duration">Duration</string>
+    <string name="playlist_sort_rj">RJ Code</string>
     <string name="player_action_open_playlist">Open Playlist</string>
     <string name="player_action_move_folder">Move Folder</string>
     <string name="player_action_reorder">Reorder</string>
@@ -249,7 +254,15 @@
     <string name="settings_threads_opt_16">16 Threads (Recommended)</string>
     <string name="settings_threads_opt_24">24 Threads (Fast)</string>
     <string name="settings_threads_opt_32">32 Threads (Maximum)</string>
-    <string name="settings_changelog_v132_title">Version 1.3.2 (Latest)</string>
+    <string name="settings_changelog_v140_title">Version 1.4.0 (Latest)</string>
+    <string name="settings_changelog_v140_item1">• In-App Auto-Updater: Direct version updates via GitHub Releases with Smart Dual-Channel Matching (debug vs release).</string>
+    <string name="settings_changelog_v140_item2">• HiBy-Style UI Redesign: Dedicated Playlist Collection screen directly shown on launch.</string>
+    <string name="settings_changelog_v140_item3">• Multi-Field Sorting Bar: Sort by Custom, Date, Title, Duration, and RJ Code with tap-to-toggle Ascending / Descending.</string>
+    <string name="settings_changelog_v140_item4">• Ultra-Smooth Drag Reordering: Physics-based collision detection with animateItem() spring transitions and haptic feedback.</string>
+    <string name="settings_changelog_v140_item5">• Bit-Perfect USB DAC Buffer Expansion: 128ms kernel URB depth &amp; 131k-frame SPSC ring buffer eliminating audio crackle during scrolling.</string>
+    <string name="settings_changelog_v140_item6">• 0ms Instant Cold-Launch Startup: Synchronous playlist cache loading with zero loading delay on frame 1.</string>
+    <string name="settings_changelog_v140_item7">• Player Ergonomics Polish: Playback transport controls elevated by 44dp for thumb reach; resolved duplicate RJ badge.</string>
+    <string name="settings_changelog_v132_title">Version 1.3.2</string>
     <string name="settings_changelog_v132_item1">• Native C++ Audio Engine: Google Oboe Exclusive MMAP &amp; miniaudio bit-perfect DAC streaming.</string>
     <string name="settings_changelog_v132_item2">• True Bit-Perfect USB Mode: Direct hardware bypass for external DACs without OS mixer resampling.</string>
     <string name="settings_changelog_v132_item3">• Zero-Jank UI &amp; ANR Prevention: Fully asynchronous background USB device discovery and non-blocking state cache.</string>
@@ -283,4 +296,24 @@
     <string name="queue_status_fetching">Fetching work metadata…</string>
     <string name="queue_status_processing">Merging audio &amp; embedding metadata…</string>
     <string name="queue_status_cancelled">Cancelled</string>
+
+    <!-- Auto Updater Strings -->
+    <string name="settings_check_update_title">Check for Updates</string>
+    <string name="settings_check_update_desc">Current version: v%1$s (Build %2$d)</string>
+    <string name="settings_checking_updates">Checking for updates…</string>
+    <string name="settings_no_update_toast">You are already on the latest version (v%1$s)</string>
+    <string name="settings_update_available_title">New Update Available</string>
+    <string name="settings_update_version_badge">Version %1$s</string>
+    <string name="settings_update_channel_debug">Debug Channel</string>
+    <string name="settings_update_channel_release">Release Channel</string>
+    <string name="settings_update_debug_tip">Debug build detected: auto-updater will use debug signature to preserve your app data and prevent conflicts.</string>
+    <string name="settings_update_download_btn">Download &amp; Update</string>
+    <string name="settings_update_downloading_title">Downloading Update…</string>
+    <string name="settings_update_ready_title">Download Complete</string>
+    <string name="settings_update_ready_desc">The update package is ready. Tap below to install.</string>
+    <string name="settings_update_install_btn">Install Update</string>
+    <string name="settings_update_later_btn">Later</string>
+    <string name="settings_update_dev_header">Developer Testing Options</string>
+    <string name="settings_update_dev_test_apk">Test Install Local APK</string>
+    <string name="settings_update_dev_channel_toggle">Use Debug Channel</string>
 </resources>

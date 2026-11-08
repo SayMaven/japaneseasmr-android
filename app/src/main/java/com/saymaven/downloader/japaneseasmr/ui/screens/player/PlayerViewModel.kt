@@ -43,8 +43,23 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
+
+enum class PlaylistSortType {
+    CUSTOM,
+    DATE,
+    TITLE,
+    DURATION,
+    RJID
+}
+
+data class PlaylistSortState(
+    val type: PlaylistSortType = PlaylistSortType.CUSTOM,
+    val isAscending: Boolean = false
+)
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -53,8 +68,74 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val historyDao = AsmrDatabase.getDatabase(application).historyDao()
     private val CURRENT_TRANSLATION_ENGINE_VERSION = 2
 
+    // Fast downloadDir StateFlow initialized from SP cache (instant 0ms)
+    private val _downloadDir = MutableStateFlow<String?>(sp.getString("cached_download_dir", null))
+
+    private fun loadFastCachedPlaylist(): List<HistoryEntity> {
+        return try {
+            val file = File(getApplication<Application>().filesDir, "fast_playlist.json")
+            if (file.exists() && file.length() > 0L) {
+                val jsonStr = file.readText()
+                val array = JSONArray(jsonStr)
+                val list = ArrayList<HistoryEntity>(array.length())
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    list.add(
+                        HistoryEntity(
+                            rjid = obj.getString("rjid"),
+                            title = obj.getString("title"),
+                            cv = obj.optString("cv", "-"),
+                            circle = obj.optString("circle", "-"),
+                            genre = obj.optString("genre", "-"),
+                            ageRating = obj.optString("ageRating", "-"),
+                            coverUrl = obj.optString("coverUrl", ""),
+                            localFilePath = obj.optString("localFilePath", ""),
+                            downloadDate = obj.optString("downloadDate", ""),
+                            fileSize = obj.optString("fileSize", ""),
+                            chaptersJson = if (obj.has("chaptersJson") && !obj.isNull("chaptersJson")) obj.optString("chaptersJson") else null,
+                            translatedTitle = if (obj.has("translatedTitle") && !obj.isNull("translatedTitle")) obj.optString("translatedTitle") else null,
+                            translatedChaptersJson = if (obj.has("translatedChaptersJson") && !obj.isNull("translatedChaptersJson")) obj.optString("translatedChaptersJson") else null
+                        )
+                    )
+                }
+                list
+            } else {
+                emptyList()
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveFastCachedPlaylist(items: List<HistoryEntity>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val array = JSONArray()
+                for (item in items) {
+                    val obj = JSONObject()
+                    obj.put("rjid", item.rjid)
+                    obj.put("title", item.title)
+                    obj.put("cv", item.cv)
+                    obj.put("circle", item.circle)
+                    obj.put("genre", item.genre)
+                    obj.put("ageRating", item.ageRating)
+                    obj.put("coverUrl", item.coverUrl)
+                    obj.put("localFilePath", item.localFilePath)
+                    obj.put("downloadDate", item.downloadDate)
+                    obj.put("fileSize", item.fileSize)
+                    if (item.chaptersJson != null) obj.put("chaptersJson", item.chaptersJson)
+                    if (item.translatedTitle != null) obj.put("translatedTitle", item.translatedTitle)
+                    if (item.translatedChaptersJson != null) obj.put("translatedChaptersJson", item.translatedChaptersJson)
+                    array.put(obj)
+                }
+                val file = File(getApplication<Application>().filesDir, "fast_playlist.json")
+                file.writeText(array.toString())
+            } catch (_: Exception) {}
+        }
+    }
+
     // Playlist: HANYA berisi audio yang benar-benar ada filenya di HP (0 missing tracks)
-    private val _playlist = MutableStateFlow<List<HistoryEntity>>(emptyList())
+    private val _playlist = MutableStateFlow<List<HistoryEntity>>(loadFastCachedPlaylist())
     val playlist = _playlist.asStateFlow()
 
     // Folder Filter & Organization States
@@ -68,8 +149,56 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _selectedFolder.value = folder
     }
 
-    val filteredPlaylist = combine(_playlist, _selectedFolder, prefs.downloadDirFlow) { list, folder, rawDirStr ->
-        if (folder == "Semua") {
+    // Playlist Sorting State
+    private val _sortState = MutableStateFlow(
+        PlaylistSortState(
+            type = try {
+                PlaylistSortType.valueOf(sp.getString("playlist_sort_type", PlaylistSortType.CUSTOM.name) ?: PlaylistSortType.CUSTOM.name)
+            } catch (_: Exception) {
+                PlaylistSortType.CUSTOM
+            },
+            isAscending = sp.getBoolean("playlist_sort_asc", false)
+        )
+    )
+    val sortState = _sortState.asStateFlow()
+
+    fun toggleSort(type: PlaylistSortType) {
+        val current = _sortState.value
+        if (current.type == type) {
+            val newAsc = !current.isAscending
+            _sortState.value = current.copy(isAscending = newAsc)
+            sp.edit().putBoolean("playlist_sort_asc", newAsc).apply()
+        } else {
+            val defaultAsc = when (type) {
+                PlaylistSortType.TITLE -> true
+                else -> false
+            }
+            _sortState.value = PlaylistSortState(type = type, isAscending = defaultAsc)
+            sp.edit()
+                .putString("playlist_sort_type", type.name)
+                .putBoolean("playlist_sort_asc", defaultAsc)
+                .apply()
+        }
+    }
+
+    private fun parseFileSizeToBytes(sizeStr: String?): Long {
+        if (sizeStr.isNullOrBlank()) return 0L
+        return try {
+            val clean = sizeStr.trim().replace(",", ".").uppercase(Locale.ROOT)
+            val num = clean.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: 0.0
+            when {
+                clean.endsWith("GB") -> (num * 1024 * 1024 * 1024).toLong()
+                clean.endsWith("MB") -> (num * 1024 * 1024).toLong()
+                clean.endsWith("KB") -> (num * 1024).toLong()
+                else -> num.toLong()
+            }
+        } catch (_: Exception) {
+            0L
+        }
+    }
+
+    val filteredPlaylist = combine(_playlist, _selectedFolder, _downloadDir, _sortState) { list, folder, rawDirStr, sort ->
+        val folderFiltered = if (folder == "Semua") {
             list
         } else {
             val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), rawDirStr) ?: rawDirStr
@@ -79,7 +208,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 itemFolder.equals(folder, ignoreCase = true)
             }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        when (sort.type) {
+            PlaylistSortType.CUSTOM -> folderFiltered
+            PlaylistSortType.DATE -> {
+                if (sort.isAscending) {
+                    folderFiltered.sortedBy { AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath) }
+                } else {
+                    folderFiltered.sortedByDescending { AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath) }
+                }
+            }
+            PlaylistSortType.TITLE -> {
+                if (sort.isAscending) {
+                    folderFiltered.sortedBy { it.title.lowercase(Locale.ROOT) }
+                } else {
+                    folderFiltered.sortedByDescending { it.title.lowercase(Locale.ROOT) }
+                }
+            }
+            PlaylistSortType.DURATION -> {
+                if (sort.isAscending) {
+                    folderFiltered.sortedBy { parseFileSizeToBytes(it.fileSize) }
+                } else {
+                    folderFiltered.sortedByDescending { parseFileSizeToBytes(it.fileSize) }
+                }
+            }
+            PlaylistSortType.RJID -> {
+                if (sort.isAscending) {
+                    folderFiltered.sortedBy { it.rjid.filter { c -> c.isDigit() }.toLongOrNull() ?: 0L }
+                } else {
+                    folderFiltered.sortedByDescending { it.rjid.filter { c -> c.isDigit() }.toLongOrNull() ?: 0L }
+                }
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, _playlist.value)
 
     val dacState = UsbDacManager.dacState
     val hardwareVolume = UsbDacManager.hardwareVolume
@@ -171,6 +332,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var sleepTimerJob: Job? = null
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            // Instant 0ms Cache-first boot: populate immediately from direct database
+            val initialDbList = historyDao.getAllHistoryDirect()
+            if (initialDbList.isNotEmpty() && _playlist.value.isEmpty()) {
+                val savedOrderStr = sp.getString("custom_playlist_order", null)
+                val orderMap = if (!savedOrderStr.isNullOrBlank()) {
+                    savedOrderStr.split(",")
+                        .mapIndexed { idx, rjid -> rjid.trim() to idx }
+                        .toMap()
+                } else {
+                    emptyMap()
+                }
+                val initialSorted = if (orderMap.isNotEmpty()) {
+                    initialDbList.sortedBy { orderMap[it.rjid] ?: Int.MAX_VALUE }
+                } else {
+                    initialDbList.sortedByDescending { AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath) }
+                }
+                _playlist.value = initialSorted
+                saveFastCachedPlaylist(initialSorted)
+            }
+        }
+
+        viewModelScope.launch {
+            prefs.downloadDirFlow.collect { dir ->
+                _downloadDir.value = dir
+                sp.edit().putString("cached_download_dir", dir).apply()
+            }
+        }
+
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 resolveAndPreloadInitialCover()
@@ -303,10 +493,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             validItems.sortedByDescending { AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath) }
         }
         _playlist.value = sorted
-
-        sorted.take(20).forEach { item ->
-            preloadCoverArtInMemory(item.coverUrl)
-        }
+        saveFastCachedPlaylist(sorted)
     }
 
     fun createNewFolder(folderName: String) {
@@ -368,6 +555,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     // Ultra-Fast In-Memory Reorder (0 disk I/O, 0 IPC calls during drag)
     fun reorderPlaylistInMemory(fromIndex: Int, toIndex: Int) {
+        if (_sortState.value.type != PlaylistSortType.CUSTOM) {
+            _sortState.value = PlaylistSortState(PlaylistSortType.CUSTOM, false)
+            sp.edit().putString("playlist_sort_type", PlaylistSortType.CUSTOM.name).putBoolean("playlist_sort_asc", false).apply()
+        }
         val current = _playlist.value.toMutableList()
         if (fromIndex in current.indices && toIndex in current.indices && fromIndex != toIndex) {
             val item = current.removeAt(fromIndex)
@@ -380,6 +571,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun commitPlaylistReorder() {
         val current = _playlist.value
         if (current.isNotEmpty()) {
+            saveFastCachedPlaylist(current)
             val rjidList = current.map { it.rjid }
             viewModelScope.launch(Dispatchers.IO) {
                 val str = rjidList.joinToString(",")

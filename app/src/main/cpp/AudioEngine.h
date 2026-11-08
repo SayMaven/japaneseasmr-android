@@ -65,8 +65,8 @@ private:
     AudioDecoder mDecoder;
     std::mutex mDecoderMutex;
 
-    // Lock-Free Ring Buffer (Jitter Buffer ~1.5s capacity)
-    AudioRingBuffer mRingBuffer{65536};
+    // Lock-Free Ring Buffer (Jitter Buffer ~3.0s capacity)
+    AudioRingBuffer mRingBuffer{131072};
     std::thread mDecoderThread;
     std::atomic<bool> mDecoderRunning{false};
     std::atomic<bool> mDecoderEof{false};

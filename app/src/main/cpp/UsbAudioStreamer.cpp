@@ -157,7 +157,7 @@ void* UsbAudioStreamer::threadFunc(void* context) {
     auto* self = static_cast<UsbAudioStreamer*>(context);
 
     // Set maximum real-time priority for urgent audio thread
-    setpriority(PRIO_PROCESS, 0, -19);
+    setpriority(PRIO_PROCESS, 0, -20);
 
     struct sched_param param;
     param.sched_priority = sched_get_priority_max(SCHED_FIFO);

@@ -64,7 +64,10 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun PlayerScreen(viewModel: PlayerViewModel) {
+fun PlayerScreen(
+    viewModel: PlayerViewModel,
+    onCollapse: () -> Unit = {}
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val currentRjId by viewModel.currentRjId.collectAsState()
@@ -106,102 +109,82 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 
     var isSliderDragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableLongStateOf(0L) }
-    var showBottomSheet by remember { mutableStateOf(false) }
     var showChapterSheet by remember { mutableStateOf(false) }
-    var showNewFolderDialog by remember { mutableStateOf(false) }
-    var newFolderNameInput by remember { mutableStateOf("") }
-    var itemToMove by remember { mutableStateOf<HistoryEntity?>(null) }
-    var showMoveDialog by remember { mutableStateOf(false) }
+    var showSleepTimerSheet by remember { mutableStateOf(false) }
+    var draftTimerMinutes by remember { mutableIntStateOf(15) }
 
-    // NestedScrollConnection to prevent upward fast-fling from accidentally closing ModalBottomSheet
     val sheetNestedScroll = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 return Offset.Zero
             }
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                // Consume remaining vertical velocity to prevent bottom sheet dismiss
                 return available
             }
         }
     }
 
-    var showSleepTimerSheet by remember { mutableStateOf(false) }
-    var draftTimerMinutes by remember { mutableIntStateOf(15) }
-
     val effectivePosition = if (isSliderDragging) dragPosition else currentPosition
 
-    // Standard High-Performance Drag-to-Reorder States using unique draggedRjid
-    val listState = rememberLazyListState()
-    var draggedRjid by remember { mutableStateOf<String?>(null) }
-    var dragAccumulatedY by remember { mutableFloatStateOf(0f) }
-    val density = LocalDensity.current
-    val slotHeightPx = remember(density) { with(density) { 74.dp.toPx() } }
-
-    // Controlled Gentle Auto-Scroll only when held at the very edge (<44dp from boundary)
-    LaunchedEffect(draggedRjid) {
-        while (isActive && draggedRjid != null) {
-            val targetRjid = draggedRjid ?: break
-            val curIdx = playlist.indexOfFirst { it.rjid == targetRjid }
-            if (curIdx == -1) break
-
-            val visibleInfo = listState.layoutInfo.visibleItemsInfo
-            val itemInfo = visibleInfo.firstOrNull { it.index == curIdx }
-
-            if (itemInfo != null) {
-                val itemTop = itemInfo.offset + dragAccumulatedY
-                val itemBottom = itemTop + itemInfo.size
-                val viewportHeight = listState.layoutInfo.viewportSize.height.toFloat()
-                val edgeZone = with(density) { 44.dp.toPx() }
-
-                if (itemTop < edgeZone && listState.canScrollBackward) {
-                    listState.scrollBy(-12f)
-                    if (curIdx > 0 && dragAccumulatedY < -slotHeightPx * 0.4f) {
-                        viewModel.reorderPlaylistInMemory(curIdx, curIdx - 1)
-                        dragAccumulatedY += slotHeightPx
-                    }
-                } else if (itemBottom > viewportHeight - edgeZone && listState.canScrollForward) {
-                    listState.scrollBy(12f)
-                    if (curIdx < playlist.size - 1 && dragAccumulatedY > slotHeightPx * 0.4f) {
-                        viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
-                        dragAccumulatedY -= slotHeightPx
-                    }
-                }
-            }
-            delay(16)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
-        // ================= 1. HEADER (TITLE & CV) & COVER ART =================
         Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // RJID Pill Badge
-            if (!currentRjId.isNullOrBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(bottom = 6.dp)
+            // ================= 1. HEADER (TITLE & CV) & COVER ART =================
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Top Navigation Bar with Chevron Down Collapse Button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = currentRjId ?: "",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                    )
+                    IconButton(
+                        onClick = onCollapse,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.action_close),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+
+                    // RJID Pill Badge
+                    if (!currentRjId.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        ) {
+                            Text(
+                                text = currentRjId ?: "",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(40.dp))
+                    }
+
+                    Spacer(modifier = Modifier.size(40.dp))
                 }
-            }
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Clean Title (Clean from [RJxxxx] prefix for cleaner presentation)
             val cleanOriginalTitle = currentTitle.replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+\\]\\s*"), "").trim()
@@ -641,335 +624,10 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Bottom Playlist Drawer Opener Button (Exact Screenshot 2 style)
-            Surface(
-                onClick = { showBottomSheet = true },
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = stringResource(R.string.player_playlist_next_title, playlist.size),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowUp,
-                        contentDescription = stringResource(R.string.player_action_open_playlist),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-
-    // ================= 3. PLAYLIST BOTTOM SHEET =================
-    if (showBottomSheet) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val filteredPlaylist by viewModel.filteredPlaylist.collectAsState()
-        val currentLocalConfig = LocalConfiguration.current
-        val currentLocalContext = LocalContext.current
-        ModalBottomSheet(
-            onDismissRequest = { showBottomSheet = false },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-        ) {
-            CompositionLocalProvider(
-                LocalConfiguration provides currentLocalConfig,
-                LocalContext provides currentLocalContext
-            ) {
-                Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.80f)
-                    .padding(horizontal = 16.dp)
-                    .nestedScroll(sheetNestedScroll)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.player_playlist_sheet_header, filteredPlaylist.size),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    IconButton(
-                        onClick = {
-                            scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                showBottomSheet = false
-                            }
-                        },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.action_close),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                // Subfolder Selector Row
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    items(availableFolders) { folder ->
-                        val isSelected = (folder == selectedFolder)
-                        val folderDisplayName = when (folder) {
-                            "Semua" -> stringResource(R.string.player_folder_all)
-                            "Utama" -> stringResource(R.string.player_folder_main)
-                            else -> folder
-                        }
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { viewModel.selectFolder(folder) },
-                            label = { Text(folderDisplayName, style = MaterialTheme.typography.labelMedium) },
-                            leadingIcon = if (isSelected) {
-                                { Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                            } else {
-                                { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                            }
-                        )
-                    }
-                    item {
-                        AssistChip(
-                            onClick = {
-                                newFolderNameInput = ""
-                                showNewFolderDialog = true
-                            },
-                            label = { Text(stringResource(R.string.player_folder_new), style = MaterialTheme.typography.labelMedium) },
-                            leadingIcon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                if (filteredPlaylist.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (selectedFolder == "Semua" || selectedFolder == stringResource(R.string.player_folder_all)) {
-                                stringResource(R.string.player_folder_all_empty)
-                            } else {
-                                val folderDisplay = if (selectedFolder == "Utama") stringResource(R.string.player_folder_main) else selectedFolder
-                                stringResource(R.string.player_folder_empty_format, folderDisplay)
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    val onDragStartAction = remember {
-                        { rjid: String ->
-                            val currentIdx = filteredPlaylist.indexOfFirst { it.rjid == rjid }
-                            if (currentIdx != -1) {
-                                draggedRjid = rjid
-                                dragAccumulatedY = 0f
-                            }
-                        }
-                    }
-                    val onDragAction = remember(slotHeightPx) {
-                        { dragAmount: Float ->
-                            dragAccumulatedY += dragAmount
-
-                            val targetRjid = draggedRjid ?: return@remember
-                            val curIdx = filteredPlaylist.indexOfFirst { it.rjid == targetRjid }
-                            if (curIdx == -1) return@remember
-
-                            val threshold = slotHeightPx * 0.48f
-
-                            if (dragAccumulatedY > threshold && curIdx < filteredPlaylist.size - 1) {
-                                viewModel.reorderPlaylistInMemory(curIdx, curIdx + 1)
-                                dragAccumulatedY -= slotHeightPx
-                            } else if (dragAccumulatedY < -threshold && curIdx > 0) {
-                                viewModel.reorderPlaylistInMemory(curIdx, curIdx - 1)
-                                dragAccumulatedY += slotHeightPx
-                            }
-                        }
-                    }
-                    val onDragEndAction = remember {
-                        {
-                            viewModel.commitPlaylistReorder()
-                            draggedRjid = null
-                            dragAccumulatedY = 0f
-                        }
-                    }
-                    val onItemClickAction = remember {
-                        { clickedItem: HistoryEntity ->
-                            viewModel.playLocalTrack(clickedItem, filteredPlaylist)
-                            scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                showBottomSheet = false
-                            }
-                            Unit
-                        }
-                    }
-                    val onItemMoveAction = remember {
-                        { clickedItem: HistoryEntity ->
-                            itemToMove = clickedItem
-                            showMoveDialog = true
-                        }
-                    }
-
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .nestedScroll(sheetNestedScroll),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(top = 10.dp, bottom = 52.dp)
-                    ) {
-                        items(
-                            items = filteredPlaylist,
-                            key = { it.rjid },
-                            contentType = { "playlist_item" }
-                        ) { item ->
-                            val isCurrentTrack = (item.rjid == currentRjId)
-                            val isDragged = (draggedRjid == item.rjid)
-
-                            PlaylistItemCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                item = item,
-                                isCurrentTrack = isCurrentTrack,
-                                isPlaying = (isCurrentTrack && isPlaying),
-                                isDragged = isDragged,
-                                dragOffsetY = if (isDragged) dragAccumulatedY else 0f,
-                                onDragStart = onDragStartAction,
-                                onDrag = onDragAction,
-                                onDragEnd = onDragEndAction,
-                                onClick = onItemClickAction,
-                                onMoveClick = onItemMoveAction
-                            )
-                        }
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(44.dp))
         }
     }
 }
-
-    if (showNewFolderDialog) {
-        AlertDialog(
-            onDismissRequest = { showNewFolderDialog = false },
-            title = { Text(stringResource(R.string.player_folder_create_title)) },
-            text = {
-                Column {
-                    Text(stringResource(R.string.player_folder_create_desc), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newFolderNameInput,
-                        onValueChange = { newFolderNameInput = it },
-                        placeholder = { Text(stringResource(R.string.player_folder_create_hint)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    if (newFolderNameInput.isNotBlank()) {
-                        viewModel.createNewFolder(newFolderNameInput.trim())
-                        showNewFolderDialog = false
-                    }
-                }) {
-                    Text(stringResource(R.string.action_create))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNewFolderDialog = false }) { Text(stringResource(R.string.action_cancel)) }
-            }
-        )
-    }
-
-    if (showMoveDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showMoveDialog = false
-                itemToMove = null
-            },
-            title = { Text(stringResource(R.string.player_folder_move_title)) },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    val allFolderLabel = stringResource(R.string.player_folder_all)
-                    val targetFolders = availableFolders.filter { it != "Semua" && it != allFolderLabel }
-                    val workTitle = "[${itemToMove?.rjid ?: ""}] ${itemToMove?.title ?: ""}"
-                    Text(stringResource(R.string.player_folder_move_desc, workTitle), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    targetFolders.forEach { folder ->
-                        Surface(
-                            onClick = {
-                                val target = itemToMove
-                                if (target != null) {
-                                    viewModel.moveTrackToFolder(target, folder)
-                                }
-                                showMoveDialog = false
-                                itemToMove = null
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                val targetFolderName = if (folder == "Utama") stringResource(R.string.player_folder_main) else folder
-                                Text(targetFolderName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = {
-                    showMoveDialog = false
-                    itemToMove = null
-                }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            }
-        )
-    }
 
     if (showSleepTimerSheet) {
         val sleepTimerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1466,180 +1124,6 @@ fun PlayerScreen(viewModel: PlayerViewModel) {
 }
 }
 
-private val PlaylistItemCardShape = RoundedCornerShape(12.dp)
-private val PlaylistItemThumbShape = RoundedCornerShape(6.dp)
-
-@Composable
-fun PlaylistItemCard(
-    modifier: Modifier = Modifier,
-    item: HistoryEntity,
-    isCurrentTrack: Boolean,
-    isPlaying: Boolean,
-    isDragged: Boolean,
-    dragOffsetY: Float,
-    onDragStart: (String) -> Unit,
-    onDrag: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onClick: (HistoryEntity) -> Unit,
-    onMoveClick: (HistoryEntity) -> Unit
-) {
-    val context = LocalContext.current
-    val currentOnDragStart by rememberUpdatedState(onDragStart)
-    val currentOnDrag by rememberUpdatedState(onDrag)
-    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
-    val currentRjid by rememberUpdatedState(item.rjid)
-
-    val cardModifier = if (isDragged) {
-        modifier
-            .fillMaxWidth()
-            .zIndex(100f)
-            .graphicsLayer {
-                translationY = dragOffsetY
-                scaleX = 1.03f
-                scaleY = 1.03f
-                shadowElevation = 30f
-                shape = PlaylistItemCardShape
-                clip = false
-            }
-            .clickable { onClick(item) }
-    } else {
-        modifier
-            .fillMaxWidth()
-            .clickable { onClick(item) }
-    }
-
-    Card(
-        modifier = cardModifier,
-        shape = PlaylistItemCardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = when {
-                isDragged -> MaterialTheme.colorScheme.secondaryContainer
-                isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-            }
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val cover = item.coverUrl
-            if (!cover.isNullOrBlank()) {
-                val imageReq = remember(cover) {
-                    ImageRequest.Builder(context)
-                        .data(cover)
-                        .memoryCacheKey(cover)
-                        .size(120, 90) // Exact thumbnail resolution
-                        .crossfade(false)
-                        .build()
-                }
-                AsyncImage(
-                    model = imageReq,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(54.dp, 40.dp)
-                        .clip(PlaylistItemThumbShape)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(54.dp, 40.dp)
-                        .clip(PlaylistItemThumbShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "[${item.rjid}] ${item.title}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "CV: ${item.cv} \u2022 ${item.fileSize}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            if (isCurrentTrack) {
-                AnimatedEqualizerWave(
-                    isPlaying = isPlaying,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            } else {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = stringResource(R.string.player_action_play),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(4.dp))
-
-            // Tombol Pindah Folder
-            IconButton(
-                onClick = { onMoveClick(item) },
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.DriveFileMove,
-                    contentDescription = stringResource(R.string.player_action_move_folder),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            // Dedicated Drag Handle Touch Target (pointerInput with rememberUpdatedState)
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onDragStart = { currentOnDragStart(currentRjid) },
-                            onVerticalDrag = { change, dragAmount ->
-                                change.consume()
-                                currentOnDrag(dragAmount)
-                            },
-                            onDragEnd = { currentOnDragEnd() },
-                            onDragCancel = { currentOnDragEnd() }
-                        )
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DragHandle,
-                    contentDescription = stringResource(R.string.player_action_reorder),
-                    tint = if (isDragged) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    },
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-    }
-}
-
 private fun formatDuration(ms: Long): String {
     val totalSeconds = (ms / 1000).coerceAtLeast(0)
     val hours = totalSeconds / 3600
@@ -1650,96 +1134,6 @@ private fun formatDuration(ms: Long): String {
         String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
     } else {
         String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
-    }
-}
-
-
-@Composable
-fun AnimatedEqualizerWave(
-    isPlaying: Boolean,
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary
-) {
-    val barColor = color
-    if (!isPlaying) {
-        androidx.compose.foundation.Canvas(modifier = modifier.size(width = 22.dp, height = 18.dp)) {
-            val totalWidth = size.width
-            val totalHeight = size.height
-            val barWidth = 3.dp.toPx()
-            val spacing = (totalWidth - (4 * barWidth)) / 3
-            val staticHeights = listOf(0.35f, 0.6f, 0.45f, 0.7f)
-
-            staticHeights.forEachIndexed { i, hFraction ->
-                val barHeight = totalHeight * hFraction
-                val left = i * (barWidth + spacing)
-                val top = (totalHeight - barHeight) / 2
-                drawRoundRect(
-                    color = barColor.copy(alpha = 0.6f),
-                    topLeft = androidx.compose.ui.geometry.Offset(left, top),
-                    size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
-                )
-            }
-        }
-    } else {
-        // Animasi bernapas sangat lembut, tenang, dan lambat (Slow ASMR Breathing Rhythm)
-        val infiniteTransition = rememberInfiniteTransition(label = "asmr_calm_wave")
-        val anim1 by infiniteTransition.animateFloat(
-            initialValue = 0.3f,
-            targetValue = 0.8f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1800, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "bar1"
-        )
-        val anim2 by infiniteTransition.animateFloat(
-            initialValue = 0.75f,
-            targetValue = 0.35f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1500, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "bar2"
-        )
-        val anim3 by infiniteTransition.animateFloat(
-            initialValue = 0.4f,
-            targetValue = 0.85f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2100, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "bar3"
-        )
-        val anim4 by infiniteTransition.animateFloat(
-            initialValue = 0.8f,
-            targetValue = 0.3f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1650, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "bar4"
-        )
-
-        androidx.compose.foundation.Canvas(modifier = modifier.size(width = 22.dp, height = 18.dp)) {
-            val totalWidth = size.width
-            val totalHeight = size.height
-            val barWidth = 3.dp.toPx()
-            val spacing = (totalWidth - (4 * barWidth)) / 3
-            val animHeights = listOf(anim1, anim2, anim3, anim4)
-
-            animHeights.forEachIndexed { i, hFraction ->
-                val barHeight = totalHeight * hFraction
-                val left = i * (barWidth + spacing)
-                val top = (totalHeight - barHeight) / 2
-                drawRoundRect(
-                    color = barColor,
-                    topLeft = androidx.compose.ui.geometry.Offset(left, top),
-                    size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
-                )
-            }
-        }
     }
 }
 

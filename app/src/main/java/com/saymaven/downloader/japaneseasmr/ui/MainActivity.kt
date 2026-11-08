@@ -20,6 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.saymaven.downloader.japaneseasmr.ui.screens.playlist.PlaylistScreen
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
@@ -118,6 +124,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 var currentTab by remember { mutableStateOf(initialTab) }
+                var isPlayerExpanded by rememberSaveable { mutableStateOf(false) }
                 val visitedTabs = remember { mutableStateListOf(initialTab) }
                 LaunchedEffect(currentTab) {
                     activeTab = currentTab
@@ -139,11 +146,11 @@ class MainActivity : ComponentActivity() {
                                     .fillMaxWidth()
                                     .navigationBarsPadding()
                             ) {
-                                // Floating Mini Player (Hanya muncul saat berada di luar tab Home / Pemutar)
-                                if (currentTab != NavTab.HOME) {
+                                // Floating Mini Player (Docked across all tabs unless full player is expanded)
+                                if (!isPlayerExpanded) {
                                     MiniPlayer(
                                         viewModel = playerViewModel,
-                                        onExpand = { currentTab = NavTab.HOME }
+                                        onExpand = { isPlayerExpanded = true }
                                     )
                                 }
 
@@ -161,7 +168,7 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxSize()
                                 .padding(innerPadding)
                         ) {
-                            // Tab 0: Home / Pemutar Audio Penuh
+                            // Tab 0: Home / Daftar Putar Koleksi (HiBy Music Style)
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -172,7 +179,10 @@ class MainActivity : ComponentActivity() {
                                         translationX = if (active) 0f else 99999f
                                     }
                             ) {
-                                PlayerScreen(viewModel = playerViewModel)
+                                PlaylistScreen(
+                                    viewModel = playerViewModel,
+                                    onOpenPlayer = { isPlayerExpanded = true }
+                                )
                             }
 
                             // Tab 1: Unduhan / Queue
@@ -207,7 +217,7 @@ class MainActivity : ComponentActivity() {
                                         viewModel = historyViewModel,
                                         onPlayTrack = { historyEntity ->
                                             playerViewModel.playLocalTrack(historyEntity)
-                                            currentTab = NavTab.HOME
+                                            isPlayerExpanded = true
                                         },
                                         onRedownload = { historyEntity ->
                                             val item = DownloadQueueItem(
@@ -250,6 +260,30 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                    }
+
+                    // Expanded Full Player Layer (HiBy Music Style slide-up drawer)
+                    AnimatedVisibility(
+                        visible = isPlayerExpanded,
+                        enter = slideInVertically(
+                            initialOffsetY = { it },
+                            animationSpec = tween(350, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(300)),
+                        exit = slideOutVertically(
+                            targetOffsetY = { it },
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(250)),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(50f)
+                    ) {
+                        BackHandler(enabled = isPlayerExpanded) {
+                            isPlayerExpanded = false
+                        }
+                        PlayerScreen(
+                            viewModel = playerViewModel,
+                            onCollapse = { isPlayerExpanded = false }
+                        )
                     }
 
                     // Floating Hardware Volume HUD (Appears when Volume Up/Down is pressed in Exclusive Mode)

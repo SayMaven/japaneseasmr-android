@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.FilterQuality
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.ui.res.stringResource
@@ -292,6 +293,7 @@ fun HistoryItemCard(
                     ImageRequest.Builder(context)
                         .data(coverUrl)
                         .memoryCacheKey(coverUrl)
+                        .allowHardware(true)
                         .size(140, 104)
                         .crossfade(false)
                         .build()
@@ -300,6 +302,7 @@ fun HistoryItemCard(
                     model = imageReq,
                     contentDescription = "Cover",
                     contentScale = ContentScale.Crop,
+                    filterQuality = FilterQuality.Low,
                     modifier = Modifier
                         .size(70.dp, 52.dp)
                         .clip(HistoryThumbShape)

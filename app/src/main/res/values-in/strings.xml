@@ -2,7 +2,7 @@
     <string name="app_name">JapaneseASMR</string>
 
     <!-- Tab Navigasi -->
-    <string name="tab_player">Pemutar</string>
+    <string name="tab_player">Utama</string>
     <string name="tab_queue">Antrean</string>
     <string name="tab_history">Riwayat</string>
     <string name="tab_settings">Pengaturan</string>
@@ -170,6 +170,11 @@
     <string name="player_folder_empty_format">Folder \'%1$s\' masih kosong.</string>
     <string name="player_playlist_next_title">BERIKUTNYA • DAFTAR PUTAR (%1$d)</string>
     <string name="player_playlist_sheet_header">Daftar Putar Koleksi (%1$d)</string>
+    <string name="playlist_sort_custom">Kustom</string>
+    <string name="playlist_sort_date">Tanggal</string>
+    <string name="playlist_sort_title">Judul</string>
+    <string name="playlist_sort_duration">Durasi</string>
+    <string name="playlist_sort_rj">Kode RJ</string>
     <string name="player_action_open_playlist">Buka Daftar Putar</string>
     <string name="player_action_move_folder">Pindah Folder</string>
     <string name="player_action_reorder">Atur Urutan</string>
@@ -249,7 +254,15 @@
     <string name="settings_threads_opt_16">16 Jalur (Rekomendasi)</string>
     <string name="settings_threads_opt_24">24 Jalur (Cepat)</string>
     <string name="settings_threads_opt_32">32 Jalur (Maksimum)</string>
-    <string name="settings_changelog_v132_title">Versi 1.3.2 (Terbaru)</string>
+    <string name="settings_changelog_v140_title">Versi 1.4.0 (Terbaru)</string>
+    <string name="settings_changelog_v140_item1">• Pembaruan Otomatis Aplikasi: Update versi langsung di Pengaturan via GitHub Releases dengan Smart Dual-Channel Matching (debug vs release).</string>
+    <string name="settings_changelog_v140_item2">• Desain Baru Koleksi HiBy-Style: Layar Daftar Putar Koleksi mandiri yang tampil langsung saat aplikasi dibuka.</string>
+    <string name="settings_changelog_v140_item3">• Bilah Sortir Multi-Field: Urutkan berdasarkan Kustom, Tanggal, Judul, Durasi, dan Kode RJ dengan toggle Ascending / Descending.</string>
+    <string name="settings_changelog_v140_item4">• Geser Urutan Lagu Ultra-Mulus: Deteksi tabrakan presisi dengan animasi geser baris dan haptic feedback bergetar.</string>
+    <string name="settings_changelog_v140_item5">• Perbaikan Buffer DAC USB Bit-Perfect: Ekspansi kernel URB 128ms &amp; SPSC ring buffer 131k frame untuk membasmi suara kresek saat scroll.</string>
+    <string name="settings_changelog_v140_item6">• Peluncuran Dingin Instan 0ms: Pemuatan sinkron fast_playlist.json tanpa jeda loading beberapa milidetik.</string>
+    <string name="settings_changelog_v140_item7">• Ergonomi Pemutar Musik: Tombol kontrol pemutar dinaikkan +44dp agar ramah jangkauan jempol dan perbaikan duplikasi badge RJ.</string>
+    <string name="settings_changelog_v132_title">Versi 1.3.2</string>
     <string name="settings_changelog_v132_item1">• Engine Audio Native C++: Dukungan Google Oboe Exclusive MMAP &amp; miniaudio untuk streaming DAC bit-perfect.</string>
     <string name="settings_changelog_v132_item2">• True Bit-Perfect USB Mode: Bypass mixer sistem Android langsung ke DAC eksternal tanpa resampling OS.</string>
     <string name="settings_changelog_v132_item3">• Zero-Jank UI &amp; Anti-ANR: Pemindaian USB DAC asinkron penuh di latar belakang dan bebas blocking storage I/O.</string>
@@ -283,4 +296,24 @@
     <string name="queue_status_fetching">Mengambil metadata karya…</string>
     <string name="queue_status_processing">Menggabungkan audio &amp; menyematkan metadata…</string>
     <string name="queue_status_cancelled">Dibatalkan</string>
+
+    <!-- Auto Updater Strings -->
+    <string name="settings_check_update_title">Periksa Pembaruan Aplikasi</string>
+    <string name="settings_check_update_desc">Versi saat ini: v%1$s (Build %2$d)</string>
+    <string name="settings_checking_updates">Sedang memeriksa rilis terbaru…</string>
+    <string name="settings_no_update_toast">Anda sudah menggunakan versi terbaru (v%1$s)</string>
+    <string name="settings_update_available_title">Pembaruan Tersedia</string>
+    <string name="settings_update_version_badge">Versi %1$s</string>
+    <string name="settings_update_channel_debug">Channel Debug</string>
+    <string name="settings_update_channel_release">Channel Rilis</string>
+    <string name="settings_update_debug_tip">Terdeteksi build debug: pembaruan otomatis memakai tanda tangan debug agar data riwayat tidak hilang.</string>
+    <string name="settings_update_download_btn">Unduh &amp; Perbarui</string>
+    <string name="settings_update_downloading_title">Mengunduh Pembaruan…</string>
+    <string name="settings_update_ready_title">Unduhan Selesai</string>
+    <string name="settings_update_ready_desc">Paket pembaruan telah siap dipasang. Tekan tombol di bawah untuk memperbarui.</string>
+    <string name="settings_update_install_btn">Pasang Pembaruan</string>
+    <string name="settings_update_later_btn">Nanti Saja</string>
+    <string name="settings_update_dev_header">Opsi Pengujian Pengembang</string>
+    <string name="settings_update_dev_test_apk">Uji Pasang APK Lokal</string>
+    <string name="settings_update_dev_channel_toggle">Gunakan Channel Debug</string>
 </resources>
