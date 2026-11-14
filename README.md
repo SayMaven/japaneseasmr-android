@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#whats-new-in-v131">What's New</a> •
+    <a href="#whats-new-in-v140">What's New</a> •
     <a href="#features">Features</a> •
     <a href="#screenshots">Screenshots</a> •
     <a href="#download">Download</a> •
@@ -36,6 +36,29 @@
 ## Overview
 
 JapaneseASMR Downloader is a full-featured, open-source Android application engineered specifically for downloading, archiving, and listening to Japanese ASMR voice dramas (RJ Works). Built from the ground up with Jetpack Compose, Kotlin Coroutines, Room Database, and AndroidX Media3 (ExoPlayer), the app delivers desktop-grade streaming performance, zero-OOM memory safety, and seamless background audio playback on mobile devices.
+
+---
+
+## What's New in v1.4.0
+
+* **In-App Auto-Updater with Smart Dual-Channel Matching**:
+  * Check, download, and install new versions directly from the Settings menu via GitHub Releases API without manual browser downloads.
+  * *Smart Dual-Channel Matching*: Automatically detects whether you are running a debug testing build or a production release build, downloading the matching APK asset (`*-debug.apk` vs `*-release.apk`). This completely prevents Android signature conflicts (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) while preserving all local download history and settings.
+  * Modern Material 3 dialogs with real-time download speed & progress metrics, seamlessly integrated via Android `FileProvider`.
+* **HiBy-Style Playlist Collection & Multi-Field Sorting Toolbar**:
+  * Overhauled dedicated Playlist Collection screen directly displayed on launch.
+  * Horizontal multi-field sorting bar: instantly sort by **Custom Order**, **Date**, **Title**, **Duration**, and **RJ Code** with tap-to-toggle **Ascending (▲)** and **Descending (▼)** direction switching.
+* **Ultra-Smooth Physics-Based Drag & Drop Reordering**:
+  * Precision center-point collision detection algorithm paired with Jetpack Compose `Modifier.animateItem()` spring transitions.
+  * Subtle haptic vibration ticks on every slot swap and intelligent edge auto-scrolling.
+* **Zero-Latency 0ms Instant Cold-Launch Startup**:
+  * Synchronous playlist cache restoration on millisecond 0 (`fast_playlist.json`), eliminating loading delays and rendering collection items instantly on frame 1.
+* **Bit-Perfect USB Audio DAC Buffer Expansion (Crackle-Free Playback)**:
+  * Deepened Linux kernel USB isochronous streaming queue to 128ms hardware depth (32 URBs × 32 packets) and expanded lock-free SPSC ring buffer to 131,072 frames (~3 seconds buffer capacity) with real-time thread priority (`nice -20`).
+  * Tuned Coil image loader dispatcher parallelism, completely eliminating audio crackling, pops, and micro-stutter during rapid 120Hz playlist scrolling or multitasking.
+* **Player Ergonomics & UI Polish**:
+  * Playback transport controls (Play/Pause, Next, Previous) elevated by 44dp for effortless one-handed thumb reach.
+  * Resolved duplicate RJ code badge and refined navigation tab titles across locales ("Utama", "Home", "ホーム", "首页").
 
 ---
 
@@ -203,7 +226,7 @@ cd japaneseasmr-android
 
 The compiled APK will be located at:
 ```
-app/build/outputs/apk/debug/JapaneseASMR-v1.3.1-debug.apk
+app/build/outputs/apk/debug/JapaneseASMR-v1.4.0-debug.apk
 ```
 
 ---

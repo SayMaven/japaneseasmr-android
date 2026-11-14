@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#apa-yang-baru-di-v131">Pembaruan</a> •
+    <a href="#apa-yang-baru-di-v140">Pembaruan</a> •
     <a href="#fitur-utama">Fitur Utama</a> •
     <a href="#tangkapan-layar">Tangkapan Layar</a> •
     <a href="#unduh-aplikasi">Unduh</a> •
@@ -36,6 +36,29 @@
 ## Gambaran Umum
 
 JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) lengkap yang dirancang khusus untuk mengunduh, mengarsipkan, dan mendengarkan drama suara ASMR Jepang (Karya RJ). Dibangun menggunakan teknologi modern Android seperti Jetpack Compose, Kotlin Coroutines, Room Database, dan AndroidX Media3 (ExoPlayer), aplikasi ini menghadirkan performa pengunduhan berkecepatan tinggi, keamanan memori tanpa risiko OOM (Out of Memory), serta pemutaran audio latar belakang yang stabil dan hemat daya.
+
+---
+
+## Apa yang Baru di v1.4.0
+
+* **Pembaruan Otomatis Aplikasi Langsung (In-App Auto-Updater)**:
+  * Pengecekan, pengunduhan, dan pemasangan pembaruan versi langsung dari menu Pengaturan melalui GitHub Releases API.
+  * *Smart Dual-Channel Matching*: Otomatis mendeteksi varian build (Debug vs Release) dan mengunduh berkas APK yang cocok (`*-debug.apk` vs `*-release.apk`), mencegah konflik tanda tangan (*Signature Mismatch* / `INSTALL_FAILED_UPDATE_INCOMPATIBLE`) pada perangkat pengujian tanpa menghapus data riwayat.
+  * Tampilan dialog modern Material 3 dengan pelacakan kecepatan unduh, persentase *real-time*, dan integrasi aman Android `FileProvider`.
+* **Desain Ulang Layar Daftar Putar HiBy-Style & Bilah Sortir**:
+  * Tampilan mandiri Daftar Putar Koleksi langsung saat aplikasi dibuka.
+  * Bilah alat sortir multi-field: urutkan instan berdasarkan **Kustom**, **Tanggal**, **Judul**, **Durasi**, dan **Kode RJ** dengan sentuhan toggle arah **Ascending (▲)** dan **Descending (▼)**.
+* **Geser Urutan Lagu Ultra-Mulus (Physics-Based Drag & Drop)**:
+  * Algoritma deteksi tabrakan presisi (*center-point collision*) dengan animasi transisi pegas Jetpack Compose `Modifier.animateItem()`.
+  * Haptic vibration feedback pada setiap pergeseran slot lagu dan auto-scrolling otomatis di tepi layar.
+* **Startup Dingin Instan 0ms (Zero-Latency Cold Launch)**:
+  * Penghapusan total jeda beberapa ratus milidetik saat membuka aplikasi melalui pemulihan cache lokal sinkron `fast_playlist.json` pada frame ke-1.
+* **Peningkatan Buffer USB Audio DAC Bit-Perfect (Bebas Kresek-Kresek)**:
+  * Antrean streaming kernel Linux USB isochronous diperdalam ke 128ms (32 URBs × 32 paket) dan buffer sirkular SPSC diperluas menjadi 131.072 frame (~3 detik) dengan prioritas thread waktu nyata (`nice -20`).
+  * Optimasi paralelisme Coil image dispatcher untuk melenyapkan suara kresek, letupan, dan micro-stutter saat scrolling cepat 120Hz di daftar lagu.
+* **Ergonomi Pemutar Musik**:
+  * Tombol kontrol pemutar (Play/Pause, Next, Previous) dinaikkan (+44dp) agar ramah jangkauan jempol satu tangan.
+  * Perbaikan duplikasi badge kode RJ dan penyesuaian penamaan tab navigasi ("Utama", "Home", "ホーム", "首页").
 
 ---
 
@@ -203,7 +226,7 @@ cd japaneseasmr-android
 
 Berkas APK hasil kompilasi akan tersimpan di:
 ```
-app/build/outputs/apk/debug/JapaneseASMR-v1.3.1-debug.apk
+app/build/outputs/apk/debug/JapaneseASMR-v1.4.0-debug.apk
 ```
 
 ---
