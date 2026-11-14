@@ -60,46 +60,6 @@ JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) len
   * Tombol kontrol pemutar (Play/Pause, Next, Previous) dinaikkan (+44dp) agar ramah jangkauan jempol satu tangan.
   * Perbaikan duplikasi badge kode RJ dan penyesuaian penamaan tab navigasi ("Utama", "Home", "ホーム", "首页").
 
----
-
-## Apa yang Baru di v1.3.1
-
-* **Lokalisasi Antarmuka Multi-Bahasa Lengkap**: Dukungan penuh untuk 4 bahasa: **English (`en`)**, **Bahasa Indonesia (`in`)**, **日本語 / Jepang (`ja`)**, dan **简体中文 / Mandarin (`zh`)**.
-* **Deteksi Bahasa Sistem Otomatis**: Menyesuaikan bahasa tampilan secara otomatis mengikuti pengaturan bahasa perangkat Android pengguna tanpa konfigurasi tambahan.
-* **Pemilih Bahasa Mandiri di Pengaturan**: Menu pengaturan bahasa khusus yang memungkinkan penggantian bahasa aplikasi secara bebas tanpa mengubah bahasa sistem ponsel.
-* **Kompatibilitas Android 13+ Per-App Language**: Mendaftarkan konfigurasi `locales_config.xml` untuk integrasi penuh dengan pemilih bahasa per-aplikasi bawaan Android 13+.
-
----
-
-## Apa yang Baru di v1.3.0
-
-* **Mesin Terjemahan ASMR Kontekstual & Naturalisasi Bahasa**:
-  * Arsitektur terjemahan dua tingkat yang memprioritaskan Google Web Translate dengan failover otomatis ke MyMemory Translation API.
-  * De-obfuskasi sensor fuseji DLsite (`〇`, `○`, `×`, `*`) secara otomatis sebelum proses penerjemahan.
-  * Glosarium domain ASMR khusus dan naturalisasi kontekstual yang teruji secara empiris pada 55 karya DLsite nyata dalam 11 tahap pengujian (~150 kiasan/trope), mencakup skenario intim, istilah roleplay, efek suara (onomatope), dan dialog drama suara.
-  * Tampilan teks terjemahan dan subtitle bahasa Jepang dwibahasa secara langsung di bawah judul karya pada layar Pemutar dan Antrean.
-* **Cache Database Room SQLite Persisten (Skema Database v4)**:
-  * Pipeline cache dua tingkat: cache memori thread-safe (`ConcurrentHashMap`, 0ms) didukung database lokal Room SQLite (`translation_cache`, <2ms).
-  * Pengambilan batch kueri SQL `IN` berefisiensi tinggi (`getTranslationsBatch`) untuk mencegah overhead kueri dan mengeliminasi permintaan jaringan berulang saat aplikasi dibuka ulang.
-  * Migrasi skema database otomatis (`MIGRATION_3_4`).
-* **Pemetaan Bab Cerdas Hibrida (Smart Hybrid Chapter Mapping)**:
-  * Klasifikasi naratif multi-tingkat dan pengurutan kronologis: Prolog, Cerita Utama, Epilog, Bonus/After, dan Free Talk/Komentar Pengisi Suara.
-  * Normalisasi Unicode NFKC penuh untuk pengurutan bab dan penomoran berkas multi-bagian yang akurat.
-* **Mesin Remux Audio Lossless Cepat**:
-  * Penggabungan audio zero-copy tingkat kernel (`FileChannel.transferTo`) untuk format MP3 dan remux kontainer sekuensial untuk AAC/M4A.
-  * Penggabungan berkas instan (<1 detik) tanpa transcoding yang membebani CPU, mempertahankan kualitas audio bitstream 100% asli dan fungsi scrubbing instan.
-* **Deteksi Bab Terpadu & Pembuatan CUE Sheet**:
-  * Pipeline ekstraksi bab otomatis dari tag embedded ID3v2 `CHAP`/`CTOC`, berkas pendamping `.cue`, serta data karya remote DLsite.
-  * Pembuatan berkas sidecar CUE opsional yang dapat diaktifkan di Pengaturan untuk pemutar media pihak ketiga.
-* **Universal Link & Code Resolver**:
-  * Ekstraksi dan resolusi otomatis kode produk RJ, VJ, dan BJ langsung dari tautan mentah (DLsite, asmr.one, dan pengalihan tautan JapaneseASMR).
-* **Optimalisasi Tampilan Halus 120 FPS**:
-  * Eliminasi operasi disk I/O dan IPC saat penyusunan ulang daftar putar (drag-and-drop).
-  * Kompilasi pola regex di awal, optimalisasi cache memori Coil, dan penanganan gestur scroll bersarang yang aman dari fling.
-* **Pembaruan Antarmuka Layar Pemutar & Antrean**:
-  * Bilah toolbar pemutar baru dengan tombol toggle terjemahan, indikator bahasa aktif, dan chip pil bab yang ringkas.
-  * Penskalaan cover art adaptif (`heightIn(max = 260.dp)`) untuk tata letak seimbang di berbagai rasio layar perangkat.
-  * Kartu pratinjau antrean bilingual dengan telemetri transfer waktu-nyata dan desain status kosong yang lebih bersih.
 
 ---
 

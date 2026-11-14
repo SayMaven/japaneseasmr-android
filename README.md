@@ -60,46 +60,6 @@ JapaneseASMR Downloader is a full-featured, open-source Android application engi
   * Playback transport controls (Play/Pause, Next, Previous) elevated by 44dp for effortless one-handed thumb reach.
   * Resolved duplicate RJ code badge and refined navigation tab titles across locales ("Utama", "Home", "ホーム", "首页").
 
----
-
-## What's New in v1.3.1
-
-* **Comprehensive Multi-Language UI (UI Localization)**: Complete native localization for 4 languages: **English (`en`)**, **Bahasa Indonesia (`in`)**, **日本語 / Japanese (`ja`)**, and **简体中文 / Simplified Chinese (`zh`)**.
-* **Automatic Device Language Detection**: Automatically adapts the UI to the user's system language out-of-the-box using standard Android resource qualifiers with zero configuration.
-* **In-App Manual Language Selector**: Dedicated language picker in Settings allowing users to customize app language independently from system settings.
-* **Android 13+ Per-App Language Preferences**: Integrated `locales_config.xml` declaring supported app languages for Android 13+ system language selector.
-
----
-
-## What's New in v1.3.0
-
-* **Context-Aware ASMR Translation & Naturalization Engine**:
-  * Dual-tier translation architecture prioritizing Google Web Translate with automatic failover to the MyMemory Translation API.
-  * Specialized DLsite fuseji censorship de-obfuscation (`〇`, `○`, `×`, `*`) prior to translation.
-  * Specialized ASMR domain glossary and contextual naturalization empirically tested across 55 real DLsite works and 11 testing stages (~150 tropes) covering intimate scenarios, roleplay tropes, sound effects (onomatopoeia), and voice drama dialogue.
-  * Live bilingual Japanese subtitle display under track titles in both the Player and Queue screens.
-* **Persistent SQLite Room Caching (Database Schema v4)**:
-  * Dual-tier caching pipeline: thread-safe in-memory cache (`ConcurrentHashMap`, 0ms) backed by persistent Room SQLite storage (`translation_cache` table, <2ms lookup).
-  * High-efficiency bulk SQL `IN` query batch fetching (`getTranslationsBatch`) eliminating SQLite query thrashing and duplicate network requests across app launches.
-  * Automated database schema migration (`MIGRATION_3_4`).
-* **Smart Hybrid Chapter Mapping**:
-  * Multi-tier narrative track classification and chronological ordering: Prologue, Main Story, Epilogue, Bonus/After, and Free Talk/Cast Comments.
-  * Full Unicode NFKC normalization for accurate chapter numbering and multi-part track sequencing.
-* **Fast Lossless Audio Remux Engine**:
-  * Zero-copy kernel audio merger (`FileChannel.transferTo`) for MP3 streams and sequential container remuxing for AAC/M4A.
-  * Instantaneous file merging (<1 second) without CPU-heavy transcoding, maintaining 100% original bitstream audio quality and seekability.
-* **Unified Chapter Discovery & CUE Sheet Generation**:
-  * Automated chapter extraction pipeline resolving embedded ID3v2 `CHAP`/`CTOC` frames, local `.cue` sidecars, and remote DLsite track listings.
-  * Optional CUE sheet sidecar export switchable in Settings for third-party audiophile media players.
-* **Universal Link & Code Resolver**:
-  * Direct extraction and automatic resolution of RJ, VJ, and BJ product IDs from raw URLs (DLsite, asmr.one, and JapaneseASMR redirects).
-* **120 FPS High Refresh Rate Scrolling Optimization**:
-  * Elimination of disk I/O and IPC calls during playlist drag-and-drop reordering.
-  * Pre-compiled regex patterns, optimized Coil memory caching, and fling-safe nested scroll interaction.
-* **Refined Player & Queue User Interface**:
-  * Redesigned player toolbar with translation toggle button, active language indicator, and compact chapter pill chip.
-  * Adaptive cover artwork scaling with height boundary constraints (`max = 260.dp`) for optimal presentation across diverse screen ratios.
-  * Bilingual download queue preview cards with real-time transfer telemetry and redesigned idle queue state.
 
 ---
 
