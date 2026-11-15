@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/版本-v1.4.0-blue?style=for-the-badge" alt="版本 v1.4.0" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/版本-v1.4.1-blue?style=for-the-badge" alt="版本 v1.4.1" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/许可证-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 许可证" /></a>
     <img src="https://img.shields.io/badge/平台-Android%208.0%2B-059669?style=for-the-badge" alt="平台" />
     <img src="https://img.shields.io/badge/开发语言-Kotlin-7c3aed?style=for-the-badge" alt="开发语言" />
@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#v140-更新内容">更新日志</a> •
+    <a href="#v141-更新内容">更新日志</a> •
     <a href="#功能特性">功能特性</a> •
     <a href="#应用截图">应用截图</a> •
     <a href="#下载安装">下载安装</a> •
@@ -39,7 +39,24 @@
 
 ---
 
-## v1.4.0 更新内容
+## v1.4.1 更新内容
+
+* **本地音频文件夹导入与虚拟多音轨专辑**:
+  * 支持直接扫描并导入本地/SAF 外部音频文件夹作为零拷贝虚拟多音轨专辑，无需复制物理文件或重新编码。
+  * 自动将文件夹内的各个音频音轨映射为章节（Chapter），精准提取播放时长与 ID3 标签信息。
+  * 虚拟专辑内跨音轨连续播放，音轨切换无缝 0 毫秒延迟。
+  * 智能区分包含多部独立作品的集合分类文件夹与真正的多音轨专辑。
+* **关联 DLsite 官方 RJ 编号与封面自定义**:
+  * 本地/导入作品一键“关联 RJ 编号”，自动抓取 DLsite 官方完整元数据（高清封面、声优/CV、社团、原名、分类与年龄分级）。
+  * 支持自定义封面更换，支持从本地图片或相册选取并持久化存储。
+* **播放器界面人体工学与性能打磨 (120 FPS)**:
+  * 锁定播放器封面位置，标题与 CV 区域自适应且永不遮挡，章节栏移至进度条上方，避免切歌时封面上下跳动。
+  * 彻底消除切歌时封面出现的灰色空白闪烁（Painter 缓存平滑过渡）。
+  * 0.0ms 极速标签页切换（同步选中与后台预加载）。
+  * 下载历史页面 O(1) 内存极速渲染，消除递归磁盘扫描延迟。
+  * 下载历史页面专属化，不再混杂本地导入的音频作品。
+  * 下载前重复作品检测：若作品已存在于存储或数据库中，自动跳过网络下载。
+  * 优化全语言导航栏标签（“下载” / “Download” / “Unduh”）与历史标题。
 
 * **应用内一键自动更新与智能双通道匹配**:
   * 支持直接在“设置”页面中检查、下载并安装新版本，无需手动前往 GitHub 网页下载。

@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.4.0-blue?style=for-the-badge" alt="Versi v1.4.0" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.4.1-blue?style=for-the-badge" alt="Versi v1.4.1" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/Lisensi-GPL%20v3.0-10b981?style=for-the-badge" alt="Lisensi GPL v3.0" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Bahasa-Kotlin-7c3aed?style=for-the-badge" alt="Bahasa" />
@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#apa-yang-baru-di-v140">Pembaruan</a> •
+    <a href="#apa-yang-baru-di-v141">Pembaruan</a> •
     <a href="#fitur-utama">Fitur Utama</a> •
     <a href="#tangkapan-layar">Tangkapan Layar</a> •
     <a href="#unduh-aplikasi">Unduh</a> •
@@ -39,7 +39,24 @@ JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) len
 
 ---
 
-## Apa yang Baru di v1.4.0
+## Apa yang Baru di v1.4.1
+
+* **Dukungan Import Folder Audio Lokal & Album Multi-Track Virtual**:
+  * Pindai dan import folder audio dari penyimpanan lokal/SAF sebagai album multi-track virtual tanpa perlu duplikasi berkas fisik atau re-encode.
+  * Setiap track di dalam folder secara otomatis dipetakan sebagai bab (*chapter*) dengan durasi dan metadata tag ID3 asli.
+  * Pemutaran berkesinambungan antar-track dalam album virtual dengan penanganan jeda 0ms.
+  * Deteksi cerdas subfolder koleksi/playlist (seperti folder berisi banyak karya ASMR mandiri) vs album multi-track berbasis kode RJ dan pola penomoran track.
+* **Tautkan Kode RJ Resmi DLsite & Kustomisasi Cover**:
+  * Fitur "Tautkan Kode RJ" untuk karya audio lokal/import guna menarik metadata lengkap DLsite secara otomatis (cover HD, pengisi suara/CV, circle, judul asli, genre, dan rating usia).
+  * Kustomisasi thumbnail dari galeri atau berkas gambar lokal dengan penyimpanan persisten.
+* **Penyempurnaan Performa & Antarmuka Pemutar (120 FPS)**:
+  * Posisi cover art pemutar terkunci stabil tanpa bergeser saat berpindah lagu, baris bab diposisikan di atas slider timeline, dan ruang judul/CV lega tanpa tumpang-tindih.
+  * Eliminasi flicker abu-abu pada cover art saat berpindah track (*cached painter retention*).
+  * Transisi tab instan 0.0ms dengan *synchronous tab selection* dan *background pre-warming*.
+  * Optimasi loading tab Riwayat Unduhan instan O(1) di memori tanpa disk scanning rekursif.
+  * Tab Riwayat Unduhan kini murni hanya menampilkan karya yang diunduh dari aplikasi.
+  * Deteksi karya ganda sebelum mengunduh: otomatis melewati unduhan jika karya sudah ada di storage atau database.
+  * Pembaruan label tab "Unduh" ("Download") dan header "Riwayat Unduhan" di seluruh bahasa.
 
 * **Pembaruan Otomatis Aplikasi Langsung (In-App Auto-Updater)**:
   * Pengecekan, pengunduhan, dan pemasangan pembaruan versi langsung dari menu Pengaturan melalui GitHub Releases API.

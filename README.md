@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.4.0-blue?style=for-the-badge" alt="Version v1.4.0" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.4.1-blue?style=for-the-badge" alt="Version v1.4.1" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 License" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Language-Kotlin-7c3aed?style=for-the-badge" alt="Language" />
@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#whats-new-in-v140">What's New</a> •
+    <a href="#whats-new-in-v141">What's New</a> •
     <a href="#features">Features</a> •
     <a href="#screenshots">Screenshots</a> •
     <a href="#download">Download</a> •
@@ -39,7 +39,24 @@ JapaneseASMR Downloader is a full-featured, open-source Android application engi
 
 ---
 
-## What's New in v1.4.0
+## What's New in v1.4.1
+
+* **Local Audio Folder Import & Virtual Multi-Track Albums**:
+  * Scan and import external/local audio folders (SAF & direct storage) as zero-copy virtual multi-track albums without physical file duplication or re-encoding.
+  * Automatically maps individual audio files within the folder into chapters with accurate durations and native ID3 tag extraction.
+  * Seamless cross-track playback within virtual albums with 0ms transition latency.
+  * Smart detection distinguishing collection/playlist subfolders (containing multiple standalone ASMR works) from true multi-track albums based on RJ codes and track numbering heuristics.
+* **Official DLsite RJ Code Linking & Custom Cover Art**:
+  * "Link RJ Code" feature for local/imported works to automatically scrape full DLsite metadata (HD covers, CV/voice actors, circle, original title, genres, and age ratings).
+  * Custom thumbnail selector from local image files or gallery with persistent caching.
+* **Player UI Ergonomics & Performance Polish (120 FPS)**:
+  * Locked and stabilized player cover art layout with spacious non-collapsing title/CV container and repositioned chapter bar above the timeline slider.
+  * Eliminated gray placeholder flicker when switching tracks via painter caching.
+  * Instant 0.0ms tab switching via synchronous selection and background pre-warming.
+  * Instant O(1) in-memory Download History loading without recursive disk scans.
+  * Isolated Download History to show only works downloaded from the app.
+  * Duplicate work detection prior to download, instantly skipping downloads for already existing/linked works.
+  * Updated navigation tab labels ("Download" / "Unduh") and headers across all supported languages.
 
 * **In-App Auto-Updater with Smart Dual-Channel Matching**:
   * Check, download, and install new versions directly from the Settings menu via GitHub Releases API without manual browser downloads.
