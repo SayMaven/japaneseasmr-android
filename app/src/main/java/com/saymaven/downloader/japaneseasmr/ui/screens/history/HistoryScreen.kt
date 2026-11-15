@@ -328,8 +328,8 @@ fun HistoryItemCard(
             Column(modifier = Modifier.weight(1f)) {
                 val isLocal = item.entity.sourceType != "DL_SITE" || item.rjid.startsWith("LOCAL_")
                 val displayTag = when {
-                    isLocal && !item.entity.linkedRjId.isNullOrBlank() -> "LOKAL • ${item.entity.linkedRjId}"
-                    isLocal -> "LOKAL"
+                    isLocal && !item.entity.linkedRjId.isNullOrBlank() -> "IMPORT • ${item.entity.linkedRjId}"
+                    isLocal -> "IMPORT"
                     else -> item.rjid
                 }
                 Text(

@@ -549,8 +549,8 @@ fun PlaylistItemCard(
             Column(modifier = Modifier.weight(1f)) {
                 val isLocal = item.sourceType != "DL_SITE" || item.rjid.startsWith("LOCAL_")
                 val displayTag = when {
-                    isLocal && !item.linkedRjId.isNullOrBlank() -> "LOKAL • ${item.linkedRjId}"
-                    isLocal -> "LOKAL"
+                    isLocal && !item.linkedRjId.isNullOrBlank() -> "IMPORT • ${item.linkedRjId}"
+                    isLocal -> "IMPORT"
                     else -> item.rjid
                 }
                 Text(

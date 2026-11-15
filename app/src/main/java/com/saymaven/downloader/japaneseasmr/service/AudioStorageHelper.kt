@@ -2,6 +2,9 @@ package com.saymaven.downloader.japaneseasmr.service
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
+import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -124,6 +127,36 @@ object AudioStorageHelper {
      */
     fun isMultiTrackFolder(folder: File): Boolean {
         return getAudioFilesInFolder(folder).size >= 2
+    }
+
+    private val virtualAlbumChaptersCache = ConcurrentHashMap<String, List<ChapterItem>>()
+
+    fun getCachedVirtualChapters(rjidOrPath: String): List<ChapterItem>? {
+        return virtualAlbumChaptersCache[rjidOrPath]
+    }
+
+    fun cacheVirtualChapters(rjidOrPath: String, chapters: List<ChapterItem>) {
+        if (chapters.isNotEmpty()) {
+            virtualAlbumChaptersCache[rjidOrPath] = chapters
+        }
+    }
+
+    suspend fun extractVirtualAlbumChapters(tracks: List<File>): List<ChapterItem> = withContext(Dispatchers.IO) {
+        var cum = 0L
+        tracks.map { tr ->
+            var dur = 0L
+            val ret = MediaMetadataRetriever()
+            try {
+                ret.setDataSource(tr.absolutePath)
+                dur = ret.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            } catch (e: Exception) {
+            } finally {
+                try { ret.release() } catch (e: Exception) {}
+            }
+            val ch = ChapterItem(cum, cum + dur, tr.nameWithoutExtension, tr.name)
+            cum += dur
+            ch
+        }
     }
 
     /**

@@ -349,8 +349,8 @@
     <string name="player_cover_folder_images">フォルダー内の画像</string>
     <string name="player_cover_no_images">フォルダー内に画像が見つかりません</string>
     <string name="player_cover_success_toast">サムネイルを変更しました！</string>
-    <string name="badge_local">LOKAL</string>
-    <string name="badge_local_rj">LOKAL • %1$s</string>
+    <string name="badge_local">IMPORT</string>
+    <string name="badge_local_rj">IMPORT • %1$s</string>
 
     <!-- Changelog v1.4.1 -->
     <string name="settings_changelog_v141_title">バージョン 1.4.1（最新）</string>

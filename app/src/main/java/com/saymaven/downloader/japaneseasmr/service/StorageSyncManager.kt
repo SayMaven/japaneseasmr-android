@@ -382,6 +382,7 @@ object StorageSyncManager {
                 linkedRjId = finalLinkedRjId
             )
             dao.insertHistory(newEntity)
+            AudioStorageHelper.cacheVirtualChapters(rjid, chapters)
 
             if (finalLinkedRjId != null) {
                 scope.launch { fetchAndCacheMetadata(context, dao, newEntity) }

@@ -274,12 +274,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (rj.isNullOrBlank()) return@combine ""
         val entity = list.firstOrNull { it.rjid == rj }
         if (entity == null) {
-            if (rj.startsWith("LOCAL_")) "LOKAL" else rj
+            if (rj.startsWith("LOCAL_")) "IMPORT" else rj
         } else {
             val isLocal = entity.sourceType != SourceType.DL_SITE.name || entity.rjid.startsWith("LOCAL_")
             when {
-                isLocal && !entity.linkedRjId.isNullOrBlank() -> "LOKAL • ${entity.linkedRjId}"
-                isLocal -> "LOKAL"
+                isLocal && !entity.linkedRjId.isNullOrBlank() -> "IMPORT • ${entity.linkedRjId}"
+                isLocal -> "IMPORT"
                 else -> entity.rjid
             }
         }
@@ -711,8 +711,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _currentRjId.value = history.rjid
                     val isLocal = history.sourceType != SourceType.DL_SITE.name || history.rjid.startsWith("LOCAL_")
                     val tag = when {
-                        isLocal && !history.linkedRjId.isNullOrBlank() -> "LOKAL • ${history.linkedRjId}"
-                        isLocal -> "LOKAL"
+                        isLocal && !history.linkedRjId.isNullOrBlank() -> "IMPORT • ${history.linkedRjId}"
+                        isLocal -> "IMPORT"
                         else -> history.rjid
                     }
                     _currentTitle.value = "[$tag] ${history.title}"
@@ -880,8 +880,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         val trackTitle = curChapter?.title ?: mediaItem.mediaMetadata.title?.toString() ?: ""
                         val isLocalAlbum = album?.sourceType != SourceType.DL_SITE.name || album?.rjid?.startsWith("LOCAL_") == true
                         val albumTag = when {
-                            isLocalAlbum && !album?.linkedRjId.isNullOrBlank() -> "LOKAL • ${album?.linkedRjId}"
-                            isLocalAlbum -> "LOKAL"
+                            isLocalAlbum && !album?.linkedRjId.isNullOrBlank() -> "IMPORT • ${album?.linkedRjId}"
+                            isLocalAlbum -> "IMPORT"
                             else -> album?.rjid ?: ""
                         }
                         _currentTitle.value = if (album != null) "[$albumTag] ${album.title} - $trackTitle" else trackTitle
@@ -928,13 +928,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updatePlayingState(p)
                 if (playbackState == Player.STATE_ENDED) {
-                    if (isCurrentVirtualAlbum) {
-                        if (_repeatMode.value == Player.REPEAT_MODE_ONE) {
-                            p.seekTo(0, 0L)
-                            p.play()
-                        } else {
-                            playAdjacentWork(forward = true)
-                        }
+                    if (_repeatMode.value == Player.REPEAT_MODE_ONE) {
+                        p.seekTo(0, 0L)
+                        p.play()
+                    } else {
+                        playAdjacentWork(forward = true)
                     }
                 } else if (playbackState == Player.STATE_READY) {
                     if (isCurrentVirtualAlbum) {
@@ -1051,67 +1049,56 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val customDirStr = prefs.downloadDirFlow.first()
             val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
 
-            val validItemsWithFiles = fullList.mapNotNull { item ->
-                val resolved = AudioStorageHelper.resolveValidAudioFile(downloadDir, item.localFilePath, item.rjid)
-                if (resolved != null) {
-                    if (resolved.absolutePath != item.localFilePath) {
-                        historyDao.insertHistory(item.copy(localFilePath = resolved.absolutePath))
-                    }
-                    Pair(item, resolved)
-                } else null
+            // Resolve target item directly without scanning the full playlist
+            val targetFile = withContext(Dispatchers.IO) {
+                AudioStorageHelper.resolveValidAudioFile(downloadDir, history.localFilePath, history.rjid)
+            } ?: return@launch
+
+            if (targetFile.absolutePath != history.localFilePath) {
+                historyDao.insertHistory(history.copy(localFilePath = targetFile.absolutePath))
             }
 
-            if (validItemsWithFiles.isEmpty()) return@launch
+            val isFolder = history.sourceType == SourceType.LOCAL_FOLDER.name || targetFile.isDirectory
 
-            val targetPair = validItemsWithFiles.firstOrNull { it.first.rjid == history.rjid } ?: validItemsWithFiles.first()
-
-            val localCover = withContext(Dispatchers.IO) {
-                AudioStorageHelper.getLocalCoverFile(getApplication(), targetPair.first.rjid, targetPair.second.absolutePath)
-            }
-            val finalCover = localCover?.absolutePath ?: targetPair.first.coverUrl
-
-            val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, finalCover)
-
-            if (targetPair.first.sourceType == SourceType.LOCAL_FOLDER.name || targetPair.second.isDirectory) {
+            if (isFolder) {
                 isCurrentVirtualAlbum = true
-                currentAlbumHistory = targetPair.first
-                val folder = targetPair.second
-                val tracks = AudioStorageHelper.getAudioFilesInFolder(folder)
+                currentAlbumHistory = history
+                val folder = targetFile
+                val tracks = withContext(Dispatchers.IO) { AudioStorageHelper.getAudioFilesInFolder(folder) }
+                if (tracks.isEmpty()) return@launch
 
-                val parsedChapters = if (!targetPair.first.chaptersJson.isNullOrBlank()) {
-                    ChapterItem.fromJsonArray(targetPair.first.chaptersJson)
-                } else emptyList()
+                val localCover = withContext(Dispatchers.IO) {
+                    AudioStorageHelper.getLocalCoverFile(getApplication(), history.rjid, targetFile.absolutePath)
+                }
+                val finalCover = localCover?.absolutePath ?: history.coverUrl
+                val coverBytes = loadArtworkBytes(targetFile.absolutePath, finalCover)
 
-                val chapters = if (parsedChapters.isNotEmpty() && parsedChapters.size == tracks.size) {
-                    parsedChapters
-                } else {
-                    var cum = 0L
-                    tracks.map { tr ->
-                        var dur = 0L
-                        val ret = MediaMetadataRetriever()
-                        try {
-                            ret.setDataSource(tr.absolutePath)
-                            dur = ret.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                        } catch (e: Exception) {}
-                        finally {
-                            try { ret.release() } catch (e: Exception) {}
-                        }
-                        val ch = ChapterItem(cum, cum + dur, tr.nameWithoutExtension, tr.name)
-                        cum += dur
-                        ch
-                    }
+                // Check RAM cache or DB chaptersJson
+                val cachedChapters = AudioStorageHelper.getCachedVirtualChapters(history.rjid)
+                    ?: if (!history.chaptersJson.isNullOrBlank()) {
+                        ChapterItem.fromJsonArray(history.chaptersJson).takeIf { it.size == tracks.size }
+                    } else null
+
+                if (cachedChapters != null) {
+                    AudioStorageHelper.cacheVirtualChapters(history.rjid, cachedChapters)
                 }
 
-                _currentChapters.value = chapters
-                val totalDur = chapters.lastOrNull()?.endMs ?: 0L
-                _duration.value = totalDur
+                val initialChapters = cachedChapters ?: tracks.mapIndexed { idx, tr ->
+                    ChapterItem(0L, 0L, tr.nameWithoutExtension, tr.name)
+                }
+
+                _currentChapters.value = initialChapters
+                val totalDur = initialChapters.lastOrNull()?.endMs ?: 0L
+                if (totalDur > 0L) {
+                    _duration.value = totalDur
+                }
 
                 val mediaItems = tracks.mapIndexed { idx, tr ->
-                    val trackTitle = chapters.getOrNull(idx)?.title ?: tr.nameWithoutExtension
+                    val trackTitle = initialChapters.getOrNull(idx)?.title ?: tr.nameWithoutExtension
                     val metaBuilder = MediaMetadata.Builder()
                         .setTitle(trackTitle)
-                        .setArtist(targetPair.first.cv)
-                        .setAlbumTitle(targetPair.first.title)
+                        .setArtist(history.cv)
+                        .setAlbumTitle(history.title)
                         .setArtworkUri(Uri.parse(finalCover ?: ""))
                     if (coverBytes != null) {
                         metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
@@ -1124,79 +1111,112 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         .build()
                 }
 
-                _currentRjId.value = targetPair.first.rjid
-                val isLocalV = targetPair.first.sourceType != SourceType.DL_SITE.name || targetPair.first.rjid.startsWith("LOCAL_")
+                _currentRjId.value = history.rjid
+                val isLocalV = history.sourceType != SourceType.DL_SITE.name || history.rjid.startsWith("LOCAL_")
                 val tag = when {
-                    isLocalV && !targetPair.first.linkedRjId.isNullOrBlank() -> "LOKAL • ${targetPair.first.linkedRjId}"
-                    isLocalV -> "LOKAL"
-                    else -> targetPair.first.rjid
+                    isLocalV && !history.linkedRjId.isNullOrBlank() -> "IMPORT • ${history.linkedRjId}"
+                    isLocalV -> "IMPORT"
+                    else -> history.rjid
                 }
-                _currentTitle.value = "[$tag] ${targetPair.first.title}"
-                _currentArtist.value = targetPair.first.cv
+                _currentTitle.value = "[$tag] ${history.title}"
+                _currentArtist.value = history.cv
                 _currentCoverUrl.value = finalCover
                 preloadCoverArtInMemory(finalCover)
 
-                val initialTrackIdx = if (startPositionMs > 0L && chapters.isNotEmpty()) {
-                    chapters.indexOfLast { startPositionMs >= it.startMs }.coerceIn(0, (tracks.size - 1).coerceAtLeast(0))
+                val initialTrackIdx = if (startPositionMs > 0L && cachedChapters != null) {
+                    cachedChapters.indexOfLast { startPositionMs >= it.startMs }.coerceIn(0, (tracks.size - 1).coerceAtLeast(0))
                 } else 0
-                val initialOffset = if (startPositionMs > 0L && chapters.isNotEmpty()) {
-                    (startPositionMs - (chapters.getOrNull(initialTrackIdx)?.startMs ?: 0L)).coerceAtLeast(0L)
+                val initialOffset = if (startPositionMs > 0L && cachedChapters != null) {
+                    (startPositionMs - (cachedChapters.getOrNull(initialTrackIdx)?.startMs ?: 0L)).coerceAtLeast(0L)
                 } else 0L
 
                 if (tracks.isNotEmpty()) {
                     calculateAudioSpecs(tracks[initialTrackIdx])
                 }
 
+                // Play immediately with zero delay
                 p.setMediaItems(mediaItems, initialTrackIdx, initialOffset)
                 p.prepare()
                 p.play()
                 _currentPosition.value = startPositionMs
                 saveCurrentState()
+
+                // If chapters were not cached yet, calculate in background and save to DB
+                if (cachedChapters == null) {
+                    viewModelScope.launch(Dispatchers.IO) {
+                        val computed = AudioStorageHelper.extractVirtualAlbumChapters(tracks)
+                        AudioStorageHelper.cacheVirtualChapters(history.rjid, computed)
+                        val json = ChapterItem.toJsonArray(computed)
+                        val updated = history.copy(chaptersJson = json)
+                        historyDao.insertHistory(updated)
+
+                        val curList = _playlist.value.toMutableList()
+                        val idx = curList.indexOfFirst { it.rjid == history.rjid }
+                        if (idx != -1) {
+                            curList[idx] = updated
+                            _playlist.value = curList
+                            saveFastCachedPlaylist(curList)
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            if (_currentRjId.value == history.rjid && isCurrentVirtualAlbum) {
+                                _currentChapters.value = computed
+                                val dur = computed.lastOrNull()?.endMs ?: 0L
+                                if (dur > 0L) _duration.value = dur
+                            }
+                        }
+                    }
+                }
             } else {
                 isCurrentVirtualAlbum = false
                 currentAlbumHistory = null
-                val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
-                calculateAudioSpecs(targetPair.second)
+                calculateAudioSpecs(targetFile)
 
-                val mediaItems = validItemsWithFiles.map { (item, file) ->
-                    val metaBuilder = MediaMetadata.Builder()
-                        .setTitle("[${item.rjid}] ${item.title}")
-                        .setArtist(item.cv)
-                        .setAlbumTitle(item.circle)
-                        .setArtworkUri(Uri.parse(item.coverUrl ?: ""))
-
-                    if (coverBytes != null && item.rjid == targetPair.first.rjid) {
-                        metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                    }
-
-                    MediaItem.Builder()
-                        .setUri(Uri.fromFile(file))
-                        .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(file)).build())
-                        .setMediaId(item.rjid)
-                        .setMediaMetadata(metaBuilder.build())
-                        .build()
+                val localCover = withContext(Dispatchers.IO) {
+                    AudioStorageHelper.getLocalCoverFile(getApplication(), history.rjid, targetFile.absolutePath)
                 }
+                val finalCover = localCover?.absolutePath ?: history.coverUrl
+                val coverBytes = loadArtworkBytes(targetFile.absolutePath, finalCover)
 
-                _currentRjId.value = targetPair.first.rjid
-                val isLocalV = targetPair.first.sourceType != SourceType.DL_SITE.name || targetPair.first.rjid.startsWith("LOCAL_")
+                val isLocalV = history.sourceType != SourceType.DL_SITE.name || history.rjid.startsWith("LOCAL_")
                 val tag = when {
-                    isLocalV && !targetPair.first.linkedRjId.isNullOrBlank() -> "LOKAL • ${targetPair.first.linkedRjId}"
-                    isLocalV -> "LOKAL"
-                    else -> targetPair.first.rjid
+                    isLocalV && !history.linkedRjId.isNullOrBlank() -> "IMPORT • ${history.linkedRjId}"
+                    isLocalV -> "IMPORT"
+                    else -> history.rjid
                 }
-                _currentTitle.value = "[$tag] ${targetPair.first.title}"
-                _currentArtist.value = targetPair.first.cv
+                val metaTitle = "[$tag] ${history.title}"
+
+                val metaBuilder = MediaMetadata.Builder()
+                    .setTitle(metaTitle)
+                    .setArtist(history.cv)
+                    .setAlbumTitle(history.circle)
+                    .setArtworkUri(Uri.parse(finalCover ?: ""))
+
+                if (coverBytes != null) {
+                    metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                }
+
+                val singleMediaItem = MediaItem.Builder()
+                    .setUri(Uri.fromFile(targetFile))
+                    .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(targetFile)).build())
+                    .setMediaId(history.rjid)
+                    .setMediaMetadata(metaBuilder.build())
+                    .build()
+
+                _currentRjId.value = history.rjid
+                _currentTitle.value = metaTitle
+                _currentArtist.value = history.cv
                 _currentCoverUrl.value = finalCover
                 preloadCoverArtInMemory(finalCover)
-                loadChaptersForCurrentTrack(targetPair.first.rjid)
+                loadChaptersForCurrentTrack(history.rjid)
                 if (_isTranslationActive.value) {
-                    loadOrFetchTranslations(targetPair.first.rjid)
+                    loadOrFetchTranslations(history.rjid)
                 } else {
                     _translatedTitle.value = null
                     _translatedChapters.value = emptyList()
                 }
 
-                p.setMediaItems(mediaItems, targetIndex, startPositionMs)
+                p.setMediaItems(listOf(singleMediaItem), 0, startPositionMs)
                 p.prepare()
                 p.play()
                 saveCurrentState()
@@ -1208,7 +1228,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         try {
             if (!localFilePath.isNullOrBlank()) {
                 val f = File(localFilePath)
-                if (f.exists()) {
+                if (f.exists() && f.isFile) {
                     val retriever = MediaMetadataRetriever()
                     try {
                         retriever.setDataSource(f.absolutePath)
@@ -1252,38 +1272,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playNext() {
-        if (isCurrentVirtualAlbum) {
-            playAdjacentWork(forward = true)
-        } else {
-            val p = player ?: return
-            if (p.hasNextMediaItem()) {
-                p.seekToNextMediaItem()
-            } else if (p.repeatMode == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
-                p.seekToDefaultPosition(0)
-            }
-            saveCurrentState()
-        }
+        playAdjacentWork(forward = true)
+        saveCurrentState()
     }
 
     fun playPrevious() {
-        if (isCurrentVirtualAlbum) {
-            val p = player
-            if (p != null && p.currentPosition > 3000) {
-                p.seekTo(0)
-            } else {
-                playAdjacentWork(forward = false)
-            }
+        val p = player
+        if (p != null && p.currentPosition > 3000) {
+            p.seekTo(0)
         } else {
-            val p = player ?: return
-            if (p.currentPosition > 3000) {
-                p.seekTo(0)
-            } else if (p.hasPreviousMediaItem()) {
-                p.seekToPreviousMediaItem()
-            } else if (p.repeatMode == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
-                p.seekToDefaultPosition(p.mediaItemCount - 1)
-            }
-            saveCurrentState()
+            playAdjacentWork(forward = false)
         }
+        saveCurrentState()
     }
 
     private fun playAdjacentWork(forward: Boolean) {
@@ -1292,7 +1292,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val curId = _currentRjId.value
         val curIdx = list.indexOfFirst { it.rjid == curId }
         if (curIdx != -1) {
-            val targetIdx = if (forward) {
+            val targetIdx = if (_shuffleMode.value) {
+                if (list.size > 1) {
+                    var r = (0 until list.size).random()
+                    while (r == curIdx) {
+                        r = (0 until list.size).random()
+                    }
+                    r
+                } else curIdx
+            } else if (forward) {
                 if (curIdx + 1 < list.size) curIdx + 1
                 else if (_repeatMode.value == Player.REPEAT_MODE_ALL) 0 else -1
             } else {
@@ -1302,6 +1310,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (targetIdx != -1) {
                 playLocalTrack(list[targetIdx], list)
             }
+        } else if (list.isNotEmpty()) {
+            playLocalTrack(list.first(), list)
         }
     }
 
@@ -1749,7 +1759,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     withContext(Dispatchers.Main) {
                         if (_currentRjId.value == currentRjid) {
                             val tag = if (updated.sourceType != SourceType.DL_SITE.name || updated.rjid.startsWith("LOCAL_")) {
-                                if (!updated.linkedRjId.isNullOrBlank()) "LOKAL • ${updated.linkedRjId}" else "LOKAL"
+                                if (!updated.linkedRjId.isNullOrBlank()) "IMPORT • ${updated.linkedRjId}" else "IMPORT"
                             } else updated.rjid
                             _currentTitle.value = "[$tag] ${updated.title}"
                             _currentArtist.value = updated.cv

@@ -349,8 +349,8 @@
     <string name="player_cover_folder_images">文件夹内现有图片</string>
     <string name="player_cover_no_images">文件夹内未发现图片文件</string>
     <string name="player_cover_success_toast">封面已成功更换！</string>
-    <string name="badge_local">LOKAL</string>
-    <string name="badge_local_rj">LOKAL • %1$s</string>
+    <string name="badge_local">IMPORT</string>
+    <string name="badge_local_rj">IMPORT • %1$s</string>
 
     <!-- Changelog v1.4.1 -->
     <string name="settings_changelog_v141_title">版本 1.4.1（最新）</string>

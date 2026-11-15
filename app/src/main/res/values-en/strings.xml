@@ -355,6 +355,6 @@
     <string name="player_cover_folder_images">Available Images in Folder</string>
     <string name="player_cover_no_images">No images found in folder</string>
     <string name="player_cover_success_toast">Thumbnail updated successfully!</string>
-    <string name="badge_local">LOKAL</string>
-    <string name="badge_local_rj">LOKAL • %1$s</string>
+    <string name="badge_local">IMPORT</string>
+    <string name="badge_local_rj">IMPORT • %1$s</string>
 </resources>
