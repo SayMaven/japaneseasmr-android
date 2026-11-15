@@ -204,35 +204,60 @@ fun PlayerScreen(
                 cleanTranslatedTitle
             } else cleanOriginalTitle
 
-            Text(
-                text = displayTitle.ifBlank { stringResource(R.string.player_no_track) },
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 14.dp)
-            )
-
-            // Original Title Subtext (when translation is active and differs)
-            if (isTranslationActive && !cleanTranslatedTitle.isNullOrBlank() && cleanOriginalTitle.isNotBlank() && cleanTranslatedTitle != cleanOriginalTitle) {
-                Spacer(modifier = Modifier.height(3.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+            // Container Judul & CV yang lega dan stabil
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 104.dp)
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Translate,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = cleanOriginalTitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                        text = displayTitle.ifBlank { stringResource(R.string.player_no_track) },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    // Original Title Subtext (when translation is active and differs)
+                    if (isTranslationActive && !cleanTranslatedTitle.isNullOrBlank() && cleanOriginalTitle.isNotBlank() && cleanTranslatedTitle != cleanOriginalTitle) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Translate,
+                                contentDescription = null,
+                                modifier = Modifier.size(11.dp),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = cleanOriginalTitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // CV Text (Below Title)
+                    Text(
+                        text = "CV: $currentArtist",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -240,80 +265,8 @@ fun PlayerScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // CV Text (Below Title)
-            Text(
-                text = "CV: $currentArtist",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            if (chapters.isNotEmpty() || isLoadingChapters) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    onClick = { showChapterSheet = true },
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)),
-                    modifier = Modifier.clip(RoundedCornerShape(16.dp))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bookmarks,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        if (isLoadingChapters) {
-                            Text(
-                                text = stringResource(R.string.player_scanning_chapters),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        } else {
-                            val activeChapTitle = if (isTranslationActive && activeChapterIndex in translatedChapters.indices) {
-                                translatedChapters[activeChapterIndex].title
-                            } else activeChapter?.title ?: stringResource(R.string.player_chapter_detected, chapters.size)
-
-                            Text(
-                                text = activeChapTitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 220.dp)
-                            )
-                            if (activeChapter != null) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = activeChapter!!.formatTime(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
+            // Geser sedikit thumbnail agak ke bawah dengan spacer 18.dp
+            Spacer(modifier = Modifier.height(18.dp))
 
             // Big Center Cover Art (Adaptive responsive sizing)
             Card(
@@ -362,6 +315,68 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Baris Bab Timeline (diletakkan tepat di atas timeline slider)
+            if (chapters.isNotEmpty() || isLoadingChapters) {
+                Surface(
+                    onClick = { showChapterSheet = true },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)),
+                    modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bookmarks,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        if (isLoadingChapters) {
+                            Text(
+                                text = stringResource(R.string.player_scanning_chapters),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        } else {
+                            val activeChapTitle = if (isTranslationActive && activeChapterIndex in translatedChapters.indices) {
+                                translatedChapters[activeChapterIndex].title
+                            } else activeChapter?.title ?: stringResource(R.string.player_chapter_detected, chapters.size)
+
+                            Text(
+                                text = activeChapTitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 240.dp)
+                            )
+                            if (activeChapter != null) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = activeChapter!!.formatTime(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
             // Timeline Slider
             Slider(
                 value = if (duration > 0) (effectivePosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f,

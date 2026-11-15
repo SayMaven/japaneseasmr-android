@@ -117,4 +117,38 @@ class AudioStorageHelperTest {
         assertTrue(allImages.any { it.canonicalPath == imgInRoot.canonicalPath })
         assertTrue(allImages.any { it.canonicalPath == imgInThumb.canonicalPath })
     }
+
+    @Test
+    fun testMoveAudioFile_movesDirectoryRecursively() {
+        val root = tempFolder.newFolder("MoveTestRoot")
+        val downloadDir = File(root, "Download").apply { mkdir() }
+        val sourceDir = File(root, "AlbumFolder").apply { mkdir() }
+        File(sourceDir, "01.mp3").writeText("track 1 audio bytes")
+        File(sourceDir, "02.mp3").writeText("track 2 audio bytes")
+        File(sourceDir, "cover.jpg").writeText("cover bytes")
+
+        val movedDir = AudioStorageHelper.moveAudioFile(sourceDir, "Favorit", downloadDir)
+        assertNotNull(movedDir)
+        assertTrue(movedDir!!.exists())
+        assertTrue(movedDir.isDirectory)
+        assertEquals("Favorit", movedDir.parentFile?.name)
+        assertEquals(2, AudioStorageHelper.getAudioFilesInFolder(movedDir).size)
+        assertTrue(File(movedDir, "cover.jpg").exists())
+    }
+
+    @Test
+    fun testMoveAudioFile_movesSingleFileWithCompanionFiles() {
+        val root = tempFolder.newFolder("MoveSingleRoot")
+        val downloadDir = File(root, "Download").apply { mkdir() }
+        val sourceAudio = File(root, "RJ123456.mp3").apply { writeText("audio content") }
+        val sourceCue = File(root, "RJ123456.cue").apply { writeText("cue content") }
+        val sourceCover = File(root, "RJ123456.jpg").apply { writeText("cover bytes") }
+
+        val movedFile = AudioStorageHelper.moveAudioFile(sourceAudio, "Hardcore", downloadDir)
+        assertNotNull(movedFile)
+        assertTrue(movedFile!!.exists())
+        assertEquals("Hardcore", movedFile.parentFile?.name)
+        assertTrue("Companion .cue must be moved", File(movedFile.parentFile, "RJ123456.cue").exists())
+        assertTrue("Companion .jpg must be moved", File(movedFile.parentFile, "RJ123456.jpg").exists())
+    }
 }

@@ -205,10 +205,55 @@ object StorageSyncManager {
     }
 
     /**
-     * Memindai folder fisik: membedakan multi-track album dan single track audio.
+     * Memeriksa apakah folder leaf adalah satu kesatuan album multi-track atau kumpulan track mandiri (koleksi/playlist).
      */
+    private fun isMultiTrackAlbumFolder(leaf: File, audioFiles: List<File>, isImported: Boolean, rootDir: File): Boolean {
+        if (audioFiles.size < 2) return false
+
+        // 1. Periksa kode RJ pada masing-masing file
+        val fileRjs = audioFiles.mapNotNull { f -> RJ_REGEX.find(f.name)?.value?.uppercase() }.distinct()
+
+        // Jika file-file memiliki kode RJ yang BERBEDA (misal RJ01075892 dan RJ01081584),
+        // maka ini PASTI kumpulan karya mandiri (folder playlist/kategori), BUKAN satu album multi-track!
+        if (fileRjs.size > 1) {
+            return false
+        }
+
+        // 2. Jika leaf adalah root direktori itu sendiri dan root memiliki subfolder audio lain -> bukan multi-track
+        if (leaf == rootDir && leaf != rootDir.parentFile) {
+            val hasChildAudioDirs = rootDir.listFiles { f -> f.isDirectory }?.any { d ->
+                AudioStorageHelper.getAudioFilesInFolder(d).isNotEmpty()
+            } == true
+            if (hasChildAudioDirs) return false
+        }
+
+        // 3. Jika folder ini diekspor/diimpor secara eksplisit via "Import Folder Audio":
+        if (isImported && (leaf == rootDir || leaf.parentFile == rootDir)) {
+            return true
+        }
+
+        // 4. Jika nama folder atau ancestor mengandung kode RJ:
+        val pathRj = AudioStorageHelper.findRjCodeInPath(leaf, rootBoundary = rootDir.parentFile)
+        if (pathRj != null) {
+            return fileRjs.isEmpty() || (fileRjs.size == 1 && fileRjs.first() == pathRj)
+        }
+
+        // 5. Jika semua file di dalam folder berbagi 1 kode RJ yang sama:
+        if (fileRjs.size == 1) {
+            return true
+        }
+
+        // 6. Untuk folder tanpa kode RJ: cek apakah penamaan file mengikuti pola penomoran track album
+        // (misal 01.mp3, 02.mp3, track01.mp3, ch1.mp3, part1.mp3, scene1.mp3)
+        val trackPattern = Regex("^(?:\\d{1,3}|track|ch|chapter|part|scene|op|ed|se|disc|\\(\\d+\\)|\\[\\d+\\])[-_ .]", RegexOption.IGNORE_CASE)
+        val numberedCount = audioFiles.count { f ->
+            trackPattern.containsMatchIn(f.name) || f.name.matches(Regex("^\\d{1,3}\\..*"))
+        }
+        return numberedCount >= (audioFiles.size * 0.6)
+    }
+
     /**
-     * Memindai folder fisik: mendukung multi-track album bertingkat (deep leaf folders) dan single track audio.
+     * Memindai folder fisik: membedakan multi-track album dan single track audio secara akurat.
      */
     private suspend fun scanPhysicalDirectory(
         context: Context,
@@ -218,68 +263,50 @@ object StorageSyncManager {
     ) {
         val leafFolders = AudioStorageHelper.findLeafAudioFolders(rootDir, maxDepth = 5)
 
-        // Kelompokkan folder leaf berdasarkan ancestor RJ (jika ada) untuk menangani varian (misal SEあり & SEなし)
-        val rjLeafMap = mutableMapOf<String, MutableList<File>>()
-        val nonRjLeaves = mutableListOf<File>()
-
         for (leaf in leafFolders) {
-            val rj = AudioStorageHelper.findRjCodeInPath(leaf, rootBoundary = rootDir.parentFile)
-            if (rj != null) {
-                rjLeafMap.getOrPut(rj) { mutableListOf() }.add(leaf)
-            } else {
-                nonRjLeaves.add(leaf)
-            }
-        }
-
-        // 1. Proses leaf folders yang terkait dengan kode RJ
-        for ((rj, leaves) in rjLeafMap) {
-            for (leaf in leaves) {
-                val audioFiles = AudioStorageHelper.getAudioFilesInFolder(leaf)
-                if (audioFiles.isEmpty()) continue
-
-                val fallbackCover = AudioStorageHelper.findCoverInPath(leaf, rootBoundary = rootDir)
-
-                // Jika leaf adalah rootDir dan rootDir juga memiliki subfolder audio lain -> proses file audio rootDir sebagai single
-                if (leaf == rootDir && leafFolders.size > 1) {
-                    for (f in audioFiles) {
-                        syncSingleAudioFile(context, dao, f, customRjid = null, linkedRj = rj, fallbackCover = fallbackCover)
-                    }
-                    continue
-                }
-
-                // Tentukan primary key unik: jika ada beberapa leaf folder untuk 1 kode RJ, berikan suffix nama folder varian
-                val rjid = if (leaves.size > 1 && !leaf.name.contains(rj, ignoreCase = true)) {
-                    "${rj}_${leaf.name}"
-                } else {
-                    rj
-                }
-
-                if (audioFiles.size >= 2) {
-                    syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = rjid, linkedRj = rj, fallbackCover = fallbackCover)
-                } else {
-                    syncSingleAudioFile(context, dao, audioFiles.first(), customRjid = rjid, linkedRj = rj, fallbackCover = fallbackCover)
-                }
-            }
-        }
-
-        // 2. Proses leaf folders non-RJ
-        for (leaf in nonRjLeaves) {
             val audioFiles = AudioStorageHelper.getAudioFilesInFolder(leaf)
             if (audioFiles.isEmpty()) continue
 
             val fallbackCover = AudioStorageHelper.findCoverInPath(leaf, rootBoundary = rootDir)
+            val pathRj = AudioStorageHelper.findRjCodeInPath(leaf, rootBoundary = rootDir.parentFile)
+            val isAlbum = isMultiTrackAlbumFolder(leaf, audioFiles, isImported, rootDir)
 
-            if (leaf == rootDir && leafFolders.size > 1) {
-                for (f in audioFiles) {
-                    syncSingleAudioFile(context, dao, f, customRjid = null, linkedRj = null, fallbackCover = fallbackCover)
-                }
-                continue
-            }
-
-            if (audioFiles.size >= 2) {
-                syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = null, linkedRj = null, fallbackCover = fallbackCover)
+            if (isAlbum) {
+                val fileRjs = audioFiles.mapNotNull { f -> RJ_REGEX.find(f.name)?.value?.uppercase() }.distinct()
+                val rj = pathRj ?: fileRjs.firstOrNull()
+                syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = rj, linkedRj = rj, fallbackCover = fallbackCover)
             } else {
-                syncSingleAudioFile(context, dao, audioFiles.first(), customRjid = null, linkedRj = null, fallbackCover = fallbackCover)
+                // Bersihkan entitas virtual album palsu/usang jika folder ini sebelumnya pernah salah didaftarkan sebagai album
+                val bogusAlbums = dao.getAllHistoryDirect().filter {
+                    it.localFilePath == leaf.absolutePath && it.sourceType == SourceType.LOCAL_FOLDER.name
+                }
+                for (bogus in bogusAlbums) {
+                    dao.deleteById(bogus.rjid)
+                }
+
+                // Proses file audio secara individual
+                val rjCounts = mutableMapOf<String, Int>()
+                for (f in audioFiles) {
+                    val fileRj = RJ_REGEX.find(f.name)?.value?.uppercase() ?: pathRj
+                    val customId = if (fileRj != null) {
+                        val count = rjCounts.getOrDefault(fileRj, 0) + 1
+                        rjCounts[fileRj] = count
+                        if (count == 1) fileRj else "${fileRj}_${count}"
+                    } else null
+
+                    val fileCover = AudioStorageHelper.findLocalCoverArt(f.parentFile ?: f)
+                        ?: AudioStorageHelper.getLocalCoverFile(context, fileRj ?: "", f.absolutePath)
+                        ?: fallbackCover
+
+                    syncSingleAudioFile(
+                        context = context,
+                        dao = dao,
+                        file = f,
+                        customRjid = customId,
+                        linkedRj = fileRj,
+                        fallbackCover = fileCover
+                    )
+                }
             }
         }
     }

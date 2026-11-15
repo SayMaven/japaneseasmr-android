@@ -394,7 +394,9 @@ object AudioStorageHelper {
     }
 
     /**
-     * Memindahkan file audio ke folder tujuan ("Utama" untuk root atau nama subfolder) secara fisik di memori HP.
+     * Memindahkan file atau folder audio ke folder tujuan ("Utama" untuk root atau nama subfolder) secara fisik di memori HP.
+     * Jika berupa direktori (album multi-track), seluruh folder beserta semua file track di dalamnya dipindahkan.
+     * Jika berupa file audio tunggal, file pendamping (.cue, cover .jpg/.png) juga ikut dipindahkan.
      */
     fun moveAudioFile(sourceFile: File, targetSubfolderName: String, downloadDir: File?): File? {
         if (!sourceFile.exists() || downloadDir == null || !downloadDir.exists()) return null
@@ -410,14 +412,43 @@ object AudioStorageHelper {
                 return sourceFile
             }
 
-            val success = sourceFile.renameTo(targetFile)
-            if (success && targetFile.exists()) {
-                targetFile
+            if (sourceFile.isDirectory) {
+                val success = sourceFile.renameTo(targetFile)
+                if (success && targetFile.exists()) {
+                    targetFile
+                } else {
+                    sourceFile.copyRecursively(targetFile, overwrite = true)
+                    sourceFile.deleteRecursively()
+                    targetFile
+                }
             } else {
-                // Fallback copy & delete if rename across mount fails
-                sourceFile.copyTo(targetFile, overwrite = true)
-                sourceFile.delete()
-                targetFile
+                val success = sourceFile.renameTo(targetFile)
+                val finalFile = if (success && targetFile.exists()) {
+                    targetFile
+                } else {
+                    sourceFile.copyTo(targetFile, overwrite = true)
+                    sourceFile.delete()
+                    targetFile
+                }
+
+                // Pindahkan file pendamping (.cue, .jpg, .png, .webp jika ada)
+                try {
+                    val baseName = sourceFile.nameWithoutExtension
+                    val parent = sourceFile.parentFile
+                    val companionExts = listOf("cue", "jpg", "png", "webp", "jpeg")
+                    companionExts.forEach { ext ->
+                        val comp = File(parent, "$baseName.$ext")
+                        if (comp.exists() && comp.isFile) {
+                            val targetComp = File(targetDir, comp.name)
+                            if (!comp.renameTo(targetComp)) {
+                                comp.copyTo(targetComp, overwrite = true)
+                                comp.delete()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {}
+
+                finalFile
             }
         } catch (e: Exception) {
             e.printStackTrace()

@@ -479,17 +479,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val allFolders = (listOf("Semua", "Utama") + subfolders).distinct()
         _availableFolders.value = allFolders
 
-        // Filter HANYA audio yang file fisiknya benar-benar ada di HP (termasuk di subfolder)
+        // Filter HANYA audio yang file fisiknya benar-benar ada di HP (termasuk di subfolder dan folder multi-track)
         val validItems = withContext(Dispatchers.IO) {
             dbList.mapNotNull { item ->
-                val direct = if (!item.localFilePath.isNullOrBlank()) File(item.localFilePath) else null
-                val validFile = if (direct != null && direct.exists() && direct.length() > 0L) {
-                    direct
-                } else {
-                    AudioStorageHelper.findExistingAudioFile(downloadDir, item.rjid)
-                }
+                val validFile = AudioStorageHelper.resolveValidAudioFile(downloadDir, item.localFilePath, item.rjid)
 
-                if (validFile != null && validFile.exists() && validFile.length() > 0L) {
+                if (validFile != null && validFile.exists() && (validFile.isDirectory || validFile.length() > 0L)) {
                     val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, validFile.absolutePath)
                     val resolvedCover = localCover?.absolutePath ?: item.coverUrl
                     item.copy(
@@ -545,7 +540,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val sourceFile = File(track.localFilePath)
             val moved = AudioStorageHelper.moveAudioFile(sourceFile, targetFolder, downloadDir)
             if (moved != null && moved.exists()) {
-                historyDao.insertHistory(track.copy(localFilePath = moved.absolutePath))
+                val isFolderAlbum = track.sourceType == SourceType.LOCAL_FOLDER.name || moved.isDirectory
+                if (isFolderAlbum) {
+                    val tracks = AudioStorageHelper.getAudioFilesInFolder(moved)
+                    val newChapters = AudioStorageHelper.extractVirtualAlbumChapters(tracks)
+                    AudioStorageHelper.cacheVirtualChapters(track.rjid, newChapters)
+                    historyDao.insertHistory(track.copy(
+                        localFilePath = moved.absolutePath,
+                        chaptersJson = ChapterItem.toJsonArray(newChapters)
+                    ))
+                } else {
+                    historyDao.insertHistory(track.copy(localFilePath = moved.absolutePath))
+                }
+
+                // Jika folder lama terdaftar di importedDirs, perbarui path impor ke lokasi baru
+                val currentImported = prefs.importedDirsFlow.first()
+                if (currentImported.contains(sourceFile.absolutePath)) {
+                    prefs.removeImportedDir(sourceFile.absolutePath)
+                    prefs.addImportedDir(moved.absolutePath)
+                }
+
                 refreshPlaylist()
                 StorageSyncManager.syncStorageWithDatabase(getApplication(), force = true)
             }
@@ -1400,8 +1414,49 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     return hasGarbageTitle || hasLateStart || hasMisplacedEpilogue
                 }
 
-                // 1. Cek cache database terlebih dahulu (jika bukan forceOnline)
+                // 0. JIKA INI MERUPAKAN VIRTUAL MULTI-TRACK ALBUM (FOLDER LOKAL):
+                // Bab selalu bersumber dari file-file fisik di dalam folder tersebut!
                 val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
+                val targetFile = history?.localFilePath?.let { File(it) }
+
+                if (targetFile != null && targetFile.exists() && (history?.sourceType == SourceType.LOCAL_FOLDER.name || targetFile.isDirectory)) {
+                    val folder = targetFile
+                    val tracks = withContext(Dispatchers.IO) { AudioStorageHelper.getAudioFilesInFolder(folder) }
+                    if (tracks.isNotEmpty()) {
+                        val freshChapters = AudioStorageHelper.extractVirtualAlbumChapters(tracks)
+                        AudioStorageHelper.cacheVirtualChapters(targetRjid, freshChapters)
+                        withContext(Dispatchers.IO) {
+                            historyDao.updateChapters(targetRjid, ChapterItem.toJsonArray(freshChapters))
+                        }
+                        _currentChapters.value = freshChapters
+                        val totalDur = freshChapters.lastOrNull()?.endMs ?: 0L
+                        if (totalDur > 0L) {
+                            _duration.value = totalDur
+                        }
+
+                        // Jika ditautkan dengan kode RJ, sync juga metadata dari DLsite jika forceOnline
+                        if (forceOnline && !history.linkedRjId.isNullOrBlank()) {
+                            withContext(Dispatchers.IO) {
+                                try {
+                                    val meta = DLsiteScraper.fetchMetadata(history.linkedRjId)
+                                    if (meta != null) {
+                                        val updated = history.copy(
+                                            title = if (meta.title.isNotBlank()) meta.title else history.title,
+                                            cv = if (meta.cv.isNotBlank() && meta.cv != "-") meta.cv else history.cv,
+                                            circle = if (meta.circle.isNotBlank() && meta.circle != "-") meta.circle else history.circle
+                                        )
+                                        historyDao.insertHistory(updated)
+                                    }
+                                } catch (e: Exception) {}
+                            }
+                        }
+
+                        checkTranslateChaptersIfNeeded(targetRjid, freshChapters)
+                        return@launch
+                    }
+                }
+
+                // 1. Cek cache database terlebih dahulu (jika bukan forceOnline)
                 if (!forceOnline && !history?.chaptersJson.isNullOrBlank()) {
                     val cached = ChapterItem.fromJsonArray(history?.chaptersJson)
                     val cleaned = ChapterDiscoveryService.deduplicateChapters(cached)
@@ -1460,7 +1515,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 } else if (!localChapters.isNullOrEmpty()) {
                     _currentChapters.value = localChapters
                 } else {
-                    _currentChapters.value = emptyList()
+                    // JANGAN kosongkan bab yang sudah ada jika pencarian online tidak menemukan bab baru
+                    val existingFromDb = if (!history?.chaptersJson.isNullOrBlank()) {
+                        ChapterItem.fromJsonArray(history.chaptersJson)
+                    } else emptyList()
+                    if (existingFromDb.isNotEmpty()) {
+                        _currentChapters.value = existingFromDb
+                    } else {
+                        _currentChapters.value = emptyList()
+                    }
                 }
 
                 checkTranslateChaptersIfNeeded(targetRjid, _currentChapters.value)
