@@ -133,6 +133,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Pre-warm sisa tab di background secara bertahap untuk transisi instan 0ms
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(350)
+                    listOf(NavTab.QUEUE, NavTab.HISTORY, NavTab.SETTINGS).forEach { tab ->
+                        if (!visitedTabs.contains(tab)) {
+                            visitedTabs.add(tab)
+                            kotlinx.coroutines.delay(120)
+                        }
+                    }
+                }
+
                 JapaneseASMRTheme(
                     themeMode = themeMode,
                     dynamicColor = dynamicColor,
@@ -156,7 +167,12 @@ class MainActivity : ComponentActivity() {
 
                                 BottomNavBar(
                                     currentTab = currentTab,
-                                    onTabSelected = { tab -> currentTab = tab }
+                                    onTabSelected = { tab ->
+                                        if (!visitedTabs.contains(tab)) {
+                                            visitedTabs.add(tab)
+                                        }
+                                        currentTab = tab
+                                    }
                                 )
                             }
                         }

@@ -19,6 +19,9 @@ interface HistoryDao {
     @Query("SELECT * FROM history_table WHERE rjid = :rjid LIMIT 1")
     suspend fun getHistoryById(rjid: String): HistoryEntity?
 
+    @Query("SELECT * FROM history_table WHERE rjid = :rjid OR linkedRjId = :rjid LIMIT 1")
+    suspend fun findByRjOrLinkedRj(rjid: String): HistoryEntity?
+
     @Query("SELECT * FROM history_table WHERE rjid LIKE '%' || :query || '%' OR title LIKE '%' || :query || '%' OR cv LIKE '%' || :query || '%' OR circle LIKE '%' || :query || '%' ORDER BY downloadDate DESC")
     fun searchHistory(query: String): Flow<List<HistoryEntity>>
 

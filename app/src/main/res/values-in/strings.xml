@@ -3,7 +3,7 @@
 
     <!-- Tab Navigasi -->
     <string name="tab_player">Utama</string>
-    <string name="tab_queue">Antrean</string>
+    <string name="tab_queue">Unduh</string>
     <string name="tab_history">Riwayat</string>
     <string name="tab_settings">Pengaturan</string>
 
@@ -41,7 +41,7 @@
     <string name="queue_console_clear">Bersihkan Log</string>
 
     <!-- Layar Riwayat -->
-    <string name="history_header_title">Riwayat &amp; Koleksi</string>
+    <string name="history_header_title">Riwayat Unduhan</string>
     <string name="history_menu_options">Opsi Riwayat</string>
     <string name="history_menu_clean_missing">Bersihkan File Hilang</string>
     <string name="history_menu_clear_all">Hapus Semua Riwayat</string>
@@ -248,7 +248,7 @@
     <string name="queue_header_count_format">Antrean Unduhan (%1$d)</string>
     <string name="queue_console_toggle">Buka/Tutup Log</string>
     <string name="queue_console_empty">Belum ada proses unduhan berjalan.\nMasukkan kode RJ di atas lalu tekan \'Unduh\' atau \'+ Antrean\'.</string>
-    <string name="history_header_title_format">Riwayat Koleksi (%1$d)</string>
+    <string name="history_header_title_format">Riwayat Unduhan (%1$d)</string>
     <string name="settings_threads_opt_4">4 Jalur (Hemat Kuota)</string>
     <string name="settings_threads_opt_8">8 Jalur (Standar)</string>
     <string name="settings_threads_opt_16">16 Jalur (Rekomendasi)</string>

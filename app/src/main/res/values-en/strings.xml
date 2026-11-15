@@ -3,7 +3,7 @@
 
     <!-- Navigation Tabs -->
     <string name="tab_player">Home</string>
-    <string name="tab_queue">Queue</string>
+    <string name="tab_queue">Download</string>
     <string name="tab_history">Library</string>
     <string name="tab_settings">Settings</string>
 
@@ -41,7 +41,7 @@
     <string name="queue_console_clear">Clear Log</string>
 
     <!-- History Screen -->
-    <string name="history_header_title">Library &amp; History</string>
+    <string name="history_header_title">Download History</string>
     <string name="history_menu_options">History Options</string>
     <string name="history_menu_clean_missing">Clean Missing Files</string>
     <string name="history_menu_clear_all">Clear All History</string>
@@ -248,7 +248,7 @@
     <string name="queue_header_count_format">Download Queue (%1$d)</string>
     <string name="queue_console_toggle">Toggle Log</string>
     <string name="queue_console_empty">No download process currently running.\nEnter an RJ code above then tap \'Download\' or \'+ Queue\'.</string>
-    <string name="history_header_title_format">Collection History (%1$d)</string>
+    <string name="history_header_title_format">Download History (%1$d)</string>
     <string name="settings_threads_opt_4">4 Threads (Data Saver)</string>
     <string name="settings_threads_opt_8">8 Threads (Standard)</string>
     <string name="settings_threads_opt_16">16 Threads (Recommended)</string>

@@ -65,6 +65,13 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
             dao.searchHistory(query)
         }
         flow.map { list ->
+            // Filter HANYA karya yang diunduh dari aplikasi (Audio Import tidak boleh muncul di riwayat unduhan)
+            val downloadedOnly = list.filter { item ->
+                item.sourceType != com.saymaven.downloader.japaneseasmr.data.model.SourceType.LOCAL_SINGLE.name &&
+                item.sourceType != com.saymaven.downloader.japaneseasmr.data.model.SourceType.LOCAL_FOLDER.name &&
+                !item.rjid.startsWith("LOCAL_")
+            }
+
             val customDirStr = prefs.downloadDirFlow.first()
             val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), customDirStr) ?: customDirStr
             val downloadDir = if (!resolvedPath.isNullOrBlank()) {
@@ -74,11 +81,12 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                 DownloadService.getDefaultDownloadDirectory()
             }
 
-            val resolved = list.map { item ->
-                val localCover = AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)
+            val resolved = downloadedOnly.map { item ->
+                val customCover = if (!item.coverUrl.isNullOrBlank() && File(item.coverUrl).exists()) item.coverUrl else null
+                val localCover = customCover ?: AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)?.absolutePath
+                val cover = localCover ?: item.coverUrl
                 val timestamp = AudioStorageHelper.parseDateToTimestamp(item.downloadDate, item.localFilePath)
                 val normalizedDate = if (timestamp > 0L) AudioStorageHelper.formatDateForDisplay(timestamp) else (item.downloadDate ?: "")
-                val cover = if (localCover != null && localCover.exists()) localCover.absolutePath else item.coverUrl
 
                 val isPresent = isFilePresentInternal(item, downloadDir)
 
@@ -104,15 +112,15 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                 HistorySortOrder.TITLE_DESC -> resolved.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.title })
             }
         }.flowOn(Dispatchers.IO)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val historyList: StateFlow<List<HistoryEntity>> = historyUiList.map { list ->
         list.map { it.entity }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val hasMissingFiles: StateFlow<Boolean> = historyUiList.map { list ->
         list.any { !it.isPresent }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private fun isFilePresentInternal(item: HistoryEntity, downloadDir: File): Boolean {
         val key = "${item.rjid}_${item.localFilePath}"
@@ -120,7 +128,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
             val path = item.localFilePath
             if (!path.isNullOrBlank()) {
                 val direct = File(path)
-                if (direct.exists() && direct.length() > 0) return@getOrPut true
+                if (direct.exists() && (direct.isDirectory || direct.length() > 0)) return@getOrPut true
             }
             AudioStorageHelper.findExistingAudioFile(downloadDir, item.rjid) != null
         }

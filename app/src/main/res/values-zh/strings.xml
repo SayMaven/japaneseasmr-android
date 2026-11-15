@@ -41,7 +41,7 @@
     <string name="queue_console_clear">清空日志</string>
 
     <!-- 媒体库与历史界面 -->
-    <string name="history_header_title">媒体库与历史</string>
+    <string name="history_header_title">下载历史</string>
     <string name="history_menu_options">历史选项</string>
     <string name="history_menu_clean_missing">清理失效文件</string>
     <string name="history_menu_clear_all">清空所有历史</string>
@@ -248,7 +248,7 @@
     <string name="queue_header_count_format">下载队列 (%1$d)</string>
     <string name="queue_console_toggle">切换日志</string>
     <string name="queue_console_empty">当前没有正在运行的下载进程。\n请在上方输入 RJ 代码，然后点击“下载”或“+ 队列”。</string>
-    <string name="history_header_title_format">收藏历史 (%1$d)</string>
+    <string name="history_header_title_format">下载历史 (%1$d)</string>
     <string name="settings_threads_opt_4">4 线程 (省流模式)</string>
     <string name="settings_threads_opt_8">8 线程 (标准)</string>
     <string name="settings_threads_opt_16">16 线程 (推荐)</string>

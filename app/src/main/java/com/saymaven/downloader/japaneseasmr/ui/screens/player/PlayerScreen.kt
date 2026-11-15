@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.media3.common.Player
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.painter.Painter
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.ui.res.stringResource
@@ -268,7 +269,8 @@ fun PlayerScreen(
             // Geser sedikit thumbnail agak ke bawah dengan spacer 18.dp
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Big Center Cover Art (Adaptive responsive sizing)
+            // Big Center Cover Art (Adaptive responsive sizing dengan pencegahan flicker abu-abu)
+            var lastValidPainter by remember { mutableStateOf<Painter?>(null) }
             Card(
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
@@ -290,6 +292,11 @@ fun PlayerScreen(
                         model = imageRequest,
                         contentDescription = "Cover Art",
                         contentScale = ContentScale.Crop,
+                        placeholder = lastValidPainter,
+                        error = lastValidPainter,
+                        onSuccess = { success ->
+                            lastValidPainter = success.painter
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {

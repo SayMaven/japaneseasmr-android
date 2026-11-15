@@ -41,7 +41,7 @@
     <string name="queue_console_clear">ログ消去</string>
 
     <!-- ライブラリ・履歴画面 -->
-    <string name="history_header_title">ライブラリと履歴</string>
+    <string name="history_header_title">ダウンロード履歴</string>
     <string name="history_menu_options">履歴オプション</string>
     <string name="history_menu_clean_missing">行方不明ファイルを整理</string>
     <string name="history_menu_clear_all">履歴をすべて消去</string>
@@ -248,7 +248,7 @@
     <string name="queue_header_count_format">ダウンロードキュー (%1$d)</string>
     <string name="queue_console_toggle">ログの切り替え</string>
     <string name="queue_console_empty">現在実行中のダウンロードはありません。\n上の入力欄にRJコードを入力し、「ダウンロード」または「+ キュー」をタップしてください。</string>
-    <string name="history_header_title_format">ライブラリ履歴 (%1$d)</string>
+    <string name="history_header_title_format">ダウンロード履歴 (%1$d)</string>
     <string name="settings_threads_opt_4">4スレッド (データ節約)</string>
     <string name="settings_threads_opt_8">8スレッド (標準)</string>
     <string name="settings_threads_opt_16">16スレッド (推奨)</string>

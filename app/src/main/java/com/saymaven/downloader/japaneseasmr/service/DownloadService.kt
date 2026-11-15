@@ -186,18 +186,49 @@ class DownloadService : Service() {
 
             log(DownloadLogHelper.processingItem(currentNum, totalInQueue, itemRjid))
 
-            // === 1. CEK FILE SUDAH ADA DI PENYIMPANAN (SKIP OTOMATIS) ===
-            val existingFile = AudioStorageHelper.findExistingAudioFile(downloadDir, itemRjid)
-            if (existingFile != null && existingFile.length() > 0) {
-                val fileSizeStr = AudioDownloader.formatFileSize(existingFile.length())
+            // === 1. CEK FILE SUDAH ADA DI PENYIMPANAN / DATABASE (SKIP OTOMATIS) ===
+            val existingDbItem = historyDao.findByRjOrLinkedRj(itemRjid)
+            val existingDbFile = existingDbItem?.localFilePath?.let { File(it) }
+            val hasValidDbFile = existingDbFile != null && existingDbFile.exists() && (
+                (existingDbFile.isFile && existingDbFile.length() > 0L) ||
+                (existingDbFile.isDirectory && AudioStorageHelper.getAudioFilesInFolder(existingDbFile).isNotEmpty())
+            )
+
+            val existingFile = if (hasValidDbFile) {
+                existingDbFile
+            } else {
+                val fromDownload = AudioStorageHelper.findExistingAudioFile(downloadDir, itemRjid)
+                if (fromDownload != null && fromDownload.length() > 0L) {
+                    fromDownload
+                } else {
+                    val importedDirs = prefs.importedDirsFlow.first()
+                    var foundInImport: File? = null
+                    for (imp in importedDirs) {
+                        val impFile = File(imp)
+                        val res = AudioStorageHelper.resolveValidAudioFile(impFile, null, itemRjid)
+                        if (res != null && res.exists()) {
+                            foundInImport = res
+                            break
+                        }
+                    }
+                    foundInImport
+                }
+            }
+
+            if (existingFile != null && existingFile.exists()) {
+                val totalBytes = if (existingFile.isDirectory) {
+                    AudioStorageHelper.getAudioFilesInFolder(existingFile).sumOf { it.length() }
+                } else {
+                    existingFile.length()
+                }
+                val fileSizeStr = AudioDownloader.formatFileSize(totalBytes)
                 val dateStr = AudioStorageHelper.formatDateForDisplay(existingFile.lastModified())
 
                 log(DownloadLogHelper.fileAlreadyExists(itemRjid, existingFile.name))
                 log(DownloadLogHelper.skippingDownload())
 
-                // Pastikan tersimpan di Room database
-                val existingHistory = historyDao.getHistoryById(itemRjid)
-                if (existingHistory == null) {
+                // Pastikan tersimpan di Room database jika belum ada
+                if (existingDbItem == null) {
                     val cueFile = File(existingFile.parentFile, "${existingFile.nameWithoutExtension}.cue")
                     val existingChapters = if (cueFile.exists()) ChapterDiscoveryService.parseCueFile(cueFile) else emptyList()
                     val chJson = if (existingChapters.isNotEmpty()) ChapterItem.toJsonArray(existingChapters) else null

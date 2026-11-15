@@ -456,6 +456,12 @@ object AudioStorageHelper {
         }
     }
 
+    fun clearLocalCoverCacheFor(rjid: String) {
+        val clean = rjid.uppercase().trim()
+        val keysToRemove = localCoverCache.keys.filter { it.startsWith(clean) }
+        keysToRemove.forEach { localCoverCache.remove(it) }
+    }
+
     /**
      * Mengambil file cover lokal instan (0ms) dari cache, cover folder fisik, atau mengekstrak dari embedded audio.
      */
