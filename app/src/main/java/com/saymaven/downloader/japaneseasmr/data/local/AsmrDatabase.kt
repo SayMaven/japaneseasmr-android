@@ -11,7 +11,7 @@ import com.saymaven.downloader.japaneseasmr.data.local.dao.TranslationCacheDao
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.local.entity.TranslationCacheEntity
 
-@Database(entities = [HistoryEntity::class, TranslationCacheEntity::class], version = 4, exportSchema = false)
+@Database(entities = [HistoryEntity::class, TranslationCacheEntity::class], version = 5, exportSchema = false)
 abstract class AsmrDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
     abstract fun translationCacheDao(): TranslationCacheDao
@@ -47,6 +47,13 @@ abstract class AsmrDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE history_table ADD COLUMN sourceType TEXT NOT NULL DEFAULT 'DL_SITE'")
+                db.execSQL("ALTER TABLE history_table ADD COLUMN linkedRjId TEXT DEFAULT NULL")
+            }
+        }
+
         fun getDatabase(context: Context): AsmrDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -54,7 +61,7 @@ abstract class AsmrDatabase : RoomDatabase() {
                     AsmrDatabase::class.java,
                     "japaneseasmr_database.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

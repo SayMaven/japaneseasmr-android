@@ -20,6 +20,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val KEY_COLOR_PALETTE = stringPreferencesKey("color_palette")
         val KEY_DOWNLOAD_DIR = stringPreferencesKey("download_dir")
+        val KEY_IMPORTED_DIRS = stringSetPreferencesKey("imported_audio_directories")
         val KEY_PARALLEL_CONNECTIONS = intPreferencesKey("parallel_connections")
         val KEY_AUTO_CLIPBOARD = booleanPreferencesKey("auto_clipboard")
         val KEY_USE_DETAILED_FILENAME = booleanPreferencesKey("use_detailed_filename")
@@ -137,6 +138,10 @@ class PreferencesManager(private val context: Context) {
         preferences[KEY_DOWNLOAD_DIR]
     }
 
+    val importedDirsFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[KEY_IMPORTED_DIRS] ?: emptySet()
+    }
+
     val parallelConnectionsFlow: Flow<Int> = context.dataStore.data.map { preferences ->
         preferences[KEY_PARALLEL_CONNECTIONS] ?: 16
     }
@@ -248,6 +253,24 @@ class PreferencesManager(private val context: Context) {
     suspend fun setDownloadDir(path: String) {
         context.dataStore.edit { preferences ->
             preferences[KEY_DOWNLOAD_DIR] = path
+        }
+    }
+
+    suspend fun addImportedDir(dirUriOrPath: String) {
+        if (dirUriOrPath.isBlank()) return
+        context.dataStore.edit { preferences ->
+            val current = preferences[KEY_IMPORTED_DIRS]?.toMutableSet() ?: mutableSetOf()
+            current.add(dirUriOrPath.trim())
+            preferences[KEY_IMPORTED_DIRS] = current
+        }
+    }
+
+    suspend fun removeImportedDir(dirUriOrPath: String) {
+        if (dirUriOrPath.isBlank()) return
+        context.dataStore.edit { preferences ->
+            val current = preferences[KEY_IMPORTED_DIRS]?.toMutableSet() ?: mutableSetOf()
+            current.remove(dirUriOrPath.trim())
+            preferences[KEY_IMPORTED_DIRS] = current
         }
     }
 

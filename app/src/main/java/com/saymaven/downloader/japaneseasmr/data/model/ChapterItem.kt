@@ -6,7 +6,8 @@ import org.json.JSONObject
 data class ChapterItem(
     val startMs: Long,
     val endMs: Long = 0L,
-    val title: String
+    val title: String,
+    val fileName: String? = null
 ) {
     fun formatTime(): String {
         val totalSec = startMs / 1000
@@ -28,6 +29,9 @@ data class ChapterItem(
                 obj.put("startMs", ch.startMs)
                 obj.put("endMs", ch.endMs)
                 obj.put("title", ch.title)
+                if (!ch.fileName.isNullOrBlank()) {
+                    obj.put("fileName", ch.fileName)
+                }
                 jsonArray.put(obj)
             }
             return jsonArray.toString()
@@ -43,7 +47,10 @@ data class ChapterItem(
                     val startMs = obj.optLong("startMs", 0L)
                     val endMs = obj.optLong("endMs", 0L)
                     val title = obj.optString("title", "Chapter ${i + 1}")
-                    list.add(ChapterItem(startMs, endMs, title))
+                    val fileName = if (obj.has("fileName") && !obj.isNull("fileName")) {
+                        obj.optString("fileName").ifBlank { null }
+                    } else null
+                    list.add(ChapterItem(startMs, endMs, title, fileName))
                 }
             } catch (e: Exception) {
                 // Return empty if parsing error
