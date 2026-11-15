@@ -112,6 +112,8 @@ fun PlayerScreen(
     var showChapterSheet by remember { mutableStateOf(false) }
     var showSleepTimerSheet by remember { mutableStateOf(false) }
     var draftTimerMinutes by remember { mutableIntStateOf(15) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
+    var showLinkRjDialog by remember { mutableStateOf(false) }
 
     val sheetNestedScroll = remember {
         object : NestedScrollConnection {
@@ -392,30 +394,66 @@ fun PlayerScreen(
                 )
             }
 
-            // DAC Status & Audio Specs (Below Timeline, Centered)
+            // DAC Status & Audio Specs with More Options button on the right (above Shuffle)
             Spacer(modifier = Modifier.height(10.dp))
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp)
             ) {
-                if (dacState.isExclusiveActive) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
+                    if (dacState.isExclusiveActive) {
+                        Text(
+                            text = stringResource(R.string.player_dac_label_format, dacState.dacName),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
+
                     Text(
-                        text = stringResource(R.string.player_dac_label_format, dacState.dacName),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        text = audioSpecs,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
                 }
 
-                Text(
-                    text = audioSpecs,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                    textAlign = TextAlign.Center
-                )
+                if (!currentRjId.isNullOrBlank()) {
+                    Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+                        IconButton(
+                            onClick = { showOverflowMenu = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Opsi",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.player_menu_link_rj)) },
+                                leadingIcon = { Icon(Icons.Default.Link, contentDescription = null) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showLinkRjDialog = true
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -1120,6 +1158,72 @@ fun PlayerScreen(
                 }
             }
         }
+    }
+
+    if (showLinkRjDialog && !currentRjId.isNullOrBlank()) {
+        var rjInput by remember { mutableStateOf("") }
+        var isLinking by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { if (!isLinking) showLinkRjDialog = false },
+            icon = { Icon(Icons.Default.Link, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text(stringResource(R.string.player_link_rj_dialog_title)) },
+            text = {
+                Column {
+                    Text(
+                        stringResource(R.string.player_link_rj_dialog_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = rjInput,
+                        onValueChange = { rjInput = it },
+                        label = { Text(stringResource(R.string.player_link_rj_input_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLinking
+                    )
+                    if (isLinking) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Menghubungkan ke DLsite…", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (rjInput.isNotBlank() && !isLinking) {
+                            isLinking = true
+                            viewModel.linkRjCode(currentRjId!!, rjInput) { success, rjOrMsg ->
+                                isLinking = false
+                                if (success) {
+                                    showLinkRjDialog = false
+                                    Toast.makeText(context, context.getString(R.string.player_link_rj_success_toast, rjOrMsg), Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, rjOrMsg ?: context.getString(R.string.player_link_rj_error_toast, rjInput), Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isLinking && rjInput.isNotBlank()
+                ) {
+                    Text(stringResource(R.string.player_link_rj_btn_link))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showLinkRjDialog = false },
+                    enabled = !isLinking
+                ) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 }
 }

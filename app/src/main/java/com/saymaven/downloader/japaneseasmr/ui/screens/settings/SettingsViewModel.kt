@@ -9,6 +9,8 @@ import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.data.model.UpdateInfo
+import com.saymaven.downloader.japaneseasmr.service.ImportPreviewData
+import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import com.saymaven.downloader.japaneseasmr.service.UpdateManager
 import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,6 +57,51 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         SharingStarted.WhileSubscribed(5000),
         null
     )
+
+    val importedDirs = preferencesManager.importedDirsFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        emptySet()
+    )
+
+    private val _importPreview = MutableStateFlow<ImportPreviewData?>(null)
+    val importPreview = _importPreview.asStateFlow()
+
+    private val _isScanning = MutableStateFlow(false)
+    val isScanning = _isScanning.asStateFlow()
+
+    fun prepareImport(uriOrPath: String) {
+        viewModelScope.launch {
+            _isScanning.value = true
+            try {
+                val preview = StorageSyncManager.previewImportDirectory(getApplication(), uriOrPath)
+                _importPreview.value = preview
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isScanning.value = false
+            }
+        }
+    }
+
+    fun confirmImport(dirUriOrPath: String) {
+        viewModelScope.launch {
+            preferencesManager.addImportedDir(dirUriOrPath)
+            _importPreview.value = null
+            StorageSyncManager.syncStorageWithDatabase(getApplication(), force = true)
+        }
+    }
+
+    fun removeImportedDir(dirUriOrPath: String) {
+        viewModelScope.launch {
+            preferencesManager.removeImportedDir(dirUriOrPath)
+            StorageSyncManager.syncStorageWithDatabase(getApplication(), force = true)
+        }
+    }
+
+    fun dismissImportPreview() {
+        _importPreview.value = null
+    }
 
     val parallelConnections = preferencesManager.parallelConnectionsFlow.stateIn(
         viewModelScope,

@@ -77,6 +77,104 @@ object AudioStorageHelper {
     }
 
     val AUDIO_EXTENSIONS = setOf("m4a", "mp3", "aac", "flac", "wav", "ogg")
+    private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
+    private val COVER_CANDIDATE_NAMES = listOf("cover", "folder", "front", "poster", "thumb", "artwork", "default")
+
+    /**
+     * Natural sort order comparator untuk file bernomor (contoh: 1.mp3, 2.mp3, 10.mp3).
+     */
+    val NATURAL_ORDER_COMPARATOR = Comparator<String> { a, b ->
+        val regex = "(\\d+)|(\\D+)".toRegex()
+        val aTokens = regex.findAll(a).map { it.value }.toList()
+        val bTokens = regex.findAll(b).map { it.value }.toList()
+        val minLen = minOf(aTokens.size, bTokens.size)
+        for (i in 0 until minLen) {
+            val aToken = aTokens[i]
+            val bToken = bTokens[i]
+            val aNum = aToken.toLongOrNull()
+            val bNum = bToken.toLongOrNull()
+            if (aNum != null && bNum != null) {
+                val cmp = aNum.compareTo(bNum)
+                if (cmp != 0) return@Comparator cmp
+            } else {
+                val cmp = aToken.compareTo(bToken, ignoreCase = true)
+                if (cmp != 0) return@Comparator cmp
+            }
+        }
+        aTokens.size.compareTo(bTokens.size)
+    }
+
+    /**
+     * Mengambil seluruh file audio di dalam folder (direct children), diurutkan natural order.
+     */
+    fun getAudioFilesInFolder(folder: File): List<File> {
+        if (!folder.exists() || !folder.isDirectory) return emptyList()
+        return try {
+            folder.listFiles { f ->
+                f.isFile && f.length() > 0L && AUDIO_EXTENSIONS.contains(f.extension.lowercase())
+            }?.sortedWith { f1, f2 -> NATURAL_ORDER_COMPARATOR.compare(f1.name, f2.name) } ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Mengecek apakah sebuah folder adalah multi-track album (memiliki >= 2 file audio).
+     */
+    fun isMultiTrackFolder(folder: File): Boolean {
+        return getAudioFilesInFolder(folder).size >= 2
+    }
+
+    /**
+     * Mencari cover art lokal di dalam folder (cover.jpg, folder.png, thumb, atau image tunggal).
+     */
+    fun findLocalCoverArt(folder: File): File? {
+        if (!folder.exists() || !folder.isDirectory) return null
+        return try {
+            val images = folder.listFiles { f ->
+                f.isFile && f.length() > 0L && IMAGE_EXTENSIONS.contains(f.extension.lowercase())
+            } ?: return null
+
+            if (images.isEmpty()) return null
+
+            // 1. Cek prioritas nama populer
+            for (cand in COVER_CANDIDATE_NAMES) {
+                val found = images.firstOrNull { it.nameWithoutExtension.equals(cand, ignoreCase = true) }
+                if (found != null) return found
+            }
+
+            // 2. Jika hanya ada 1 gambar di folder, gunakan itu
+            if (images.size == 1) return images.first()
+
+            // 3. Cek apakah ada file gambar yang memuat kode RJ jika folder memiliki nama RJ
+            val rjMatch = Regex("((?:RJ|VJ|BJ)\\d{6,8})", RegexOption.IGNORE_CASE).find(folder.name)
+            if (rjMatch != null) {
+                val rjid = rjMatch.value.uppercase()
+                val found = images.firstOrNull { it.name.uppercase().contains(rjid) }
+                if (found != null) return found
+            }
+
+            // Default ke gambar pertama
+            images.first()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Membuat ID deterministik sintetis unik untuk file/folder lokal non-RJ (misal LOCAL_A1B2C3D4E5).
+     */
+    fun generateLocalId(path: String): String {
+        return try {
+            val md = java.security.MessageDigest.getInstance("MD5")
+            val bytes = md.digest(path.toByteArray(Charsets.UTF_8))
+            val hash = bytes.joinToString("") { "%02x".format(it) }
+            "LOCAL_${hash.take(10).uppercase()}"
+        } catch (e: Exception) {
+            val hex = path.hashCode().toUInt().toString(16).padStart(8, '0')
+            "LOCAL_${hex.take(10).uppercase()}"
+        }
+    }
 
     /**
      * Mencari file audio yang cocok untuk kode RJ di folder unduhan (termasuk subfolder).
@@ -107,12 +205,15 @@ object AudioStorageHelper {
     }
 
     /**
-     * Memeriksa dan mengembalikan File valid untuk HistoryEntity.
+     * Memeriksa dan mengembalikan File valid untuk HistoryEntity (file tunggal atau folder multi-track).
      */
     fun resolveValidAudioFile(downloadDir: File?, localFilePath: String?, rjid: String): File? {
         if (!localFilePath.isNullOrBlank()) {
             val direct = File(localFilePath)
-            if (direct.exists() && direct.length() > 0) return direct
+            if (direct.exists()) {
+                if (direct.isFile && direct.length() > 0) return direct
+                if (direct.isDirectory && getAudioFilesInFolder(direct).isNotEmpty()) return direct
+            }
         }
         return findExistingAudioFile(downloadDir, rjid)
     }
@@ -192,7 +293,7 @@ object AudioStorageHelper {
     }
 
     /**
-     * Mengambil file cover lokal instan (0ms) dari cache atau mengekstrak dari embedded audio.
+     * Mengambil file cover lokal instan (0ms) dari cache, cover folder fisik, atau mengekstrak dari embedded audio.
      */
     fun getLocalCoverFile(context: Context, rjid: String, audioFilePath: String?): File? {
         val cleanRj = rjid.uppercase().trim()
@@ -207,21 +308,41 @@ object AudioStorageHelper {
         }
 
         if (!audioFilePath.isNullOrBlank()) {
-            val audioFile = File(audioFilePath)
-            if (audioFile.exists() && audioFile.length() > 0) {
-                if (!coversDir.exists()) coversDir.mkdirs()
-                val retriever = MediaMetadataRetriever()
-                try {
-                    retriever.setDataSource(audioFile.absolutePath)
-                    val pic = retriever.embeddedPicture
-                    if (pic != null && pic.isNotEmpty()) {
-                        FileOutputStream(cachedCover).use { it.write(pic) }
-                        localCoverCache[cacheKey] = cachedCover
-                        return cachedCover
+            val fileOrDir = File(audioFilePath)
+            if (fileOrDir.exists()) {
+                if (fileOrDir.isDirectory) {
+                    val folderCover = findLocalCoverArt(fileOrDir)
+                    if (folderCover != null && folderCover.exists() && folderCover.length() > 0) {
+                        localCoverCache[cacheKey] = folderCover
+                        return folderCover
                     }
-                } catch (e: Exception) {
-                } finally {
-                    try { retriever.release() } catch (e: Exception) {}
+                    val firstAudio = getAudioFilesInFolder(fileOrDir).firstOrNull()
+                    if (firstAudio != null) {
+                        return getLocalCoverFile(context, rjid, firstAudio.absolutePath)
+                    }
+                } else if (fileOrDir.length() > 0) {
+                    val parent = fileOrDir.parentFile
+                    if (parent != null && parent.exists()) {
+                        val folderCover = findLocalCoverArt(parent)
+                        if (folderCover != null && folderCover.exists() && folderCover.length() > 0) {
+                            localCoverCache[cacheKey] = folderCover
+                            return folderCover
+                        }
+                    }
+                    if (!coversDir.exists()) coversDir.mkdirs()
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(fileOrDir.absolutePath)
+                        val pic = retriever.embeddedPicture
+                        if (pic != null && pic.isNotEmpty()) {
+                            FileOutputStream(cachedCover).use { it.write(pic) }
+                            localCoverCache[cacheKey] = cachedCover
+                            return cachedCover
+                        }
+                    } catch (e: Exception) {
+                    } finally {
+                        try { retriever.release() } catch (e: Exception) {}
+                    }
                 }
             }
         }
@@ -240,7 +361,15 @@ object AudioStorageHelper {
         if (uriString.startsWith("content://")) {
             try {
                 val uri = android.net.Uri.parse(uriString)
-                val docId = android.provider.DocumentsContract.getTreeDocumentId(uri)
+                val docId = try {
+                    android.provider.DocumentsContract.getTreeDocumentId(uri)
+                } catch (e: Exception) {
+                    try {
+                        android.provider.DocumentsContract.getDocumentId(uri)
+                    } catch (e2: Exception) {
+                        null
+                    }
+                }
                 if (docId != null) {
                     val split = docId.split(":")
                     if (split.size >= 2) {
@@ -250,7 +379,22 @@ object AudioStorageHelper {
                             val primaryStorage = android.os.Environment.getExternalStorageDirectory().absolutePath
                             return "$primaryStorage/$relPath"
                         } else {
-                            return "/storage/$type/$relPath"
+                            val candidate = "/storage/$type/$relPath"
+                            if (File(candidate).exists()) {
+                                return candidate
+                            }
+                            // Fallback scanning external directories for secondary SD card mount
+                            val extDirs = context.getExternalFilesDirs(null)
+                            for (extDir in extDirs) {
+                                if (extDir != null && extDir.absolutePath.contains(type, ignoreCase = true)) {
+                                    val sdRoot = extDir.absolutePath.substringBefore("/Android")
+                                    val possiblePath = "$sdRoot/$relPath"
+                                    if (File(possiblePath).exists()) {
+                                        return possiblePath
+                                    }
+                                }
+                            }
+                            return candidate
                         }
                     }
                 }

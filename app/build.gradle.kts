@@ -151,6 +151,9 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
+    // SAF DocumentFile for Scoped Storage & SD Card tree traversal
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
     // DataStore Preferences
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 

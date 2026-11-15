@@ -22,6 +22,7 @@ import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
+import com.saymaven.downloader.japaneseasmr.data.model.SourceType
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
 import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
@@ -45,8 +46,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 enum class PlaylistSortType {
     CUSTOM,
@@ -327,6 +332,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val activeChapter = combine(activeChapterIndex, _currentChapters) { idx, chapters ->
         if (idx in chapters.indices) chapters[idx] else null
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    var isCurrentVirtualAlbum = false
+        private set
+    var currentAlbumHistory: HistoryEntity? = null
+        private set
 
     private var progressJob: Job? = null
     private var sleepTimerJob: Job? = null
@@ -684,7 +694,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val finalCover = localCover?.absolutePath ?: history.coverUrl
 
                     _currentRjId.value = history.rjid
-                    _currentTitle.value = "[${history.rjid}] ${history.title}"
+                    val tag = history.linkedRjId ?: if (history.rjid.startsWith("LOCAL_")) "LOCAL" else history.rjid
+                    _currentTitle.value = "[$tag] ${history.title}"
                     _currentArtist.value = history.cv
                     _currentCoverUrl.value = finalCover
                     preloadCoverArtInMemory(finalCover)
@@ -724,34 +735,104 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (validItemsWithFiles.isEmpty()) return@launch
 
             val targetPair = validItemsWithFiles.firstOrNull { it.first.rjid == history.rjid } ?: validItemsWithFiles.first()
-            val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
-
-            calculateAudioSpecs(targetPair.second)
 
             val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, targetPair.first.coverUrl)
 
-            val mediaItems = validItemsWithFiles.map { (item, file) ->
-                val metaBuilder = MediaMetadata.Builder()
-                    .setTitle("[${item.rjid}] ${item.title}")
-                    .setArtist(item.cv)
-                    .setAlbumTitle(item.circle)
-                    .setArtworkUri(Uri.parse(item.coverUrl ?: ""))
+            if (targetPair.first.sourceType == SourceType.LOCAL_FOLDER.name || targetPair.second.isDirectory) {
+                isCurrentVirtualAlbum = true
+                currentAlbumHistory = targetPair.first
+                val folder = targetPair.second
+                val tracks = AudioStorageHelper.getAudioFilesInFolder(folder)
 
-                if (coverBytes != null && item.rjid == targetPair.first.rjid) {
-                    metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                val parsedChapters = if (!targetPair.first.chaptersJson.isNullOrBlank()) {
+                    ChapterItem.fromJsonArray(targetPair.first.chaptersJson)
+                } else emptyList()
+
+                val chapters = if (parsedChapters.isNotEmpty() && parsedChapters.size == tracks.size) {
+                    parsedChapters
+                } else {
+                    var cum = 0L
+                    tracks.map { tr ->
+                        var dur = 0L
+                        val ret = MediaMetadataRetriever()
+                        try {
+                            ret.setDataSource(tr.absolutePath)
+                            dur = ret.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                        } catch (e: Exception) {}
+                        finally {
+                            try { ret.release() } catch (e: Exception) {}
+                        }
+                        val ch = ChapterItem(cum, cum + dur, tr.nameWithoutExtension, tr.name)
+                        cum += dur
+                        ch
+                    }
                 }
 
-                MediaItem.Builder()
-                    .setUri(Uri.fromFile(file))
-                    .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(file)).build())
-                    .setMediaId(item.rjid)
-                    .setMediaMetadata(metaBuilder.build())
-                    .build()
-            }
+                _currentChapters.value = chapters
+                val totalDur = chapters.lastOrNull()?.endMs ?: 0L
+                _duration.value = totalDur
 
-            p.setMediaItems(mediaItems, targetIndex, startPositionMs)
-            p.prepare()
-            _currentPosition.value = startPositionMs
+                val mediaItems = tracks.mapIndexed { idx, tr ->
+                    val trackTitle = chapters.getOrNull(idx)?.title ?: tr.nameWithoutExtension
+                    val metaBuilder = MediaMetadata.Builder()
+                        .setTitle(trackTitle)
+                        .setArtist(targetPair.first.cv)
+                        .setAlbumTitle(targetPair.first.title)
+                        .setArtworkUri(Uri.parse(targetPair.first.coverUrl ?: ""))
+                    if (coverBytes != null) {
+                        metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                    }
+                    MediaItem.Builder()
+                        .setUri(Uri.fromFile(tr))
+                        .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(tr)).build())
+                        .setMediaId(tr.absolutePath)
+                        .setMediaMetadata(metaBuilder.build())
+                        .build()
+                }
+
+                val initialTrackIdx = if (startPositionMs > 0L && chapters.isNotEmpty()) {
+                    chapters.indexOfLast { startPositionMs >= it.startMs }.coerceIn(0, (tracks.size - 1).coerceAtLeast(0))
+                } else 0
+                val initialOffset = if (startPositionMs > 0L && chapters.isNotEmpty()) {
+                    (startPositionMs - (chapters.getOrNull(initialTrackIdx)?.startMs ?: 0L)).coerceAtLeast(0L)
+                } else 0L
+
+                if (tracks.isNotEmpty()) {
+                    calculateAudioSpecs(tracks[initialTrackIdx])
+                }
+
+                p.setMediaItems(mediaItems, initialTrackIdx, initialOffset)
+                p.prepare()
+                _currentPosition.value = startPositionMs
+            } else {
+                isCurrentVirtualAlbum = false
+                currentAlbumHistory = null
+                val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
+                calculateAudioSpecs(targetPair.second)
+
+                val mediaItems = validItemsWithFiles.map { (item, file) ->
+                    val metaBuilder = MediaMetadata.Builder()
+                        .setTitle("[${item.rjid}] ${item.title}")
+                        .setArtist(item.cv)
+                        .setAlbumTitle(item.circle)
+                        .setArtworkUri(Uri.parse(item.coverUrl ?: ""))
+
+                    if (coverBytes != null && item.rjid == targetPair.first.rjid) {
+                        metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                    }
+
+                    MediaItem.Builder()
+                        .setUri(Uri.fromFile(file))
+                        .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(file)).build())
+                        .setMediaId(item.rjid)
+                        .setMediaMetadata(metaBuilder.build())
+                        .build()
+                }
+
+                p.setMediaItems(mediaItems, targetIndex, startPositionMs)
+                p.prepare()
+                _currentPosition.value = startPositionMs
+            }
         }
     }
 
@@ -772,33 +853,49 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (mediaItem != null) {
-                    val prevRj = _currentRjId.value
-                    _currentRjId.value = mediaItem.mediaId
-                    if (prevRj != mediaItem.mediaId) {
-                        loadChaptersForCurrentTrack(mediaItem.mediaId)
-                        if (_isTranslationActive.value) {
-                            loadOrFetchTranslations(mediaItem.mediaId)
-                        } else {
-                            _translatedTitle.value = null
-                            _translatedChapters.value = emptyList()
+                    if (isCurrentVirtualAlbum) {
+                        val album = currentAlbumHistory
+                        val curIdx = p.currentMediaItemIndex
+                        val curChapter = _currentChapters.value.getOrNull(curIdx)
+                        val trackTitle = curChapter?.title ?: mediaItem.mediaMetadata.title?.toString() ?: ""
+                        val albumTag = album?.linkedRjId ?: if (album?.rjid?.startsWith("LOCAL_") == true) "LOCAL" else album?.rjid
+                        _currentTitle.value = if (album != null) "[$albumTag] ${album.title} - $trackTitle" else trackTitle
+                        val baseMs = curChapter?.startMs ?: 0L
+                        _currentPosition.value = (baseMs + p.currentPosition).coerceAtLeast(0L)
+                        val totalDur = _currentChapters.value.lastOrNull()?.endMs ?: 0L
+                        if (totalDur > 0L) {
+                            _duration.value = totalDur
                         }
+                        saveCurrentState()
+                    } else {
+                        val prevRj = _currentRjId.value
+                        _currentRjId.value = mediaItem.mediaId
+                        if (prevRj != mediaItem.mediaId) {
+                            loadChaptersForCurrentTrack(mediaItem.mediaId)
+                            if (_isTranslationActive.value) {
+                                loadOrFetchTranslations(mediaItem.mediaId)
+                            } else {
+                                _translatedTitle.value = null
+                                _translatedChapters.value = emptyList()
+                            }
+                        }
+                        mediaItem.mediaMetadata.let { meta ->
+                            _currentTitle.value = meta.title?.toString() ?: ""
+                            _currentArtist.value = meta.artist?.toString() ?: "-"
+                            val cover = meta.artworkUri?.toString()
+                            _currentCoverUrl.value = cover
+                            preloadCoverArtInMemory(cover)
+                        }
+                        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
+                            _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                        } else if (p.isPlaying) {
+                            _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                        }
+                        if (p.duration > 0L) {
+                            _duration.value = p.duration.coerceAtLeast(0L)
+                        }
+                        saveCurrentState()
                     }
-                    mediaItem.mediaMetadata.let { meta ->
-                        _currentTitle.value = meta.title?.toString() ?: ""
-                        _currentArtist.value = meta.artist?.toString() ?: "-"
-                        val cover = meta.artworkUri?.toString()
-                        _currentCoverUrl.value = cover
-                        preloadCoverArtInMemory(cover)
-                    }
-                    if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
-                        _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
-                    } else if (p.isPlaying) {
-                        _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
-                    }
-                    if (p.duration > 0L) {
-                        _duration.value = p.duration.coerceAtLeast(0L)
-                    }
-                    saveCurrentState()
                 }
                 updatePlayingState(p)
             }
@@ -806,11 +903,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updatePlayingState(p)
                 if (playbackState == Player.STATE_READY) {
-                    if (p.duration > 0L) {
-                        _duration.value = p.duration.coerceAtLeast(0L)
-                    }
-                    if (p.isPlaying) {
-                        _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                    if (isCurrentVirtualAlbum) {
+                        val totalDur = _currentChapters.value.lastOrNull()?.endMs ?: 0L
+                        if (totalDur > 0L) _duration.value = totalDur
+                        val curIdx = p.currentMediaItemIndex
+                        val curChapter = _currentChapters.value.getOrNull(curIdx)
+                        val baseMs = curChapter?.startMs ?: 0L
+                        _currentPosition.value = (baseMs + p.currentPosition).coerceAtLeast(0L)
+                    } else {
+                        if (p.duration > 0L) {
+                            _duration.value = p.duration.coerceAtLeast(0L)
+                        }
+                        if (p.isPlaying) {
+                            _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                        }
                     }
                 }
             }
@@ -924,9 +1030,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (validItemsWithFiles.isEmpty()) return@launch
 
             val targetPair = validItemsWithFiles.firstOrNull { it.first.rjid == history.rjid } ?: validItemsWithFiles.first()
-            val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
-
-            calculateAudioSpecs(targetPair.second)
 
             val localCover = withContext(Dispatchers.IO) {
                 AudioStorageHelper.getLocalCoverFile(getApplication(), targetPair.first.rjid, targetPair.second.absolutePath)
@@ -935,42 +1038,125 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, finalCover)
 
-            val mediaItems = validItemsWithFiles.map { (item, file) ->
-                val metaBuilder = MediaMetadata.Builder()
-                    .setTitle("[${item.rjid}] ${item.title}")
-                    .setArtist(item.cv)
-                    .setAlbumTitle(item.circle)
-                    .setArtworkUri(Uri.parse(item.coverUrl ?: ""))
+            if (targetPair.first.sourceType == SourceType.LOCAL_FOLDER.name || targetPair.second.isDirectory) {
+                isCurrentVirtualAlbum = true
+                currentAlbumHistory = targetPair.first
+                val folder = targetPair.second
+                val tracks = AudioStorageHelper.getAudioFilesInFolder(folder)
 
-                if (coverBytes != null && item.rjid == targetPair.first.rjid) {
-                    metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                val parsedChapters = if (!targetPair.first.chaptersJson.isNullOrBlank()) {
+                    ChapterItem.fromJsonArray(targetPair.first.chaptersJson)
+                } else emptyList()
+
+                val chapters = if (parsedChapters.isNotEmpty() && parsedChapters.size == tracks.size) {
+                    parsedChapters
+                } else {
+                    var cum = 0L
+                    tracks.map { tr ->
+                        var dur = 0L
+                        val ret = MediaMetadataRetriever()
+                        try {
+                            ret.setDataSource(tr.absolutePath)
+                            dur = ret.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                        } catch (e: Exception) {}
+                        finally {
+                            try { ret.release() } catch (e: Exception) {}
+                        }
+                        val ch = ChapterItem(cum, cum + dur, tr.nameWithoutExtension, tr.name)
+                        cum += dur
+                        ch
+                    }
                 }
 
-                MediaItem.Builder()
-                    .setUri(Uri.fromFile(file))
-                    .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(file)).build())
-                    .setMediaId(item.rjid)
-                    .setMediaMetadata(metaBuilder.build())
-                    .build()
-            }
+                _currentChapters.value = chapters
+                val totalDur = chapters.lastOrNull()?.endMs ?: 0L
+                _duration.value = totalDur
 
-            _currentRjId.value = targetPair.first.rjid
-            _currentTitle.value = "[${targetPair.first.rjid}] ${targetPair.first.title}"
-            _currentArtist.value = targetPair.first.cv
-            _currentCoverUrl.value = finalCover
-            preloadCoverArtInMemory(finalCover)
-            loadChaptersForCurrentTrack(targetPair.first.rjid)
-            if (_isTranslationActive.value) {
-                loadOrFetchTranslations(targetPair.first.rjid)
+                val mediaItems = tracks.mapIndexed { idx, tr ->
+                    val trackTitle = chapters.getOrNull(idx)?.title ?: tr.nameWithoutExtension
+                    val metaBuilder = MediaMetadata.Builder()
+                        .setTitle(trackTitle)
+                        .setArtist(targetPair.first.cv)
+                        .setAlbumTitle(targetPair.first.title)
+                        .setArtworkUri(Uri.parse(finalCover ?: ""))
+                    if (coverBytes != null) {
+                        metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                    }
+                    MediaItem.Builder()
+                        .setUri(Uri.fromFile(tr))
+                        .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(tr)).build())
+                        .setMediaId(tr.absolutePath)
+                        .setMediaMetadata(metaBuilder.build())
+                        .build()
+                }
+
+                _currentRjId.value = targetPair.first.rjid
+                val tag = targetPair.first.linkedRjId ?: if (targetPair.first.rjid.startsWith("LOCAL_")) "LOCAL" else targetPair.first.rjid
+                _currentTitle.value = "[$tag] ${targetPair.first.title}"
+                _currentArtist.value = targetPair.first.cv
+                _currentCoverUrl.value = finalCover
+                preloadCoverArtInMemory(finalCover)
+
+                val initialTrackIdx = if (startPositionMs > 0L && chapters.isNotEmpty()) {
+                    chapters.indexOfLast { startPositionMs >= it.startMs }.coerceIn(0, (tracks.size - 1).coerceAtLeast(0))
+                } else 0
+                val initialOffset = if (startPositionMs > 0L && chapters.isNotEmpty()) {
+                    (startPositionMs - (chapters.getOrNull(initialTrackIdx)?.startMs ?: 0L)).coerceAtLeast(0L)
+                } else 0L
+
+                if (tracks.isNotEmpty()) {
+                    calculateAudioSpecs(tracks[initialTrackIdx])
+                }
+
+                p.setMediaItems(mediaItems, initialTrackIdx, initialOffset)
+                p.prepare()
+                p.play()
+                _currentPosition.value = startPositionMs
+                saveCurrentState()
             } else {
-                _translatedTitle.value = null
-                _translatedChapters.value = emptyList()
-            }
+                isCurrentVirtualAlbum = false
+                currentAlbumHistory = null
+                val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
+                calculateAudioSpecs(targetPair.second)
 
-            p.setMediaItems(mediaItems, targetIndex, startPositionMs)
-            p.prepare()
-            p.play()
-            saveCurrentState()
+                val mediaItems = validItemsWithFiles.map { (item, file) ->
+                    val metaBuilder = MediaMetadata.Builder()
+                        .setTitle("[${item.rjid}] ${item.title}")
+                        .setArtist(item.cv)
+                        .setAlbumTitle(item.circle)
+                        .setArtworkUri(Uri.parse(item.coverUrl ?: ""))
+
+                    if (coverBytes != null && item.rjid == targetPair.first.rjid) {
+                        metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                    }
+
+                    MediaItem.Builder()
+                        .setUri(Uri.fromFile(file))
+                        .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(file)).build())
+                        .setMediaId(item.rjid)
+                        .setMediaMetadata(metaBuilder.build())
+                        .build()
+                }
+
+                _currentRjId.value = targetPair.first.rjid
+                val tag = targetPair.first.linkedRjId ?: if (targetPair.first.rjid.startsWith("LOCAL_")) "LOCAL" else targetPair.first.rjid
+                _currentTitle.value = "[$tag] ${targetPair.first.title}"
+                _currentArtist.value = targetPair.first.cv
+                _currentCoverUrl.value = finalCover
+                preloadCoverArtInMemory(finalCover)
+                loadChaptersForCurrentTrack(targetPair.first.rjid)
+                if (_isTranslationActive.value) {
+                    loadOrFetchTranslations(targetPair.first.rjid)
+                } else {
+                    _translatedTitle.value = null
+                    _translatedChapters.value = emptyList()
+                }
+
+                p.setMediaItems(mediaItems, targetIndex, startPositionMs)
+                p.prepare()
+                p.play()
+                saveCurrentState()
+            }
         }
     }
 
@@ -1044,25 +1230,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun replay10() {
-        val p = player ?: return
-        val newPos = (p.currentPosition - 10000L).coerceAtLeast(0L)
-        p.seekTo(newPos)
-        _currentPosition.value = newPos
-        saveCurrentState()
+        seekTo((_currentPosition.value - 10000L).coerceAtLeast(0L))
     }
 
     fun forward10() {
-        val p = player ?: return
-        val newPos = (p.currentPosition + 10000L).coerceAtMost(_duration.value.coerceAtLeast(0L))
-        p.seekTo(newPos)
-        _currentPosition.value = newPos
-        saveCurrentState()
+        seekTo((_currentPosition.value + 10000L).coerceAtMost(_duration.value.coerceAtLeast(0L)))
     }
 
     fun seekTo(positionMs: Long) {
         val p = player ?: return
-        p.seekTo(positionMs.coerceIn(0L, _duration.value.coerceAtLeast(0L)))
-        _currentPosition.value = positionMs
+        if (isCurrentVirtualAlbum && _currentChapters.value.isNotEmpty()) {
+            val chapters = _currentChapters.value
+            val trackIdx = chapters.indexOfLast { positionMs >= it.startMs }.coerceIn(0, (chapters.size - 1).coerceAtLeast(0))
+            val offset = (positionMs - chapters[trackIdx].startMs).coerceAtLeast(0L)
+            p.seekTo(trackIdx, offset)
+            _currentPosition.value = positionMs
+        } else {
+            p.seekTo(positionMs.coerceIn(0L, _duration.value.coerceAtLeast(0L)))
+            _currentPosition.value = positionMs
+        }
         saveCurrentState()
     }
 
@@ -1087,6 +1273,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun seekToChapter(chapter: ChapterItem) {
+        val p = player ?: return
+        if (isCurrentVirtualAlbum && _currentChapters.value.isNotEmpty()) {
+            val idx = _currentChapters.value.indexOf(chapter)
+            if (idx != -1) {
+                p.seekToDefaultPosition(idx)
+                _currentPosition.value = chapter.startMs
+                saveCurrentState()
+                return
+            }
+        }
         seekTo(chapter.startMs)
     }
 
@@ -1341,8 +1537,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         progressJob = viewModelScope.launch {
             while (true) {
                 player?.let { p ->
-                    _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
-                    _duration.value = p.duration.coerceAtLeast(0L)
+                    if (isCurrentVirtualAlbum && _currentChapters.value.isNotEmpty()) {
+                        val curIdx = p.currentMediaItemIndex
+                        val curChapter = _currentChapters.value.getOrNull(curIdx)
+                        val baseMs = curChapter?.startMs ?: 0L
+                        _currentPosition.value = (baseMs + p.currentPosition).coerceAtLeast(0L)
+                        val totalDur = _currentChapters.value.lastOrNull()?.endMs ?: 0L
+                        if (totalDur > 0L) {
+                            _duration.value = totalDur
+                        }
+                    } else {
+                        _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                        _duration.value = p.duration.coerceAtLeast(0L)
+                    }
                     saveCacheSynchronously()
                 }
                 delay(1000)
@@ -1395,6 +1602,79 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun stopSleepTimer() {
         sleepTimerJob?.cancel()
         _sleepTimerRemainingMs.value = null
+    }
+
+    fun linkRjCode(currentRjid: String, targetRjInput: String, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val rjMatch = StorageSyncManager.RJ_REGEX.find(targetRjInput.trim())
+            if (rjMatch == null) {
+                onResult(false, "Kode RJ tidak valid")
+                return@launch
+            }
+            val targetRj = rjMatch.value.uppercase()
+            val meta = withContext(Dispatchers.IO) {
+                try {
+                    DLsiteScraper.fetchMetadata(targetRj)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            if (meta == null || (meta.title.isBlank() && meta.cv.isBlank())) {
+                onResult(false, "Karya $targetRj tidak ditemukan di DLsite")
+                return@launch
+            }
+
+            withContext(Dispatchers.IO) {
+                val existing = historyDao.getHistoryById(currentRjid)
+                if (existing != null) {
+                    var resolvedCover = existing.coverUrl
+                    if (!meta.coverUrl.isNullOrBlank()) {
+                        try {
+                            val coversDir = File(getApplication<Application>().cacheDir, "covers").apply { if (!exists()) mkdirs() }
+                            val targetCoverFile = File(coversDir, "${targetRj}.jpg")
+                            val req = Request.Builder()
+                                .url(meta.coverUrl)
+                                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                                .header("Referer", "https://japaneseasmr.com")
+                                .build()
+                            val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).build()
+                            val resp = client.newCall(req).execute()
+                            if (resp.isSuccessful) {
+                                resp.body?.byteStream()?.use { input ->
+                                    FileOutputStream(targetCoverFile).use { output -> input.copyTo(output) }
+                                }
+                                if (targetCoverFile.exists() && targetCoverFile.length() > 0) {
+                                    resolvedCover = targetCoverFile.absolutePath
+                                }
+                            }
+                        } catch (e: Exception) {}
+                    }
+
+                    val updated = existing.copy(
+                        title = if (meta.title.isNotBlank()) meta.title else existing.title,
+                        cv = if (meta.cv.isNotBlank() && meta.cv != "-") meta.cv else existing.cv,
+                        circle = if (meta.circle.isNotBlank() && meta.circle != "-") meta.circle else existing.circle,
+                        genre = if (meta.genre.isNotBlank() && meta.genre != "-") meta.genre else existing.genre,
+                        ageRating = if (meta.ageRating.isNotBlank() && meta.ageRating != "-") meta.ageRating else existing.ageRating,
+                        coverUrl = resolvedCover,
+                        linkedRjId = targetRj
+                    )
+                    historyDao.insertHistory(updated)
+
+                    withContext(Dispatchers.Main) {
+                        if (_currentRjId.value == currentRjid) {
+                            val tag = updated.linkedRjId ?: if (updated.rjid.startsWith("LOCAL_")) "LOCAL" else updated.rjid
+                            _currentTitle.value = "[$tag] ${updated.title}"
+                            _currentArtist.value = updated.cv
+                            _currentCoverUrl.value = updated.coverUrl
+                            preloadCoverArtInMemory(updated.coverUrl)
+                        }
+                    }
+                }
+            }
+            onResult(true, targetRj)
+        }
     }
 
     override fun onCleared() {

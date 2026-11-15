@@ -547,8 +547,9 @@ fun PlaylistItemCard(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
+                val displayTag = item.linkedRjId ?: if (item.rjid.startsWith("LOCAL_")) "LOCAL" else item.rjid
                 Text(
-                    text = "[${item.rjid}] ${item.title}",
+                    text = "[$displayTag] ${item.title}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,

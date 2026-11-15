@@ -71,6 +71,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val updateUiState by viewModel.updateUiState.collectAsState()
     val targetDebugChannel by viewModel.targetDebugChannel.collectAsState()
 
+    val importedDirs by viewModel.importedDirs.collectAsState()
+    val importPreview by viewModel.importPreview.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
+    var folderToRemove by remember { mutableStateOf<String?>(null) }
+
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showThreadDialog by remember { mutableStateOf(false) }
@@ -92,6 +97,19 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             val resolved = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, uri.toString()) ?: uri.toString()
             viewModel.setDownloadDir(resolved)
             Toast.makeText(context, context.getString(R.string.settings_folder_toast_changed), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val importFolderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                context.contentResolver.takePersistableUriPermission(uri, takeFlags)
+            } catch (e: Exception) {
+            }
+            viewModel.prepareImport(uri.toString())
         }
     }
 
@@ -348,6 +366,95 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         )
                     }
                 )
+            }
+        }
+
+        // ================= 2.1 FOLDER AUDIO & IMPOR =================
+        SettingsCategoryHeader(title = stringResource(R.string.settings_cat_import), icon = Icons.Default.FolderSpecial)
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+        ) {
+            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_import_folders_title), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_import_folders_desc), style = MaterialTheme.typography.bodySmall) },
+                    leadingContent = { Icon(Icons.Default.DriveFolderUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = {
+                        FilledTonalButton(onClick = { importFolderLauncher.launch(null) }) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.settings_import_add_btn))
+                        }
+                    }
+                )
+
+                if (importedDirs.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_import_empty_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                } else {
+                    importedDirs.forEach { dirStr ->
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        val physical = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, dirStr) ?: dirStr
+                        val displayPath = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.formatPathForDisplay(physical)
+                        val isSdCard = physical.contains("SD Card", ignoreCase = true) || (physical.startsWith("/storage/") && !physical.contains("emulated"))
+
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    displayPath,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
+                            supportingContent = {
+                                if (isSdCard) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "SD CARD",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            leadingContent = {
+                                Icon(
+                                    if (isSdCard) Icons.Default.SdStorage else Icons.Default.FolderOpen,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            trailingContent = {
+                                IconButton(onClick = { folderToRemove = dirStr }) {
+                                    Icon(
+                                        Icons.Default.DeleteOutline,
+                                        contentDescription = "Hapus",
+                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                        )
+                    }
+                }
             }
         }
 
@@ -1141,6 +1248,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text(stringResource(R.string.settings_changelog_title)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(stringResource(R.string.settings_changelog_v141_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_changelog_v141_item1), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v141_item2), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v141_item3), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v141_item4), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v141_item5), style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(stringResource(R.string.settings_changelog_v140_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text(stringResource(R.string.settings_changelog_v140_item1), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.settings_changelog_v140_item2), style = MaterialTheme.typography.bodySmall)
@@ -1215,6 +1329,108 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             },
             confirmButton = {
                 TextButton(onClick = { showGuideDialog = false }) { Text(stringResource(R.string.action_close)) }
+            }
+        )
+    }
+
+    importPreview?.let { preview ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissImportPreview() },
+            icon = { Icon(Icons.Default.FolderZip, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text(stringResource(R.string.settings_import_preview_title)) },
+            text = {
+                Column {
+                    Text(preview.folderName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    val resolved = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, preview.folderPathOrUri) ?: preview.folderPathOrUri
+                    val disp = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.formatPathForDisplay(resolved)
+                    Text(disp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(stringResource(R.string.settings_import_preview_total, preview.totalAudioTracks), fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(stringResource(R.string.settings_import_preview_multi, preview.multiAlbumCount), style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.settings_import_preview_singles, preview.singleCount), style = MaterialTheme.typography.bodyMedium)
+
+                            if (preview.unreadableCount > 0) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    stringResource(R.string.settings_import_preview_unreadable, preview.unreadableCount),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        stringResource(R.string.settings_import_preview_zerocopy),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.confirmImport(preview.folderPathOrUri)
+                    Toast.makeText(context, context.getString(R.string.settings_import_toast_success), Toast.LENGTH_SHORT).show()
+                }) {
+                    Text(stringResource(R.string.settings_import_preview_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissImportPreview() }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
+    folderToRemove?.let { dir ->
+        AlertDialog(
+            onDismissRequest = { folderToRemove = null },
+            title = { Text(stringResource(R.string.settings_import_delete_confirm)) },
+            text = {
+                val resolved = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, dir) ?: dir
+                val disp = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.formatPathForDisplay(resolved)
+                Text(disp, style = MaterialTheme.typography.bodyMedium)
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.removeImportedDir(dir)
+                    folderToRemove = null
+                    Toast.makeText(context, context.getString(R.string.settings_import_toast_removed), Toast.LENGTH_SHORT).show()
+                }) {
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { folderToRemove = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
+    if (isScanning) {
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {},
+            text = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(stringResource(R.string.settings_import_preview_scanning))
+                }
             }
         )
     }

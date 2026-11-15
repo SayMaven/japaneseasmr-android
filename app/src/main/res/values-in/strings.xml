@@ -254,7 +254,13 @@
     <string name="settings_threads_opt_16">16 Jalur (Rekomendasi)</string>
     <string name="settings_threads_opt_24">24 Jalur (Cepat)</string>
     <string name="settings_threads_opt_32">32 Jalur (Maksimum)</string>
-    <string name="settings_changelog_v140_title">Versi 1.4.0 (Terbaru)</string>
+    <string name="settings_changelog_v141_title">Versi 1.4.1 (Terbaru)</string>
+    <string name="settings_changelog_v141_item1">• Impor Folder Audio Fleksibel: Impor folder audio eksternal dari Memori Internal maupun SD Card dengan mudah.</string>
+    <string name="settings_changelog_v141_item2">• Album Virtual Multi-Track (Zero-Copy): Putar folder berisi banyak track file sebagai satu karya tanpa duplikasi memori penyimpanan.</string>
+    <string name="settings_changelog_v141_item3">• Dukungan Audio Lokal Non-RJ: Kelola koleksi audio bebas dengan ekstraksi tag ID3 otomatis dan ID sintetis persisten.</string>
+    <string name="settings_changelog_v141_item4">• Tautkan Metadata DLsite Resmi: Tautkan karya lokal ke kode RJ resmi untuk memperoleh cover HD dan info DLsite lengkap.</string>
+    <string name="settings_changelog_v141_item5">• Pratinjau Cerdas Pra-Impor: Pengecekan instan jumlah lagu, album multi-track, dan integritas file sebelum disimpan.</string>
+    <string name="settings_changelog_v140_title">Versi 1.4.0</string>
     <string name="settings_changelog_v140_item1">• Pembaruan Otomatis Aplikasi: Update versi langsung di Pengaturan via GitHub Releases dengan Smart Dual-Channel Matching (debug vs release).</string>
     <string name="settings_changelog_v140_item2">• Desain Baru Koleksi HiBy-Style: Layar Daftar Putar Koleksi mandiri yang tampil langsung saat aplikasi dibuka.</string>
     <string name="settings_changelog_v140_item3">• Bilah Sortir Multi-Field: Urutkan berdasarkan Kustom, Tanggal, Judul, Durasi, dan Kode RJ dengan toggle Ascending / Descending.</string>
@@ -316,4 +322,31 @@
     <string name="settings_update_dev_header">Opsi Pengujian Pengembang</string>
     <string name="settings_update_dev_test_apk">Uji Pasang APK Lokal</string>
     <string name="settings_update_dev_channel_toggle">Gunakan Channel Debug</string>
+
+    <!-- Audio Import Strings -->
+    <string name="settings_cat_import">Folder Audio &amp; Impor</string>
+    <string name="settings_import_folders_title">Folder Audio Eksternal</string>
+    <string name="settings_import_folders_desc">Tambahkan folder audio dari Memori Internal maupun Kartu SD.</string>
+    <string name="settings_import_add_btn">Tambah Folder Audio</string>
+    <string name="settings_import_empty_desc">Belum ada folder audio eksternal yang diimpor.</string>
+    <string name="settings_import_delete_confirm">Hapus folder ini dari pustaka JapaneseASMR?</string>
+    <string name="settings_import_preview_title">Pratinjau Impor Audio</string>
+    <string name="settings_import_preview_scanning">Memindai folder…</string>
+    <string name="settings_import_preview_singles">%1$d File Audio Tunggal</string>
+    <string name="settings_import_preview_multi">%1$d Album Multi-Track</string>
+    <string name="settings_import_preview_total">Total %1$d berkas audio terdeteksi</string>
+    <string name="settings_import_preview_unreadable">Peringatan: %1$d berkas tidak dapat dibaca / rusak</string>
+    <string name="settings_import_preview_zerocopy">Berkas audio akan dibaca langsung dari foldernya tanpa menggandakan memori penyimpanan (Zero-Copy).</string>
+    <string name="settings_import_preview_confirm">Impor Sekarang</string>
+    <string name="settings_import_toast_success">Folder audio berhasil diimpor!</string>
+    <string name="settings_import_toast_removed">Folder audio dihapus dari pustaka.</string>
+
+    <!-- RJ Linking Dialog Strings -->
+    <string name="player_menu_link_rj">Tautkan Kode RJ (DLsite)</string>
+    <string name="player_link_rj_dialog_title">Tautkan Kode RJ DLsite</string>
+    <string name="player_link_rj_dialog_desc">Masukkan kode karya resmi DLsite (contoh: RJ123456) untuk mengambil cover HD, pemeran (CV), dan info circle resmi.</string>
+    <string name="player_link_rj_input_hint">Kode RJ / VJ / BJ</string>
+    <string name="player_link_rj_btn_link">Tautkan Karya</string>
+    <string name="player_link_rj_success_toast">Berhasil menautkan karya dengan %1$s!</string>
+    <string name="player_link_rj_error_toast">Gagal menemukan metadata untuk %1$s.</string>
 </resources>
