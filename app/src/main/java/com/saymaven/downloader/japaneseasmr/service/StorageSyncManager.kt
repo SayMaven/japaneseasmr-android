@@ -64,11 +64,17 @@ object StorageSyncManager {
             var totalAudioTracks = 0
             var unreadableCount = 0
 
-            // 1. Cek immediate subfolders
-            val subfolders = directFile.listFiles { f -> f.isDirectory && !f.name.startsWith(".") } ?: emptyArray()
-            for (sub in subfolders) {
-                val audios = AudioStorageHelper.getAudioFilesInFolder(sub)
-                if (audios.size >= 2) {
+            val leafFolders = AudioStorageHelper.findLeafAudioFolders(directFile, maxDepth = 5)
+            for (leaf in leafFolders) {
+                val audios = AudioStorageHelper.getAudioFilesInFolder(leaf)
+                if (leaf == directFile && leafFolders.size > 1) {
+                    // directFile memiliki subfolder audio sekaligus file audio di root -> hitung file root sebagai single
+                    singleCount += audios.size
+                    totalAudioTracks += audios.size
+                    for (f in audios) {
+                        if (!f.canRead() || f.length() == 0L) unreadableCount++
+                    }
+                } else if (audios.size >= 2) {
                     multiAlbumCount++
                     totalAudioTracks += audios.size
                     for (f in audios) {
@@ -79,25 +85,6 @@ object StorageSyncManager {
                     totalAudioTracks += 1
                     val f = audios[0]
                     if (!f.canRead() || f.length() == 0L) unreadableCount++
-                }
-            }
-
-            // 2. Cek root audio files
-            val rootAudios = AudioStorageHelper.getAudioFilesInFolder(directFile)
-            if (rootAudios.isNotEmpty()) {
-                if (multiAlbumCount == 0 && singleCount == 0 && rootAudios.size >= 2) {
-                    // User memilih folder album multi-track secara langsung
-                    multiAlbumCount = 1
-                    totalAudioTracks = rootAudios.size
-                    for (f in rootAudios) {
-                        if (!f.canRead() || f.length() == 0L) unreadableCount++
-                    }
-                } else {
-                    singleCount += rootAudios.size
-                    totalAudioTracks += rootAudios.size
-                    for (f in rootAudios) {
-                        if (!f.canRead() || f.length() == 0L) unreadableCount++
-                    }
                 }
             }
 
@@ -122,22 +109,25 @@ object StorageSyncManager {
                 var totalAudioTracks = 0
                 var unreadableCount = 0
 
-                val children = docDir.listFiles()
-                for (doc in children) {
-                    if (doc.isDirectory && !doc.name.orEmpty().startsWith(".")) {
-                        val subAudios = doc.listFiles().filter { it.isFile && AudioStorageHelper.AUDIO_EXTENSIONS.contains(it.name?.substringAfterLast('.', "")?.lowercase()) }
-                        if (subAudios.size >= 2) {
-                            multiAlbumCount++
-                            totalAudioTracks += subAudios.size
-                        } else if (subAudios.size == 1) {
-                            singleCount++
-                            totalAudioTracks += 1
-                        }
-                    } else if (doc.isFile && AudioStorageHelper.AUDIO_EXTENSIONS.contains(doc.name?.substringAfterLast('.', "")?.lowercase())) {
+                fun scanDocRecursive(dir: DocumentFile, depth: Int) {
+                    if (depth > 5) return
+                    val children = dir.listFiles()
+                    val audioDocs = children.filter { it.isFile && AudioStorageHelper.AUDIO_EXTENSIONS.contains(it.name?.substringAfterLast('.', "")?.lowercase()) }
+                    if (audioDocs.size >= 2) {
+                        multiAlbumCount++
+                        totalAudioTracks += audioDocs.size
+                    } else if (audioDocs.size == 1) {
                         singleCount++
-                        totalAudioTracks++
+                        totalAudioTracks += 1
+                    }
+                    for (child in children) {
+                        if (child.isDirectory && !child.name.orEmpty().startsWith(".")) {
+                            scanDocRecursive(child, depth + 1)
+                        }
                     }
                 }
+
+                scanDocRecursive(docDir, 1)
 
                 return@withContext ImportPreviewData(
                     singleCount = singleCount,
@@ -217,36 +207,79 @@ object StorageSyncManager {
     /**
      * Memindai folder fisik: membedakan multi-track album dan single track audio.
      */
+    /**
+     * Memindai folder fisik: mendukung multi-track album bertingkat (deep leaf folders) dan single track audio.
+     */
     private suspend fun scanPhysicalDirectory(
         context: Context,
         dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao,
         rootDir: File,
         isImported: Boolean
     ) {
-        val subfolders = rootDir.listFiles { f -> f.isDirectory && !f.name.startsWith(".") } ?: emptyArray()
+        val leafFolders = AudioStorageHelper.findLeafAudioFolders(rootDir, maxDepth = 5)
 
-        // 1. Periksa subfolder langsung
-        for (sub in subfolders) {
-            val audioFiles = AudioStorageHelper.getAudioFilesInFolder(sub)
-            if (audioFiles.size >= 2) {
-                // Multi-track Virtual Album
-                syncMultiTrackFolder(context, dao, sub, audioFiles)
-            } else if (audioFiles.size == 1) {
-                // Single audio track di dalam subfolder
-                syncSingleAudioFile(context, dao, audioFiles.first())
+        // Kelompokkan folder leaf berdasarkan ancestor RJ (jika ada) untuk menangani varian (misal SEあり & SEなし)
+        val rjLeafMap = mutableMapOf<String, MutableList<File>>()
+        val nonRjLeaves = mutableListOf<File>()
+
+        for (leaf in leafFolders) {
+            val rj = AudioStorageHelper.findRjCodeInPath(leaf, rootBoundary = rootDir.parentFile)
+            if (rj != null) {
+                rjLeafMap.getOrPut(rj) { mutableListOf() }.add(leaf)
+            } else {
+                nonRjLeaves.add(leaf)
             }
         }
 
-        // 2. Periksa audio files di root folder itu sendiri
-        val rootAudios = AudioStorageHelper.getAudioFilesInFolder(rootDir)
-        if (rootAudios.isNotEmpty()) {
-            if (subfolders.isEmpty() && rootAudios.size >= 2 && isImported) {
-                // User mengimpor folder album multi-track secara langsung
-                syncMultiTrackFolder(context, dao, rootDir, rootAudios)
-            } else {
-                for (f in rootAudios) {
-                    syncSingleAudioFile(context, dao, f)
+        // 1. Proses leaf folders yang terkait dengan kode RJ
+        for ((rj, leaves) in rjLeafMap) {
+            for (leaf in leaves) {
+                val audioFiles = AudioStorageHelper.getAudioFilesInFolder(leaf)
+                if (audioFiles.isEmpty()) continue
+
+                val fallbackCover = AudioStorageHelper.findCoverInPath(leaf, rootBoundary = rootDir)
+
+                // Jika leaf adalah rootDir dan rootDir juga memiliki subfolder audio lain -> proses file audio rootDir sebagai single
+                if (leaf == rootDir && leafFolders.size > 1) {
+                    for (f in audioFiles) {
+                        syncSingleAudioFile(context, dao, f, customRjid = null, linkedRj = rj, fallbackCover = fallbackCover)
+                    }
+                    continue
                 }
+
+                // Tentukan primary key unik: jika ada beberapa leaf folder untuk 1 kode RJ, berikan suffix nama folder varian
+                val rjid = if (leaves.size > 1 && !leaf.name.contains(rj, ignoreCase = true)) {
+                    "${rj}_${leaf.name}"
+                } else {
+                    rj
+                }
+
+                if (audioFiles.size >= 2) {
+                    syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = rjid, linkedRj = rj, fallbackCover = fallbackCover)
+                } else {
+                    syncSingleAudioFile(context, dao, audioFiles.first(), customRjid = rjid, linkedRj = rj, fallbackCover = fallbackCover)
+                }
+            }
+        }
+
+        // 2. Proses leaf folders non-RJ
+        for (leaf in nonRjLeaves) {
+            val audioFiles = AudioStorageHelper.getAudioFilesInFolder(leaf)
+            if (audioFiles.isEmpty()) continue
+
+            val fallbackCover = AudioStorageHelper.findCoverInPath(leaf, rootBoundary = rootDir)
+
+            if (leaf == rootDir && leafFolders.size > 1) {
+                for (f in audioFiles) {
+                    syncSingleAudioFile(context, dao, f, customRjid = null, linkedRj = null, fallbackCover = fallbackCover)
+                }
+                continue
+            }
+
+            if (audioFiles.size >= 2) {
+                syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = null, linkedRj = null, fallbackCover = fallbackCover)
+            } else {
+                syncSingleAudioFile(context, dao, audioFiles.first(), customRjid = null, linkedRj = null, fallbackCover = fallbackCover)
             }
         }
     }
@@ -258,11 +291,16 @@ object StorageSyncManager {
         context: Context,
         dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao,
         folder: File,
-        audioTracks: List<File>
+        audioTracks: List<File>,
+        customRjid: String? = null,
+        linkedRj: String? = null,
+        fallbackCover: File? = null
     ) {
         val rjMatch = RJ_REGEX.find(folder.name)
-        val rjid = rjMatch?.value?.uppercase() ?: AudioStorageHelper.generateLocalId(folder.absolutePath)
-        val isOfficialRj = rjMatch != null
+        val baseRj = linkedRj ?: rjMatch?.value?.uppercase()
+        val rjid = customRjid ?: baseRj ?: AudioStorageHelper.generateLocalId(folder.absolutePath)
+        val isOfficialRj = baseRj != null
+        val finalLinkedRjId = linkedRj ?: if (isOfficialRj) baseRj else null
 
         val existing = dao.getHistoryById(rjid)
         val formattedDate = AudioStorageHelper.formatDateForDisplay(folder.lastModified())
@@ -301,17 +339,28 @@ object StorageSyncManager {
 
         val chaptersJson = ChapterItem.toJsonArray(chapters)
         val localCover = AudioStorageHelper.findLocalCoverArt(folder)
-            ?: AudioStorageHelper.getLocalCoverFile(context, rjid, audioTracks.first().absolutePath)
+            ?: fallbackCover
+            ?: AudioStorageHelper.getLocalCoverFile(context, finalLinkedRjId ?: rjid, audioTracks.first().absolutePath)
 
-        val cleanTitle = if (isOfficialRj) {
-            folder.name.replace(rjid, "").replace("[$rjid]", "").trim().ifEmpty { folder.name }
+        val cleanTitle = if (baseRj != null && folder.name != baseRj && !folder.name.contains(baseRj)) {
+            val parentWorkFolder = folder.parentFile?.let { p ->
+                if (AudioStorageHelper.findRjCodeInPath(p) != null) p else null
+            }
+            val parentTitle = parentWorkFolder?.name?.replace(baseRj, "")?.replace("[$baseRj]", "")?.trim()?.ifEmpty { null }
+            if (parentTitle != null) {
+                "$parentTitle (${folder.name})"
+            } else {
+                folder.name
+            }
+        } else if (isOfficialRj) {
+            folder.name.replace(baseRj ?: "", "").replace("[${baseRj ?: ""}]", "").trim().ifEmpty { folder.name }
         } else {
             folder.name
         }
 
-        val fallbackCoverUrl = if (isOfficialRj) {
-            val prefix = if (rjid.length >= 2) rjid.substring(0, 2) else "RJ"
-            "https://img.dlsite.jp/modpub/images2/work/doujin/${prefix}0000/${rjid}_img_main.jpg"
+        val fallbackCoverUrl = if (finalLinkedRjId != null) {
+            val prefix = if (finalLinkedRjId.length >= 2) finalLinkedRjId.substring(0, 2) else "RJ"
+            "https://img.dlsite.jp/modpub/images2/work/doujin/${prefix}0000/${finalLinkedRjId}_img_main.jpg"
         } else ""
 
         val coverUrl = localCover?.absolutePath ?: fallbackCoverUrl
@@ -330,11 +379,11 @@ object StorageSyncManager {
                 fileSize = AudioDownloader.formatFileSize(totalBytes),
                 chaptersJson = chaptersJson,
                 sourceType = SourceType.LOCAL_FOLDER.name,
-                linkedRjId = if (isOfficialRj) rjid else null
+                linkedRjId = finalLinkedRjId
             )
             dao.insertHistory(newEntity)
 
-            if (isOfficialRj) {
+            if (finalLinkedRjId != null) {
                 scope.launch { fetchAndCacheMetadata(context, dao, newEntity) }
             }
         } else {
@@ -352,6 +401,14 @@ object StorageSyncManager {
                 updated = updated.copy(chaptersJson = chaptersJson)
                 needsUpdate = true
             }
+            if (existing.linkedRjId != finalLinkedRjId && finalLinkedRjId != null) {
+                updated = updated.copy(linkedRjId = finalLinkedRjId)
+                needsUpdate = true
+            }
+            if (existing.coverUrl.isBlank() && coverUrl.isNotBlank()) {
+                updated = updated.copy(coverUrl = coverUrl)
+                needsUpdate = true
+            }
             if (needsUpdate) {
                 dao.insertHistory(updated)
             }
@@ -364,17 +421,26 @@ object StorageSyncManager {
     private suspend fun syncSingleAudioFile(
         context: Context,
         dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao,
-        file: File
+        file: File,
+        customRjid: String? = null,
+        linkedRj: String? = null,
+        fallbackCover: File? = null
     ) {
         val rjMatch = RJ_REGEX.find(file.name) ?: RJ_REGEX.find(file.parentFile?.name ?: "")
-        val isOfficialRj = rjMatch != null
-        val rjid = rjMatch?.value?.uppercase() ?: AudioStorageHelper.generateLocalId(file.absolutePath)
+        val baseRj = linkedRj ?: rjMatch?.value?.uppercase()
+        val isOfficialRj = baseRj != null
+        val rjid = customRjid ?: baseRj ?: AudioStorageHelper.generateLocalId(file.absolutePath)
+        val finalLinkedRjId = linkedRj ?: if (isOfficialRj) baseRj else null
 
         val existing = dao.getHistoryById(rjid)
         val formattedDate = AudioStorageHelper.formatDateForDisplay(file.lastModified())
 
         if (existing == null) {
-            var title = file.nameWithoutExtension.replace("[$rjid]", "").replace(rjid, "").trim().ifEmpty { file.nameWithoutExtension }
+            var title = if (baseRj != null) {
+                file.nameWithoutExtension.replace("[$baseRj]", "").replace(baseRj, "").trim().ifEmpty { file.nameWithoutExtension }
+            } else {
+                file.nameWithoutExtension
+            }
             var artist = "-"
 
             val retriever = MediaMetadataRetriever()
@@ -382,17 +448,20 @@ object StorageSyncManager {
                 retriever.setDataSource(file.absolutePath)
                 val metaTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
                 val metaArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                if (!metaTitle.isNullOrBlank()) title = metaTitle.replace("[$rjid]", "").trim()
+                if (!metaTitle.isNullOrBlank()) title = metaTitle.replace("[$baseRj]", "").trim()
                 if (!metaArtist.isNullOrBlank()) artist = metaArtist.trim()
             } catch (e: Exception) {
             } finally {
                 try { retriever.release() } catch (e: Exception) {}
             }
 
-            val localCover = AudioStorageHelper.getLocalCoverFile(context, rjid, file.absolutePath)
-            val fallbackCoverUrl = if (isOfficialRj) {
-                val prefix = if (rjid.length >= 2) rjid.substring(0, 2) else "RJ"
-                "https://img.dlsite.jp/modpub/images2/work/doujin/${prefix}0000/${rjid}_img_main.jpg"
+            val localCover = fallbackCover
+                ?: AudioStorageHelper.findLocalCoverArt(file.parentFile ?: file)
+                ?: AudioStorageHelper.getLocalCoverFile(context, finalLinkedRjId ?: rjid, file.absolutePath)
+
+            val fallbackCoverUrl = if (finalLinkedRjId != null) {
+                val prefix = if (finalLinkedRjId.length >= 2) finalLinkedRjId.substring(0, 2) else "RJ"
+                "https://img.dlsite.jp/modpub/images2/work/doujin/${prefix}0000/${finalLinkedRjId}_img_main.jpg"
             } else ""
             val coverUrl = localCover?.absolutePath ?: fallbackCoverUrl
 
@@ -413,11 +482,11 @@ object StorageSyncManager {
                 fileSize = AudioDownloader.formatFileSize(file.length()),
                 chaptersJson = chJson,
                 sourceType = if (isOfficialRj) SourceType.DL_SITE.name else SourceType.LOCAL_SINGLE.name,
-                linkedRjId = if (isOfficialRj) rjid else null
+                linkedRjId = finalLinkedRjId
             )
             dao.insertHistory(newEntity)
 
-            if (isOfficialRj) {
+            if (finalLinkedRjId != null) {
                 scope.launch { fetchAndCacheMetadata(context, dao, newEntity) }
             }
         } else {
@@ -430,6 +499,14 @@ object StorageSyncManager {
             }
             if (existing.downloadDate.isBlank()) {
                 updated = updated.copy(downloadDate = formattedDate)
+                needsUpdate = true
+            }
+            if (existing.linkedRjId != finalLinkedRjId && finalLinkedRjId != null) {
+                updated = updated.copy(linkedRjId = finalLinkedRjId)
+                needsUpdate = true
+            }
+            if (existing.coverUrl.isBlank() && fallbackCover != null) {
+                updated = updated.copy(coverUrl = fallbackCover.absolutePath)
                 needsUpdate = true
             }
 
@@ -458,28 +535,34 @@ object StorageSyncManager {
             val docDir = DocumentFile.fromTreeUri(context, Uri.parse(uriString)) ?: return
             if (!docDir.exists() || !docDir.isDirectory) return
 
-            for (doc in docDir.listFiles()) {
-                if (doc.isFile && AudioStorageHelper.AUDIO_EXTENSIONS.contains(doc.name?.substringAfterLast('.', "")?.lowercase())) {
-                    val rjMatch = RJ_REGEX.find(doc.name.orEmpty())
-                    val isOfficialRj = rjMatch != null
-                    val rjid = rjMatch?.value?.uppercase() ?: AudioStorageHelper.generateLocalId(doc.uri.toString())
+            suspend fun scanDocRecursive(dir: DocumentFile, depth: Int, parentRj: String?) {
+                if (depth > 5) return
+                val rjHere = RJ_REGEX.find(dir.name.orEmpty())?.value?.uppercase() ?: parentRj
+                val children = dir.listFiles()
+                val audioDocs = children.filter { it.isFile && AudioStorageHelper.AUDIO_EXTENSIONS.contains(it.name?.substringAfterLast('.', "")?.lowercase()) }
+
+                if (audioDocs.isNotEmpty()) {
+                    val rjCode = rjHere ?: audioDocs.firstNotNullOfOrNull { RJ_REGEX.find(it.name.orEmpty())?.value?.uppercase() }
+                    val isOfficialRj = rjCode != null
+                    val rjid = rjCode ?: AudioStorageHelper.generateLocalId(dir.uri.toString())
 
                     val existing = dao.getHistoryById(rjid)
                     if (existing == null) {
+                        val firstDoc = audioDocs.first()
                         val newEntity = HistoryEntity(
                             rjid = rjid,
-                            title = doc.name?.substringBeforeLast('.') ?: rjid,
+                            title = dir.name ?: firstDoc.name?.substringBeforeLast('.') ?: rjid,
                             cv = "-",
                             circle = "-",
                             genre = "-",
                             ageRating = "-",
                             coverUrl = "",
-                            localFilePath = doc.uri.toString(),
-                            downloadDate = AudioStorageHelper.formatDateForDisplay(doc.lastModified()),
-                            fileSize = AudioDownloader.formatFileSize(doc.length()),
+                            localFilePath = if (audioDocs.size >= 2) dir.uri.toString() else firstDoc.uri.toString(),
+                            downloadDate = AudioStorageHelper.formatDateForDisplay(firstDoc.lastModified()),
+                            fileSize = AudioDownloader.formatFileSize(audioDocs.sumOf { it.length() }),
                             chaptersJson = null,
-                            sourceType = if (isOfficialRj) SourceType.DL_SITE.name else SourceType.LOCAL_SINGLE.name,
-                            linkedRjId = if (isOfficialRj) rjid else null
+                            sourceType = if (audioDocs.size >= 2) SourceType.LOCAL_FOLDER.name else (if (isOfficialRj) SourceType.DL_SITE.name else SourceType.LOCAL_SINGLE.name),
+                            linkedRjId = rjCode
                         )
                         dao.insertHistory(newEntity)
                         if (isOfficialRj) {
@@ -487,7 +570,15 @@ object StorageSyncManager {
                         }
                     }
                 }
+
+                for (child in children) {
+                    if (child.isDirectory && !child.name.orEmpty().startsWith(".")) {
+                        scanDocRecursive(child, depth + 1, rjHere)
+                    }
+                }
             }
+
+            scanDocRecursive(docDir, 1, null)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -547,8 +638,16 @@ object StorageSyncManager {
                 }
             }
 
+            val variantSuffix = if (entity.rjid.contains("_") && entity.rjid != rjid) {
+                " (${entity.rjid.substringAfter("_")})"
+            } else ""
+
+            val updatedTitle = if (meta.title.isNotBlank() && meta.title != rjid) {
+                if (variantSuffix.isNotBlank()) "${meta.title}$variantSuffix" else meta.title
+            } else entity.title
+
             val finalEntity = entity.copy(
-                title = if (meta.title.isNotBlank() && meta.title != rjid) meta.title else entity.title,
+                title = updatedTitle,
                 circle = if (meta.circle.isNotBlank() && meta.circle != "-") meta.circle else entity.circle,
                 cv = if (meta.cv.isNotBlank() && meta.cv != "-") meta.cv else entity.cv,
                 genre = if (meta.genre.isNotBlank() && meta.genre != "-") meta.genre else entity.genre,

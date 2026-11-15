@@ -316,4 +316,47 @@
     <string name="settings_update_dev_header">開発者テストオプション</string>
     <string name="settings_update_dev_test_apk">ローカルAPKをテストインストール</string>
     <string name="settings_update_dev_channel_toggle">デバッグチャンネルを使用</string>
+
+    <!-- 音声インポート -->
+    <string name="settings_cat_import">音声フォルダーとインポート</string>
+    <string name="settings_import_folders_title">外部音声フォルダー</string>
+    <string name="settings_import_folders_desc">本体ストレージやSDカードから音声フォルダーを追加します。</string>
+    <string name="settings_import_add_btn">追加</string>
+    <string name="settings_import_empty_desc">インポートされた外部音声フォルダーはありません。</string>
+    <string name="settings_import_delete_confirm">このフォルダーをライブラリから削除しますか？</string>
+    <string name="settings_import_preview_title">音声インポートのプレビュー</string>
+    <string name="settings_import_preview_scanning">フォルダーをスキャン中…</string>
+    <string name="settings_import_preview_singles">%1$d 件の個別音声ファイル</string>
+    <string name="settings_import_preview_multi">%1$d 件のマルチトラック作品</string>
+    <string name="settings_import_preview_total">合計 %1$d 個の音声ファイルを検出</string>
+    <string name="settings_import_preview_unreadable">警告: %1$d 個のファイルを読み込めません（破損または0バイト）</string>
+    <string name="settings_import_preview_zerocopy">音声ファイルは元のフォルダーから直接再生されます。</string>
+    <string name="settings_import_preview_confirm">今すぐインポート</string>
+    <string name="settings_import_toast_success">音声フォルダーをインポートしました！</string>
+    <string name="settings_import_toast_removed">音声フォルダーをライブラリから削除しました。</string>
+
+    <!-- プレーヤーメニュー & RJ連携 & サムネイル変更 -->
+    <string name="player_menu_link_rj">DLsite RJコードを連携</string>
+    <string name="player_link_rj_dialog_title">DLsite作品に連携</string>
+    <string name="player_link_rj_dialog_desc">DLsiteのRJ/VJコードを入力すると、公式サムネイル、CV、サークル情報、チャプター情報を自動取得します。</string>
+    <string name="player_link_rj_input_hint">RJ / VJ / BJコード（例: RJ01697860）</string>
+    <string name="player_link_rj_btn_link">連携する</string>
+    <string name="player_link_rj_success_toast">%1$s に連携し、作品情報を取得しました！</string>
+    <string name="player_link_rj_error_toast">%1$s の作品情報取得に失敗しました。</string>
+    <string name="player_menu_change_cover">サムネイルを変更</string>
+    <string name="player_cover_dialog_title">サムネイルを選択</string>
+    <string name="player_cover_btn_gallery">端末のギャラリー／ファイルから選択</string>
+    <string name="player_cover_folder_images">フォルダー内の画像</string>
+    <string name="player_cover_no_images">フォルダー内に画像が見つかりません</string>
+    <string name="player_cover_success_toast">サムネイルを変更しました！</string>
+    <string name="badge_local">LOKAL</string>
+    <string name="badge_local_rj">LOKAL • %1$s</string>
+
+    <!-- Changelog v1.4.1 -->
+    <string name="settings_changelog_v141_title">バージョン 1.4.1（最新）</string>
+    <string name="settings_changelog_v141_item1">• マルチフォルダー音声インポート: 本体ストレージおよびSDカードから外部フォルダーを一括インポート。</string>
+    <string name="settings_changelog_v141_item2">• ゼロコピー仮想アルバム: ストレージを圧迫せず、分割トラック作品をシームレスに再生。</string>
+    <string name="settings_changelog_v141_item3">• 自動トラックブックマーク: 分割トラックがタイムラインのチャプターとして自動登録。</string>
+    <string name="settings_changelog_v141_item4">• 非RJ音声対応＆RJ連携: 独自IDの付与と、DLsite公式サムネイル・メタデータのワンタップ連携。</string>
+    <string name="settings_changelog_v141_item5">• インポート確認プレビュー: 保存前に検出ファイル数と作品数を事前に確認可能。</string>
 </resources>

@@ -77,8 +77,9 @@ object AudioStorageHelper {
     }
 
     val AUDIO_EXTENSIONS = setOf("m4a", "mp3", "aac", "flac", "wav", "ogg")
-    private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
-    private val COVER_CANDIDATE_NAMES = listOf("cover", "folder", "front", "poster", "thumb", "artwork", "default")
+    val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
+    private val COVER_CANDIDATE_NAMES = listOf("cover", "folder", "front", "main", "poster", "thumb", "artwork", "default")
+    private val IMAGE_SUBDIRECTORIES = listOf("thumb", "thumbnail", "img", "image", "images", "jacket", "cover", "サムネイル", "画像")
 
     /**
      * Natural sort order comparator untuk file bernomor (contoh: 1.mp3, 2.mp3, 10.mp3).
@@ -126,27 +127,64 @@ object AudioStorageHelper {
     }
 
     /**
+     * Mengambil seluruh berkas gambar lokal di dalam folder (dan subfolder gambar pendukung).
+     */
+    fun getAllLocalImagesInFolder(folder: File): List<File> {
+        if (!folder.exists() || !folder.isDirectory) return emptyList()
+        val result = mutableListOf<File>()
+        try {
+            // 1. Gambar langsung di dalam folder
+            folder.listFiles { f ->
+                f.isFile && f.length() > 0L && IMAGE_EXTENSIONS.contains(f.extension.lowercase())
+            }?.let { result.addAll(it) }
+
+            // 2. Gambar di subfolder populer
+            val subdirs = folder.listFiles { f ->
+                f.isDirectory && !f.name.startsWith(".") && IMAGE_SUBDIRECTORIES.any { cand -> f.name.contains(cand, ignoreCase = true) }
+            } ?: emptyArray()
+
+            for (sub in subdirs) {
+                sub.listFiles { f ->
+                    f.isFile && f.length() > 0L && IMAGE_EXTENSIONS.contains(f.extension.lowercase())
+                }?.let { result.addAll(it) }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return result.distinctBy { it.canonicalPath }.sortedWith { f1, f2 -> NATURAL_ORDER_COMPARATOR.compare(f1.name, f2.name) }
+    }
+
+    /**
      * Mencari cover art lokal di dalam folder (cover.jpg, folder.png, thumb, atau image tunggal).
+     * Mendukung pemilahan logo (あり vs なし) serta pencarian di subfolder gambar.
      */
     fun findLocalCoverArt(folder: File): File? {
         if (!folder.exists() || !folder.isDirectory) return null
         return try {
-            val images = folder.listFiles { f ->
-                f.isFile && f.length() > 0L && IMAGE_EXTENSIONS.contains(f.extension.lowercase())
-            } ?: return null
-
+            val images = getAllLocalImagesInFolder(folder)
             if (images.isEmpty()) return null
 
-            // 1. Cek prioritas nama populer
+            // 1. Prioritaskan gambar bertanda 'あり' (dengan logo/teks karya resmi DLsite)
+            val ariImg = images.firstOrNull {
+                val n = it.nameWithoutExtension
+                n.contains("あり") || n.contains("有") || n.contains("logo_on", ignoreCase = true)
+            }
+            if (ariImg != null) return ariImg
+
+            // 2. Cek prioritas nama populer
             for (cand in COVER_CANDIDATE_NAMES) {
                 val found = images.firstOrNull { it.nameWithoutExtension.equals(cand, ignoreCase = true) }
                 if (found != null) return found
             }
 
-            // 2. Jika hanya ada 1 gambar di folder, gunakan itu
+            // 3. Cek jika ada file cover khas DLsite (berisi "img_main")
+            val dlsiteMain = images.firstOrNull { it.nameWithoutExtension.contains("img_main", ignoreCase = true) }
+            if (dlsiteMain != null) return dlsiteMain
+
+            // 4. Jika hanya ada 1 gambar di folder, gunakan itu
             if (images.size == 1) return images.first()
 
-            // 3. Cek apakah ada file gambar yang memuat kode RJ jika folder memiliki nama RJ
+            // 5. Cek apakah ada file gambar yang memuat kode RJ jika folder memiliki nama RJ
             val rjMatch = Regex("((?:RJ|VJ|BJ)\\d{6,8})", RegexOption.IGNORE_CASE).find(folder.name)
             if (rjMatch != null) {
                 val rjid = rjMatch.value.uppercase()
@@ -154,11 +192,73 @@ object AudioStorageHelper {
                 if (found != null) return found
             }
 
+            // 6. Cek gambar tanpa logo 'なし' jika tidak ada opsi lain
+            val nashiImg = images.firstOrNull {
+                val n = it.nameWithoutExtension
+                n.contains("なし") || n.contains("無し")
+            }
+            if (nashiImg != null) return nashiImg
+
             // Default ke gambar pertama
             images.first()
         } catch (e: Exception) {
             null
         }
+    }
+
+    /**
+     * Menemukan seluruh folder leaf yang secara langsung berisi file audio (rekursif hingga kedalaman maxDepth).
+     * Mendukung struktur bertingkat seperti RJ01697860/mp3/SEあり/
+     */
+    fun findLeafAudioFolders(rootDir: File, maxDepth: Int = 5): List<File> {
+        if (!rootDir.exists() || !rootDir.isDirectory) return emptyList()
+        val leafFolders = mutableListOf<File>()
+        try {
+            rootDir.walkTopDown().maxDepth(maxDepth).forEach { file ->
+                if (file.isDirectory && !file.name.startsWith(".")) {
+                    val hasAudios = file.listFiles { f ->
+                        f.isFile && f.length() > 0L && AUDIO_EXTENSIONS.contains(f.extension.lowercase())
+                    }?.isNotEmpty() == true
+                    if (hasAudios) {
+                        leafFolders.add(file)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return leafFolders
+    }
+
+    /**
+     * Mencari kode RJ ke atas hierarki folder (ancestor) hingga mencapai boundary/root direktori.
+     */
+    fun findRjCodeInPath(fileOrFolder: File, rootBoundary: File? = null): String? {
+        val rjRegex = Regex("((?:RJ|VJ|BJ)\\d{6,8})", RegexOption.IGNORE_CASE)
+        var curr: File? = fileOrFolder
+        val stopPath = rootBoundary?.canonicalPath
+        while (curr != null) {
+            val match = rjRegex.find(curr.name)
+            if (match != null) return match.value.uppercase()
+            if (stopPath != null && curr.canonicalPath.equals(stopPath, ignoreCase = true)) break
+            curr = curr.parentFile
+        }
+        return null
+    }
+
+    /**
+     * Mencari cover art lokal dengan menelusuri ke atas hierarki folder (misal cover berada di folder RJ induk).
+     */
+    fun findCoverInPath(folder: File, rootBoundary: File? = null): File? {
+        var curr: File? = folder
+        val stopPath = rootBoundary?.canonicalPath
+        while (curr != null) {
+            val found = findLocalCoverArt(curr)
+            if (found != null && found.exists() && found.length() > 0) return found
+            if (stopPath != null && curr.canonicalPath.equals(stopPath, ignoreCase = true)) break
+            curr = curr.parentFile
+        }
+        return null
     }
 
     /**

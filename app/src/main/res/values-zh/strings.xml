@@ -316,4 +316,47 @@
     <string name="settings_update_dev_header">开发者测试选项</string>
     <string name="settings_update_dev_test_apk">测试安装本地 APK</string>
     <string name="settings_update_dev_channel_toggle">使用调试通道</string>
+
+    <!-- 音频导入 -->
+    <string name="settings_cat_import">音频文件夹与导入</string>
+    <string name="settings_import_folders_title">外部音频文件夹</string>
+    <string name="settings_import_folders_desc">从内部存储空间或SD卡添加外部音频文件夹。</string>
+    <string name="settings_import_add_btn">添加</string>
+    <string name="settings_import_empty_desc">尚未导入任何外部音频文件夹。</string>
+    <string name="settings_import_delete_confirm">确定将此文件夹从媒体库中移除吗？</string>
+    <string name="settings_import_preview_title">音频导入预览</string>
+    <string name="settings_import_preview_scanning">正在扫描文件夹…</string>
+    <string name="settings_import_preview_singles">%1$d 个单音频文件</string>
+    <string name="settings_import_preview_multi">%1$d 部多音轨作品</string>
+    <string name="settings_import_preview_total">共检测到 %1$d 个音频文件</string>
+    <string name="settings_import_preview_unreadable">警告: %1$d 个文件无法读取或为空文件</string>
+    <string name="settings_import_preview_zerocopy">音频文件将直接从原文件夹中读取播放。</string>
+    <string name="settings_import_preview_confirm">立即导入</string>
+    <string name="settings_import_toast_success">音频文件夹导入成功！</string>
+    <string name="settings_import_toast_removed">已将音频文件夹从媒体库中移除。</string>
+
+    <!-- 播放器菜单 & 关联RJ & 更换封面 -->
+    <string name="player_menu_link_rj">关联 DLsite RJ 代码</string>
+    <string name="player_link_rj_dialog_title">关联 DLsite 作品</string>
+    <string name="player_link_rj_dialog_desc">输入 DLsite RJ/VJ 代码，自动获取官方封面、声优(CV)、社团及章节信息。</string>
+    <string name="player_link_rj_input_hint">RJ / VJ / BJ 代码（例如: RJ01697860）</string>
+    <string name="player_link_rj_btn_link">关联</string>
+    <string name="player_link_rj_success_toast">已成功关联至 %1$s 并获取作品信息！</string>
+    <string name="player_link_rj_error_toast">获取 %1$s 作品信息失败。</string>
+    <string name="player_menu_change_cover">更换封面</string>
+    <string name="player_cover_dialog_title">选择封面图</string>
+    <string name="player_cover_btn_gallery">从相册／设备文件中选择</string>
+    <string name="player_cover_folder_images">文件夹内现有图片</string>
+    <string name="player_cover_no_images">文件夹内未发现图片文件</string>
+    <string name="player_cover_success_toast">封面已成功更换！</string>
+    <string name="badge_local">LOKAL</string>
+    <string name="badge_local_rj">LOKAL • %1$s</string>
+
+    <!-- Changelog v1.4.1 -->
+    <string name="settings_changelog_v141_title">版本 1.4.1（最新）</string>
+    <string name="settings_changelog_v141_item1">• 多文件夹音频导入: 支持从内部存储及SD卡导入外部音频文件夹。</string>
+    <string name="settings_changelog_v141_item2">• 零拷贝虚拟专辑: 无需复制音频文件，无缝播放多音轨分轨作品，零空间浪费。</string>
+    <string name="settings_changelog_v141_item3">• 自动音轨书签: 分轨文件自动映射为时间轴章节/书签，支持一键跳转。</string>
+    <string name="settings_changelog_v141_item4">• 支持非RJ音频与RJ关联: 自动生成本地唯一ID，并支持关联DLsite获取官方封面与元数据。</string>
+    <string name="settings_changelog_v141_item5">• 导入前扫描预览: 导入前实时预览单文件及多音轨作品数量，防误操作。</string>
 </resources>

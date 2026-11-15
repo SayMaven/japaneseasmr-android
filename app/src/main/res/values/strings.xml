@@ -327,7 +327,7 @@
     <string name="settings_cat_import">Audio Folders &amp; Import</string>
     <string name="settings_import_folders_title">Imported Audio Folders</string>
     <string name="settings_import_folders_desc">Include external audio folders from Internal Storage or SD Card.</string>
-    <string name="settings_import_add_btn">Add Audio Folder</string>
+    <string name="settings_import_add_btn">Add</string>
     <string name="settings_import_empty_desc">No external audio folders imported yet.</string>
     <string name="settings_import_delete_confirm">Remove this folder from JapaneseASMR library?</string>
     <string name="settings_import_preview_title">Import Folder Preview</string>
@@ -336,12 +336,12 @@
     <string name="settings_import_preview_multi">%1$d Multi-Track Albums</string>
     <string name="settings_import_preview_total">Total %1$d audio tracks detected</string>
     <string name="settings_import_preview_unreadable">Warning: %1$d files cannot be read or are empty</string>
-    <string name="settings_import_preview_zerocopy">Audio files will be played directly from their current location without duplicating storage (Zero-Copy).</string>
+    <string name="settings_import_preview_zerocopy">Audio files will be played directly from their folder.</string>
     <string name="settings_import_preview_confirm">Import Now</string>
     <string name="settings_import_toast_success">Audio folder successfully imported!</string>
     <string name="settings_import_toast_removed">Audio folder removed from library.</string>
 
-    <!-- RJ Linking Dialog Strings -->
+    <!-- RJ Linking & Thumbnail Strings -->
     <string name="player_menu_link_rj">Link RJ Code (DLsite)</string>
     <string name="player_link_rj_dialog_title">Link DLsite RJ Code</string>
     <string name="player_link_rj_dialog_desc">Enter the official DLsite work code (e.g. RJ123456) to retrieve HD cover art, cast, and official circle metadata.</string>
@@ -349,4 +349,12 @@
     <string name="player_link_rj_btn_link">Link Work</string>
     <string name="player_link_rj_success_toast">Successfully linked work to %1$s!</string>
     <string name="player_link_rj_error_toast">Failed to find metadata for %1$s.</string>
+    <string name="player_menu_change_cover">Change Thumbnail</string>
+    <string name="player_cover_dialog_title">Select Thumbnail</string>
+    <string name="player_cover_btn_gallery">Choose from Gallery / Files</string>
+    <string name="player_cover_folder_images">Available Images in Folder</string>
+    <string name="player_cover_no_images">No images found in folder</string>
+    <string name="player_cover_success_toast">Thumbnail updated successfully!</string>
+    <string name="badge_local">LOKAL</string>
+    <string name="badge_local_rj">LOKAL • %1$s</string>
 </resources>

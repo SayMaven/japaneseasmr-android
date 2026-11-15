@@ -326,7 +326,12 @@ fun HistoryItemCard(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                val displayTag = item.entity.linkedRjId ?: if (item.rjid.startsWith("LOCAL_")) "LOCAL" else item.rjid
+                val isLocal = item.entity.sourceType != "DL_SITE" || item.rjid.startsWith("LOCAL_")
+                val displayTag = when {
+                    isLocal && !item.entity.linkedRjId.isNullOrBlank() -> "LOKAL • ${item.entity.linkedRjId}"
+                    isLocal -> "LOKAL"
+                    else -> item.rjid
+                }
                 Text(
                     text = "[$displayTag] ${item.title}",
                     style = MaterialTheme.typography.bodyMedium,

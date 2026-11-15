@@ -327,7 +327,7 @@
     <string name="settings_cat_import">Folder Audio &amp; Impor</string>
     <string name="settings_import_folders_title">Folder Audio Eksternal</string>
     <string name="settings_import_folders_desc">Tambahkan folder audio dari Memori Internal maupun Kartu SD.</string>
-    <string name="settings_import_add_btn">Tambah Folder Audio</string>
+    <string name="settings_import_add_btn">Tambah</string>
     <string name="settings_import_empty_desc">Belum ada folder audio eksternal yang diimpor.</string>
     <string name="settings_import_delete_confirm">Hapus folder ini dari pustaka JapaneseASMR?</string>
     <string name="settings_import_preview_title">Pratinjau Impor Audio</string>
@@ -336,12 +336,12 @@
     <string name="settings_import_preview_multi">%1$d Album Multi-Track</string>
     <string name="settings_import_preview_total">Total %1$d berkas audio terdeteksi</string>
     <string name="settings_import_preview_unreadable">Peringatan: %1$d berkas tidak dapat dibaca / rusak</string>
-    <string name="settings_import_preview_zerocopy">Berkas audio akan dibaca langsung dari foldernya tanpa menggandakan memori penyimpanan (Zero-Copy).</string>
+    <string name="settings_import_preview_zerocopy">Berkas audio akan dibaca langsung dari foldernya.</string>
     <string name="settings_import_preview_confirm">Impor Sekarang</string>
     <string name="settings_import_toast_success">Folder audio berhasil diimpor!</string>
     <string name="settings_import_toast_removed">Folder audio dihapus dari pustaka.</string>
 
-    <!-- RJ Linking Dialog Strings -->
+    <!-- RJ Linking & Thumbnail Strings -->
     <string name="player_menu_link_rj">Tautkan Kode RJ (DLsite)</string>
     <string name="player_link_rj_dialog_title">Tautkan Kode RJ DLsite</string>
     <string name="player_link_rj_dialog_desc">Masukkan kode karya resmi DLsite (contoh: RJ123456) untuk mengambil cover HD, pemeran (CV), dan info circle resmi.</string>
@@ -349,4 +349,12 @@
     <string name="player_link_rj_btn_link">Tautkan Karya</string>
     <string name="player_link_rj_success_toast">Berhasil menautkan karya dengan %1$s!</string>
     <string name="player_link_rj_error_toast">Gagal menemukan metadata untuk %1$s.</string>
+    <string name="player_menu_change_cover">Ganti Thumbnail</string>
+    <string name="player_cover_dialog_title">Pilih Thumbnail</string>
+    <string name="player_cover_btn_gallery">Pilih dari Galeri / Berkas</string>
+    <string name="player_cover_folder_images">Gambar Tersedia di Folder</string>
+    <string name="player_cover_no_images">Tidak ada gambar di folder</string>
+    <string name="player_cover_success_toast">Thumbnail berhasil diubah!</string>
+    <string name="badge_local">LOKAL</string>
+    <string name="badge_local_rj">LOKAL • %1$s</string>
 </resources>

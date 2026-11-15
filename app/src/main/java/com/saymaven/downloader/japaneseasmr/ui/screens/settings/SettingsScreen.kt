@@ -376,15 +376,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
-            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            Column {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_import_folders_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = { Text(stringResource(R.string.settings_import_folders_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.DriveFolderUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    leadingContent = { Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
                         FilledTonalButton(onClick = { importFolderLauncher.launch(null) }) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
                             Text(stringResource(R.string.settings_import_add_btn))
                         }
                     }

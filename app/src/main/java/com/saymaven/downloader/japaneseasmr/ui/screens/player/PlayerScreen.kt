@@ -1,8 +1,11 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import android.app.Activity
+import android.net.Uri
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -56,9 +59,12 @@ import androidx.compose.ui.res.stringResource
 import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
+import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -96,6 +102,7 @@ fun PlayerScreen(
     val isTranslating by viewModel.isTranslating.collectAsState()
     val translatedTitle by viewModel.translatedTitle.collectAsState()
     val translatedChapters by viewModel.translatedChapters.collectAsState()
+    val currentDisplayBadge by viewModel.currentDisplayBadge.collectAsState()
 
     val activity = context as? Activity
     DisposableEffect(keepScreenOn) {
@@ -114,6 +121,7 @@ fun PlayerScreen(
     var draftTimerMinutes by remember { mutableIntStateOf(15) }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var showLinkRjDialog by remember { mutableStateOf(false) }
+    var showCoverPickerSheet by remember { mutableStateOf(false) }
 
     val sheetNestedScroll = remember {
         object : NestedScrollConnection {
@@ -166,14 +174,14 @@ fun PlayerScreen(
                         )
                     }
 
-                    // RJID Pill Badge
-                    if (!currentRjId.isNullOrBlank()) {
+                    // RJID / Local Pill Badge
+                    if (currentDisplayBadge.isNotBlank()) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
                         ) {
                             Text(
-                                text = currentRjId ?: "",
+                                text = currentDisplayBadge,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -449,6 +457,14 @@ fun PlayerScreen(
                                 onClick = {
                                     showOverflowMenu = false
                                     showLinkRjDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.player_menu_change_cover)) },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showCoverPickerSheet = true
                                 }
                             )
                         }
@@ -1159,6 +1175,7 @@ fun PlayerScreen(
             }
         }
     }
+}
 
     if (showLinkRjDialog && !currentRjId.isNullOrBlank()) {
         var rjInput by remember { mutableStateOf("") }
@@ -1225,7 +1242,139 @@ fun PlayerScreen(
             }
         )
     }
-}
+
+    if (showCoverPickerSheet && !currentRjId.isNullOrBlank()) {
+        val coverSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val rjid = currentRjId!!
+        val currentItem = playlist.firstOrNull { it.rjid == rjid }
+        val folderFile = currentItem?.localFilePath?.let { File(it) }?.let { if (it.isDirectory) it else it.parentFile }
+        val localFolderImages = remember(rjid, folderFile?.canonicalPath) {
+            if (folderFile != null && folderFile.exists()) {
+                AudioStorageHelper.getAllLocalImagesInFolder(folderFile)
+            } else {
+                emptyList()
+            }
+        }
+
+        val galleryLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri: Uri? ->
+            if (uri != null) {
+                try {
+                    val coversDir = File(context.cacheDir, "covers").apply { if (!exists()) mkdirs() }
+                    val targetFile = File(coversDir, "custom_${rjid.filter { it.isLetterOrDigit() }}_${System.currentTimeMillis()}.jpg")
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        FileOutputStream(targetFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    if (targetFile.exists() && targetFile.length() > 0) {
+                        viewModel.updateCustomCover(rjid, targetFile.absolutePath)
+                        showCoverPickerSheet = false
+                        Toast.makeText(context, context.getString(R.string.player_cover_success_toast), Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        ModalBottomSheet(
+            onDismissRequest = { showCoverPickerSheet = false },
+            sheetState = coverSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .navigationBarsPadding()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.player_cover_dialog_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    IconButton(
+                        onClick = { showCoverPickerSheet = false },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                FilledTonalButton(
+                    onClick = { galleryLauncher.launch("image/*") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.player_cover_btn_gallery))
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (localFolderImages.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.player_cover_folder_images),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        items(localFolderImages) { imgFile ->
+                            val isSelected = currentCoverUrl == imgFile.absolutePath
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .width(96.dp)
+                                    .clickable {
+                                        viewModel.updateCustomCover(rjid, imgFile.absolutePath)
+                                        showCoverPickerSheet = false
+                                        Toast.makeText(context, context.getString(R.string.player_cover_success_toast), Toast.LENGTH_SHORT).show()
+                                    }
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                                    shadowElevation = 2.dp
+                                ) {
+                                    AsyncImage(
+                                        model = imgFile,
+                                        contentDescription = imgFile.name,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(96.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = imgFile.name,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 private fun formatDuration(ms: Long): String {

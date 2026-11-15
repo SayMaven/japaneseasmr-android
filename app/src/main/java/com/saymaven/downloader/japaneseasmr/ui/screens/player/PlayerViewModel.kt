@@ -270,6 +270,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _currentRjId = MutableStateFlow<String?>(if (isAutoResumeActive) sp.getString("cached_rjid", null) else null)
     val currentRjId = _currentRjId.asStateFlow()
 
+    val currentDisplayBadge = combine(_currentRjId, _playlist) { rj, list ->
+        if (rj.isNullOrBlank()) return@combine ""
+        val entity = list.firstOrNull { it.rjid == rj }
+        if (entity == null) {
+            if (rj.startsWith("LOCAL_")) "LOKAL" else rj
+        } else {
+            val isLocal = entity.sourceType != SourceType.DL_SITE.name || entity.rjid.startsWith("LOCAL_")
+            when {
+                isLocal && !entity.linkedRjId.isNullOrBlank() -> "LOKAL • ${entity.linkedRjId}"
+                isLocal -> "LOKAL"
+                else -> entity.rjid
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
     private val _currentTitle = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_title", "Belum ada lagu yang diputar") ?: "Belum ada lagu yang diputar" else "Belum ada lagu yang diputar")
     val currentTitle = _currentTitle.asStateFlow()
 
@@ -694,7 +709,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val finalCover = localCover?.absolutePath ?: history.coverUrl
 
                     _currentRjId.value = history.rjid
-                    val tag = history.linkedRjId ?: if (history.rjid.startsWith("LOCAL_")) "LOCAL" else history.rjid
+                    val isLocal = history.sourceType != SourceType.DL_SITE.name || history.rjid.startsWith("LOCAL_")
+                    val tag = when {
+                        isLocal && !history.linkedRjId.isNullOrBlank() -> "LOKAL • ${history.linkedRjId}"
+                        isLocal -> "LOKAL"
+                        else -> history.rjid
+                    }
                     _currentTitle.value = "[$tag] ${history.title}"
                     _currentArtist.value = history.cv
                     _currentCoverUrl.value = finalCover
@@ -858,7 +878,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         val curIdx = p.currentMediaItemIndex
                         val curChapter = _currentChapters.value.getOrNull(curIdx)
                         val trackTitle = curChapter?.title ?: mediaItem.mediaMetadata.title?.toString() ?: ""
-                        val albumTag = album?.linkedRjId ?: if (album?.rjid?.startsWith("LOCAL_") == true) "LOCAL" else album?.rjid
+                        val isLocalAlbum = album?.sourceType != SourceType.DL_SITE.name || album?.rjid?.startsWith("LOCAL_") == true
+                        val albumTag = when {
+                            isLocalAlbum && !album?.linkedRjId.isNullOrBlank() -> "LOKAL • ${album?.linkedRjId}"
+                            isLocalAlbum -> "LOKAL"
+                            else -> album?.rjid ?: ""
+                        }
                         _currentTitle.value = if (album != null) "[$albumTag] ${album.title} - $trackTitle" else trackTitle
                         val baseMs = curChapter?.startMs ?: 0L
                         _currentPosition.value = (baseMs + p.currentPosition).coerceAtLeast(0L)
@@ -902,7 +927,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updatePlayingState(p)
-                if (playbackState == Player.STATE_READY) {
+                if (playbackState == Player.STATE_ENDED) {
+                    if (isCurrentVirtualAlbum) {
+                        if (_repeatMode.value == Player.REPEAT_MODE_ONE) {
+                            p.seekTo(0, 0L)
+                            p.play()
+                        } else {
+                            playAdjacentWork(forward = true)
+                        }
+                    }
+                } else if (playbackState == Player.STATE_READY) {
                     if (isCurrentVirtualAlbum) {
                         val totalDur = _currentChapters.value.lastOrNull()?.endMs ?: 0L
                         if (totalDur > 0L) _duration.value = totalDur
@@ -1091,7 +1125,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
 
                 _currentRjId.value = targetPair.first.rjid
-                val tag = targetPair.first.linkedRjId ?: if (targetPair.first.rjid.startsWith("LOCAL_")) "LOCAL" else targetPair.first.rjid
+                val isLocalV = targetPair.first.sourceType != SourceType.DL_SITE.name || targetPair.first.rjid.startsWith("LOCAL_")
+                val tag = when {
+                    isLocalV && !targetPair.first.linkedRjId.isNullOrBlank() -> "LOKAL • ${targetPair.first.linkedRjId}"
+                    isLocalV -> "LOKAL"
+                    else -> targetPair.first.rjid
+                }
                 _currentTitle.value = "[$tag] ${targetPair.first.title}"
                 _currentArtist.value = targetPair.first.cv
                 _currentCoverUrl.value = finalCover
@@ -1139,7 +1178,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
 
                 _currentRjId.value = targetPair.first.rjid
-                val tag = targetPair.first.linkedRjId ?: if (targetPair.first.rjid.startsWith("LOCAL_")) "LOCAL" else targetPair.first.rjid
+                val isLocalV = targetPair.first.sourceType != SourceType.DL_SITE.name || targetPair.first.rjid.startsWith("LOCAL_")
+                val tag = when {
+                    isLocalV && !targetPair.first.linkedRjId.isNullOrBlank() -> "LOKAL • ${targetPair.first.linkedRjId}"
+                    isLocalV -> "LOKAL"
+                    else -> targetPair.first.rjid
+                }
                 _currentTitle.value = "[$tag] ${targetPair.first.title}"
                 _currentArtist.value = targetPair.first.cv
                 _currentCoverUrl.value = finalCover
@@ -1208,25 +1252,57 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playNext() {
-        val p = player ?: return
-        if (p.hasNextMediaItem()) {
-            p.seekToNextMediaItem()
-        } else if (p.repeatMode == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
-            p.seekToDefaultPosition(0)
+        if (isCurrentVirtualAlbum) {
+            playAdjacentWork(forward = true)
+        } else {
+            val p = player ?: return
+            if (p.hasNextMediaItem()) {
+                p.seekToNextMediaItem()
+            } else if (p.repeatMode == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
+                p.seekToDefaultPosition(0)
+            }
+            saveCurrentState()
         }
-        saveCurrentState()
     }
 
     fun playPrevious() {
-        val p = player ?: return
-        if (p.currentPosition > 3000) {
-            p.seekTo(0)
-        } else if (p.hasPreviousMediaItem()) {
-            p.seekToPreviousMediaItem()
-        } else if (p.repeatMode == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
-            p.seekToDefaultPosition(p.mediaItemCount - 1)
+        if (isCurrentVirtualAlbum) {
+            val p = player
+            if (p != null && p.currentPosition > 3000) {
+                p.seekTo(0)
+            } else {
+                playAdjacentWork(forward = false)
+            }
+        } else {
+            val p = player ?: return
+            if (p.currentPosition > 3000) {
+                p.seekTo(0)
+            } else if (p.hasPreviousMediaItem()) {
+                p.seekToPreviousMediaItem()
+            } else if (p.repeatMode == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
+                p.seekToDefaultPosition(p.mediaItemCount - 1)
+            }
+            saveCurrentState()
         }
-        saveCurrentState()
+    }
+
+    private fun playAdjacentWork(forward: Boolean) {
+        val list = filteredPlaylist.value.ifEmpty { _playlist.value }
+        if (list.isEmpty()) return
+        val curId = _currentRjId.value
+        val curIdx = list.indexOfFirst { it.rjid == curId }
+        if (curIdx != -1) {
+            val targetIdx = if (forward) {
+                if (curIdx + 1 < list.size) curIdx + 1
+                else if (_repeatMode.value == Player.REPEAT_MODE_ALL) 0 else -1
+            } else {
+                if (curIdx - 1 >= 0) curIdx - 1
+                else if (_repeatMode.value == Player.REPEAT_MODE_ALL) list.size - 1 else -1
+            }
+            if (targetIdx != -1) {
+                playLocalTrack(list[targetIdx], list)
+            }
+        }
     }
 
     fun replay10() {
@@ -1662,9 +1738,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     )
                     historyDao.insertHistory(updated)
 
+                    val curList = _playlist.value.toMutableList()
+                    val idx = curList.indexOfFirst { it.rjid == currentRjid }
+                    if (idx != -1) {
+                        curList[idx] = updated
+                        _playlist.value = curList
+                        saveFastCachedPlaylist(curList)
+                    }
+
                     withContext(Dispatchers.Main) {
                         if (_currentRjId.value == currentRjid) {
-                            val tag = updated.linkedRjId ?: if (updated.rjid.startsWith("LOCAL_")) "LOCAL" else updated.rjid
+                            val tag = if (updated.sourceType != SourceType.DL_SITE.name || updated.rjid.startsWith("LOCAL_")) {
+                                if (!updated.linkedRjId.isNullOrBlank()) "LOKAL • ${updated.linkedRjId}" else "LOKAL"
+                            } else updated.rjid
                             _currentTitle.value = "[$tag] ${updated.title}"
                             _currentArtist.value = updated.cv
                             _currentCoverUrl.value = updated.coverUrl
@@ -1674,6 +1760,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
             onResult(true, targetRj)
+        }
+    }
+
+    fun updateCustomCover(targetRjid: String, newCoverPath: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val existing = historyDao.getHistoryById(targetRjid)
+            if (existing != null) {
+                val updated = existing.copy(coverUrl = newCoverPath)
+                historyDao.insertHistory(updated)
+
+                val curList = _playlist.value.toMutableList()
+                val idx = curList.indexOfFirst { it.rjid == targetRjid }
+                if (idx != -1) {
+                    curList[idx] = updated
+                    _playlist.value = curList
+                    saveFastCachedPlaylist(curList)
+                }
+
+                withContext(Dispatchers.Main) {
+                    if (_currentRjId.value == targetRjid) {
+                        _currentCoverUrl.value = newCoverPath
+                        preloadCoverArtInMemory(newCoverPath)
+                    }
+                }
+            }
         }
     }
 
