@@ -35,7 +35,11 @@ bool AudioEngine::openFile(const std::string& filePath) {
 
     if (isUsbDirectActive()) {
         closeStream();
+        mUsbStreamer.stop();
         LOGI("Opened file for True Exclusive USB Streaming: %s (SR=%d)", filePath.c_str(), mSampleRate);
+        if (mIsPlaying.load()) {
+            startUsbPlayback();
+        }
         return true;
     } else {
         return createStream();
@@ -218,6 +222,17 @@ void AudioEngine::releaseUsbDevice() {
 bool AudioEngine::startUsbPlayback() {
     if (mUsbFd < 0) return false;
 
+    // Wake decoder thread immediately to start filling the jitter buffer
+    mDecoderCv.notify_all();
+
+    // Pre-buffer at least 16,384 frames (~370ms @ 44.1kHz) to prevent initial underflow crackles
+    int waitLoops = 0;
+    while (mDecoderRunning.load() && !mDecoderEof.load() &&
+           mRingBuffer.getAvailableReadFrames() < 16384 && waitLoops < 50) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        waitLoops++;
+    }
+
     return mUsbStreamer.start(mSampleRate, [this](int16_t* buffer, uint64_t frames) -> uint64_t {
         if (!mIsPlaying.load()) {
             return 0;
@@ -239,8 +254,9 @@ bool AudioEngine::startUsbPlayback() {
             }
         }
 
-        // Wake up decoder worker thread to refill buffer ahead of time
-        if (mRingBuffer.getAvailableWriteFrames() >= 4096) {
+        // Wake up decoder worker thread ONLY when buffer drains below 50% capacity (65,536 frames)
+        // This avoids futex thrashing (8,000 notify_one calls/sec) which causes micro-stutter/crackle
+        if (mRingBuffer.getAvailableReadFrames() < 65536) {
             mDecoderCv.notify_one();
         }
 
@@ -427,7 +443,7 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
         }
     }
 
-    if (mRingBuffer.getAvailableWriteFrames() >= 4096) {
+    if (mRingBuffer.getAvailableReadFrames() < 65536) {
         mDecoderCv.notify_one();
     }
 

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/resource.h>
+#include <poll.h>
 
 #define TAG "UsbAudioStreamer"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -66,6 +67,26 @@ bool UsbAudioStreamer::start(uint32_t sampleRate, ReadCallback callback) {
     int retCtrl = ioctl(mFd, USBDEVFS_CONTROL, &ctrl);
     LOGI("Set Clock Source %d sampling rate to %u Hz result: %d", mClockSourceId, sampleRate, retCtrl);
 
+    // If UAC2 clock control failed, try UAC1 endpoint sampling frequency control
+    if (retCtrl < 0) {
+        uint8_t uac1Rate[3];
+        uac1Rate[0] = static_cast<uint8_t>(sampleRate & 0xFF);
+        uac1Rate[1] = static_cast<uint8_t>((sampleRate >> 8) & 0xFF);
+        uac1Rate[2] = static_cast<uint8_t>((sampleRate >> 16) & 0xFF);
+
+        struct usbdevfs_ctrltransfer ctrl1;
+        ctrl1.bRequestType = 0x22; // Class Endpoint OUT
+        ctrl1.bRequest = 0x01;     // SET_CUR
+        ctrl1.wValue = 0x0100;     // SAMPLING_FREQ_CONTROL
+        ctrl1.wIndex = mEpOut;     // Target is the audio streaming endpoint
+        ctrl1.wLength = 3;
+        ctrl1.timeout = 500;
+        ctrl1.data = uac1Rate;
+
+        int retUac1 = ioctl(mFd, USBDEVFS_CONTROL, &ctrl1);
+        LOGI("Set UAC1 Endpoint 0x%02X sampling rate to %u Hz result: %d", mEpOut, sampleRate, retUac1);
+    }
+
     // 2. Set Alternate Setting 1 (16-bit PCM Stereo AudioStreaming)
     struct usbdevfs_setinterface setintf;
     setintf.interface = mAsInterface;
@@ -77,19 +98,24 @@ bool UsbAudioStreamer::start(uint32_t sampleRate, ReadCallback callback) {
     mIsRunning.store(true);
     mIsPaused.store(false);
 
+    int submittedCount = 0;
     for (int i = 0; i < NUM_URBS; i++) {
         fillUrb(mUrbs[i].urb);
         int retSub = ioctl(mFd, USBDEVFS_SUBMITURB, mUrbs[i].urb);
         if (retSub < 0) {
             LOGE("Initial USBDEVFS_SUBMITURB %d failed: %d (%s)", i, errno, strerror(errno));
-            mIsRunning.store(false);
-            return false;
+            if (submittedCount == 0) {
+                mIsRunning.store(false);
+                return false;
+            }
+            break;
         }
+        submittedCount++;
     }
 
-    // 4. Launch dedicated real-time worker thread
+    // 4. Launch dedicated worker thread
     pthread_create(&mThread, nullptr, threadFunc, this);
-    LOGI("UsbAudioStreamer started successfully for %u Hz!", sampleRate);
+    LOGI("UsbAudioStreamer started successfully for %u Hz with %d initial URBs!", sampleRate, submittedCount);
     return true;
 }
 
@@ -102,31 +128,33 @@ void UsbAudioStreamer::resume() {
 }
 
 void UsbAudioStreamer::stop() {
-    if (!mIsRunning.load()) return;
+    if (!mIsRunning.load() && mThread == 0) return;
 
     mIsRunning.store(false);
 
-    // Discard all queued URBs
-    for (int i = 0; i < NUM_URBS; i++) {
-        if (mUrbs[i].urb) {
-            ioctl(mFd, USBDEVFS_DISCARDURB, mUrbs[i].urb);
+    // Discard all queued URBs non-blocking
+    if (mFd >= 0) {
+        for (int i = 0; i < NUM_URBS; i++) {
+            if (mUrbs[i].urb) {
+                ioctl(mFd, USBDEVFS_DISCARDURB, mUrbs[i].urb);
+            }
         }
     }
 
-    // Wait for thread to finish
-    if (mThread) {
+    // Wait for worker thread to exit cleanly
+    if (mThread != 0) {
         pthread_join(mThread, nullptr);
         mThread = 0;
     }
 
-    // Drain any remaining discarded URBs
-    for (int i = 0; i < NUM_URBS; i++) {
-        struct usbdevfs_urb* reaped = nullptr;
-        ioctl(mFd, USBDEVFS_REAPURBNDELAY, &reaped);
-    }
-
-    // Reset interface to Alt 0 (Zero Bandwidth)
+    // Drain any remaining discarded URBs without blocking
     if (mFd >= 0) {
+        for (int i = 0; i < NUM_URBS; i++) {
+            struct usbdevfs_urb* reaped = nullptr;
+            ioctl(mFd, USBDEVFS_REAPURBNDELAY, &reaped);
+        }
+
+        // Reset interface to Alt 0 (Zero Bandwidth)
         struct usbdevfs_setinterface setintf;
         setintf.interface = mAsInterface;
         setintf.altsetting = 0;
@@ -156,11 +184,12 @@ void UsbAudioStreamer::release() {
 void* UsbAudioStreamer::threadFunc(void* context) {
     auto* self = static_cast<UsbAudioStreamer*>(context);
 
-    // Set maximum real-time priority for urgent audio thread
-    setpriority(PRIO_PROCESS, 0, -20);
+    // Safe high-priority audio thread (nice -16) without CPU starvation
+    setpriority(PRIO_PROCESS, 0, -16);
 
+    // Use moderate SCHED_FIFO priority (3) instead of max (99) to avoid starving UI & GC
     struct sched_param param;
-    param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+    param.sched_priority = 3;
     pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
 
     self->streamLoop();
@@ -172,21 +201,43 @@ void UsbAudioStreamer::streamLoop() {
         struct usbdevfs_urb* reaped = nullptr;
         int ret = ioctl(mFd, USBDEVFS_REAPURB, &reaped);
         if (ret < 0) {
-            if (errno == EAGAIN || errno == EINTR) continue;
+            int err = errno;
+            if (err == EAGAIN || err == EINTR) {
+                // Non-blocking timed poll: wait up to 1ms for USB completion instead of busy-spinning
+                struct pollfd pfd;
+                pfd.fd = mFd;
+                pfd.events = POLLOUT | POLLIN;
+                pfd.revents = 0;
+                poll(&pfd, 1, 1);
+                continue;
+            }
             if (mIsRunning.load()) {
-                LOGE("USBDEVFS_REAPURB fatal error: %d (%s)", errno, strerror(errno));
+                LOGE("USBDEVFS_REAPURB fatal error: %d (%s)", err, strerror(err));
+                mIsRunning.store(false);
             }
             break;
         }
 
         if (!reaped || !mIsRunning.load()) break;
 
+        // Reset status on reaped URB
+        reaped->status = 0;
+
         fillUrb(reaped);
 
         int subRet = ioctl(mFd, USBDEVFS_SUBMITURB, reaped);
-        if (subRet < 0 && mIsRunning.load()) {
-            LOGE("USBDEVFS_SUBMITURB failed in loop: %d (%s)", errno, strerror(errno));
-            break;
+        if (subRet < 0) {
+            int subErr = errno;
+            if (subErr == EXDEV || subErr == EPIPE) {
+                // Temporary timing/schedule gap: re-sync frame without terminating
+                usleep(500);
+                subRet = ioctl(mFd, USBDEVFS_SUBMITURB, reaped);
+            }
+            if (subRet < 0 && mIsRunning.load()) {
+                LOGE("USBDEVFS_SUBMITURB failed in loop: %d (%s)", subErr, strerror(subErr));
+                mIsRunning.store(false);
+                break;
+            }
         }
     }
 }
@@ -251,4 +302,5 @@ void UsbAudioStreamer::fillUrb(struct usbdevfs_urb* urb) {
 
     urb->buffer_length = offset;
 }
+
 

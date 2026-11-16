@@ -8,6 +8,9 @@
 #include <media/NdkMediaFormat.h>
 #include <algorithm>
 #include <cstring>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #define TAG "AudioDecoder_Native"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -57,6 +60,18 @@ bool AudioDecoder::openWithMiniaudio(const std::string& filePath) {
         return false;
     }
 
+    // USB DACs universally reject sample rates below 44100Hz (e.g. 16kHz, 22.05kHz, 24kHz, 32kHz).
+    // Reconfigure miniaudio internal resampler to 44100Hz if the native file rate is < 44100Hz.
+    if (dec->outputSampleRate < 44100) {
+        ma_decoder_uninit(dec);
+        config = ma_decoder_config_init(ma_format_f32, 2, 44100);
+        res = ma_decoder_init_file(filePath.c_str(), &config, dec);
+        if (res != MA_SUCCESS) {
+            delete dec;
+            return false;
+        }
+    }
+
     mMaDecoder = dec;
     mInfo.sampleRate = dec->outputSampleRate;
     mInfo.channels = 2;
@@ -77,8 +92,25 @@ bool AudioDecoder::openWithNdkMediaCodec(const std::string& filePath) {
     AMediaExtractor* extractor = AMediaExtractor_new();
     if (!extractor) return false;
 
-    media_status_t status = AMediaExtractor_setDataSource(extractor, filePath.c_str());
+    int fd = open(filePath.c_str(), O_RDONLY);
+    if (fd < 0) {
+        LOGE("Failed to open file descriptor for %s (errno=%d)", filePath.c_str(), errno);
+        AMediaExtractor_delete(extractor);
+        return false;
+    }
+
+    struct stat st;
+    if (fstat(fd, &st) < 0) {
+        LOGE("fstat failed for %s (errno=%d)", filePath.c_str(), errno);
+        ::close(fd);
+        AMediaExtractor_delete(extractor);
+        return false;
+    }
+
+    media_status_t status = AMediaExtractor_setDataSourceFd(extractor, fd, 0, st.st_size);
     if (status != AMEDIA_OK) {
+        LOGE("AMediaExtractor_setDataSourceFd failed: %d", status);
+        ::close(fd);
         AMediaExtractor_delete(extractor);
         return false;
     }
@@ -101,6 +133,8 @@ bool AudioDecoder::openWithNdkMediaCodec(const std::string& filePath) {
     }
 
     if (audioTrackIndex < 0 || !audioFormat) {
+        LOGE("No audio track found in file: %s", filePath.c_str());
+        ::close(fd);
         AMediaExtractor_delete(extractor);
         return false;
     }
@@ -113,10 +147,13 @@ bool AudioDecoder::openWithNdkMediaCodec(const std::string& filePath) {
     AMediaFormat_getInt32(audioFormat, AMEDIAFORMAT_KEY_SAMPLE_RATE, &sr);
     AMediaFormat_getInt32(audioFormat, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &ch);
     AMediaFormat_getInt64(audioFormat, AMEDIAFORMAT_KEY_DURATION, &durUs);
+    mNdkChannelCount = ch;
 
     AMediaCodec* codec = AMediaCodec_createDecoderByType(mime);
     if (!codec) {
+        LOGE("AMediaCodec_createDecoderByType failed for mime: %s", mime);
         AMediaFormat_delete(audioFormat);
+        ::close(fd);
         AMediaExtractor_delete(extractor);
         return false;
     }
@@ -125,17 +162,22 @@ bool AudioDecoder::openWithNdkMediaCodec(const std::string& filePath) {
     AMediaFormat_delete(audioFormat);
 
     if (cfgStatus != AMEDIA_OK) {
+        LOGE("AMediaCodec_configure failed: %d", cfgStatus);
         AMediaCodec_delete(codec);
+        ::close(fd);
         AMediaExtractor_delete(extractor);
         return false;
     }
 
     if (AMediaCodec_start(codec) != AMEDIA_OK) {
+        LOGE("AMediaCodec_start failed");
         AMediaCodec_delete(codec);
+        ::close(fd);
         AMediaExtractor_delete(extractor);
         return false;
     }
 
+    mNdkFd = fd;
     mNdkExtractor = extractor;
     mNdkCodec = codec;
     mNdkAudioTrackIndex = audioTrackIndex;
@@ -230,17 +272,28 @@ uint64_t AudioDecoder::readPcmFrames(float* outputBuffer, uint64_t frameCount) {
                     size_t outBufSize = 0;
                     uint8_t* outBuf = AMediaCodec_getOutputBuffer(codec, outIdx, &outBufSize);
                     if (outBuf) {
-                        // Assuming 16-bit PCM output from MediaCodec, convert to float32 stereo
                         int16_t* pcm16 = reinterpret_cast<int16_t*>(outBuf + info.offset);
-                        size_t sampleCount = info.size / sizeof(int16_t);
+                        int chCount = mNdkChannelCount > 0 ? mNdkChannelCount : 2;
+                        size_t framesDecoded = info.size / (chCount * sizeof(int16_t));
 
                         delete[] mNdkPcmBuffer;
-                        mNdkPcmBuffer = new float[sampleCount];
-                        mNdkPcmBufferSize = sampleCount;
+                        mNdkPcmBuffer = new float[framesDecoded * 2]; // Always stereo float32
+                        mNdkPcmBufferSize = framesDecoded * 2;
                         mNdkPcmBufferOffset = 0;
 
-                        for (size_t s = 0; s < sampleCount; ++s) {
-                            mNdkPcmBuffer[s] = pcm16[s] / 32768.0f;
+                        if (chCount == 1) {
+                            // Expand mono to stereo
+                            for (size_t f = 0; f < framesDecoded; ++f) {
+                                float val = pcm16[f] / 32768.0f;
+                                mNdkPcmBuffer[f * 2] = val;
+                                mNdkPcmBuffer[f * 2 + 1] = val;
+                            }
+                        } else {
+                            // Interleaved stereo (or take first 2 channels if multi-channel)
+                            for (size_t f = 0; f < framesDecoded; ++f) {
+                                mNdkPcmBuffer[f * 2] = pcm16[f * chCount] / 32768.0f;
+                                mNdkPcmBuffer[f * 2 + 1] = pcm16[f * chCount + 1] / 32768.0f;
+                            }
                         }
                     }
                 }
@@ -248,8 +301,12 @@ uint64_t AudioDecoder::readPcmFrames(float* outputBuffer, uint64_t frameCount) {
             } else if (outIdx == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
                 AMediaFormat* format = AMediaCodec_getOutputFormat(codec);
                 int32_t newSr = 0;
+                int32_t newCh = 0;
                 if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_SAMPLE_RATE, &newSr) && newSr > 0) {
                     mInfo.sampleRate = static_cast<uint32_t>(newSr);
+                }
+                if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &newCh) && newCh > 0) {
+                    mNdkChannelCount = newCh;
                 }
                 AMediaFormat_delete(format);
             } else if (outIdx == AMEDIACODEC_INFO_TRY_AGAIN_LATER) {
@@ -350,6 +407,11 @@ void AudioDecoder::close() {
     if (mNdkExtractor) {
         AMediaExtractor_delete(static_cast<AMediaExtractor*>(mNdkExtractor));
         mNdkExtractor = nullptr;
+    }
+
+    if (mNdkFd >= 0) {
+        ::close(mNdkFd);
+        mNdkFd = -1;
     }
 
     delete[] mNdkPcmBuffer;

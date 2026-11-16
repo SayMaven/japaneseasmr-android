@@ -18,6 +18,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.service.usb.UsbAudioSink
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
@@ -138,10 +139,16 @@ class PlaybackService : MediaSessionService() {
                 if (UsbDacManager.isExclusiveActivelyRunning()) {
                     if (player.hasNextMediaItem()) {
                         player.seekToNextMediaItem()
-                    } else if (player.repeatMode == Player.REPEAT_MODE_ALL && player.mediaItemCount > 0) {
+                    } else if (player.repeatMode == Player.REPEAT_MODE_ONE) {
                         player.seekToDefaultPosition(0)
+                        player.play()
                     } else {
-                        player.pause()
+                        // Fast forward to end to let ExoPlayer trigger STATE_ENDED for playlist progression
+                        if (player.duration > 0L) {
+                            player.seekTo(player.duration)
+                        } else {
+                            player.pause()
+                        }
                     }
                 }
             }
@@ -228,11 +235,23 @@ class PlaybackService : MediaSessionService() {
             path = mediaId
         }
 
-        if (!path.isNullOrBlank()) {
+        // Fallback: If path is not found or file does not exist, attempt resolution by RJ-code via AudioStorageHelper
+        if ((path.isNullOrBlank() || !File(path).exists()) && !mediaId.isNullOrBlank()) {
+            val downloadDir = DownloadService.getDefaultDownloadDirectory()
+            val resolvedFile = AudioStorageHelper.findExistingAudioFile(downloadDir, mediaId)
+            if (resolvedFile != null && resolvedFile.exists()) {
+                path = resolvedFile.absolutePath
+                Log.i(TAG, "Resolved physical path from RJ code $mediaId -> $path")
+            }
+        }
+
+        var nativeSuccess = false
+        if (!path.isNullOrBlank() && File(path).exists()) {
             Log.i(TAG, "Opening native file: $path (startPosMs=$startPosMs, shouldPlay=$shouldPlay)")
             val ok = NativeAudioPlayer.openFile(path)
             Log.i(TAG, "NativeAudioPlayer.openFile result: $ok")
             if (ok) {
+                nativeSuccess = true
                 if (startPosMs > 0L) {
                     NativeAudioPlayer.seekTo(startPosMs)
                 }
@@ -241,7 +260,18 @@ class PlaybackService : MediaSessionService() {
                 }
             }
         } else {
-            Log.w(TAG, "Cannot sync to native: uri is null or unresolvable ($uri, mediaId=$mediaId)")
+            Log.w(TAG, "Cannot sync to native: uri is null or unresolvable ($uri, mediaId=$mediaId, path=$path)")
+        }
+
+        // FAIL-SAFE: If native playback failed to open the file, immediately unmute ExoPlayer
+        // so the user always hears audio seamlessly and never experiences complete silence!
+        if (UsbDacManager.isExclusiveActivelyRunning()) {
+            if (nativeSuccess) {
+                player.volume = 0.0f
+            } else {
+                Log.w(TAG, "Native audio open failed. Restoring ExoPlayer volume for fallback playback.")
+                player.volume = UsbDacManager.hardwareVolume.value
+            }
         }
     }
 

@@ -657,7 +657,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (p.duration > 0L) {
                 _duration.value = p.duration.coerceAtLeast(0L)
             }
-            _repeatMode.value = p.repeatMode
+            // Keep user-facing _repeatMode intact; map to ExoPlayer internal repeatMode
+            p.repeatMode = if (_repeatMode.value == Player.REPEAT_MODE_ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
             _shuffleMode.value = p.shuffleModeEnabled
 
             p.currentMediaItem?.let { item ->
@@ -969,7 +970,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             override fun onRepeatModeChanged(repeatMode: Int) {
-                _repeatMode.value = repeatMode
+                // When toggled via system notification or external controller
+                if (repeatMode == Player.REPEAT_MODE_ONE) {
+                    _repeatMode.value = Player.REPEAT_MODE_ONE
+                } else if (repeatMode == Player.REPEAT_MODE_OFF && _repeatMode.value == Player.REPEAT_MODE_ONE) {
+                    _repeatMode.value = Player.REPEAT_MODE_OFF
+                }
                 saveCurrentState()
             }
 
@@ -979,7 +985,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         })
 
-        p.repeatMode = _repeatMode.value
+        p.repeatMode = if (_repeatMode.value == Player.REPEAT_MODE_ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
         p.shuffleModeEnabled = _shuffleMode.value
         updatePlayingState(p)
     }
@@ -1368,13 +1374,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun cycleRepeatMode() {
         val p = player ?: return
-        val nextMode = when (p.repeatMode) {
+        val nextMode = when (_repeatMode.value) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
             else -> Player.REPEAT_MODE_OFF
         }
-        p.repeatMode = nextMode
         _repeatMode.value = nextMode
+        // Only set REPEAT_MODE_ONE on internal ExoPlayer so that REPEAT_MODE_ALL reaches STATE_ENDED
+        // to seamlessly trigger playAdjacentWork() across the full playlist.
+        p.repeatMode = if (nextMode == Player.REPEAT_MODE_ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
         saveCurrentState()
     }
 

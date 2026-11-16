@@ -51,7 +51,9 @@ private:
     // NDK MediaCodec state
     void* mNdkExtractor = nullptr; // AMediaExtractor*
     void* mNdkCodec = nullptr;     // AMediaCodec*
+    int mNdkFd = -1;
     int mNdkAudioTrackIndex = -1;
+    int mNdkChannelCount = 2;
     bool mNdkSawInputEOS = false;
     bool mNdkSawOutputEOS = false;
 
