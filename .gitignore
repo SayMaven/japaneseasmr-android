@@ -51,4 +51,6 @@ build_debug.bat
 
 # VS Code / IDE settings
 .vscode/
+compile_commands.json
+
 

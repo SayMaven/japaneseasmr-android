@@ -16,7 +16,8 @@ public:
     AudioDecoder();
     ~AudioDecoder();
 
-    bool openFile(const std::string& filePath);
+    bool openFile(const std::string& filePath, uint32_t targetSampleRate = 0);
+    bool reopen(uint32_t targetSampleRate);
     void close();
 
     // Read interleaved float32 PCM frames: [L, R, L, R, ...]
@@ -36,8 +37,8 @@ public:
     bool isLoaded() const { return mIsLoaded.load(); }
 
 private:
-    bool openWithMiniaudio(const std::string& filePath);
-    bool openWithNdkMediaCodec(const std::string& filePath);
+    bool openWithMiniaudio(const std::string& filePath, uint32_t targetSampleRate = 0);
+    bool openWithNdkMediaCodec(const std::string& filePath, uint32_t targetSampleRate = 0);
 
     enum class DecoderType {
         NONE,
@@ -47,6 +48,7 @@ private:
 
     DecoderType mType = DecoderType::NONE;
     void* mMaDecoder = nullptr; // ma_decoder*
+    void* mNdkResampler = nullptr; // ma_resampler*
 
     // NDK MediaCodec state
     void* mNdkExtractor = nullptr; // AMediaExtractor*
@@ -62,6 +64,8 @@ private:
     size_t mNdkPcmBufferSize = 0;
     size_t mNdkPcmBufferOffset = 0;
 
+    std::string mFilePath;
+    uint32_t mTargetSampleRate = 0;
     AudioFileInfo mInfo;
     std::atomic<uint64_t> mCurrentFrame{0};
     std::atomic<bool> mIsLoaded{false};

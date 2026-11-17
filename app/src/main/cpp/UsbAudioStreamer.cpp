@@ -184,8 +184,8 @@ void UsbAudioStreamer::release() {
 void* UsbAudioStreamer::threadFunc(void* context) {
     auto* self = static_cast<UsbAudioStreamer*>(context);
 
-    // Safe high-priority audio thread (nice -16) without CPU starvation
-    setpriority(PRIO_PROCESS, 0, -16);
+    // Dedicated high-priority audio streamer thread
+    setpriority(PRIO_PROCESS, 0, -19);
 
     // Use moderate SCHED_FIFO priority (3) instead of max (99) to avoid starving UI & GC
     struct sched_param param;

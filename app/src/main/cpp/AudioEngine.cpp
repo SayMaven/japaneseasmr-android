@@ -1,6 +1,7 @@
 #include "AudioEngine.h"
 #include <android/log.h>
 #include <algorithm>
+#include <cmath>
 #include <sys/ioctl.h>
 #include <linux/usbdevice_fs.h>
 #include <errno.h>
@@ -24,11 +25,16 @@ bool AudioEngine::openFile(const std::string& filePath) {
     stopDecoderThread();
 
     std::lock_guard<std::mutex> lock(mDecoderMutex);
-    bool ok = mDecoder.openFile(filePath);
+
+    // If USB Exclusive mode is active, resample non-48kHz audio to 48000Hz.
+    // In High-Speed UAC2 (8000 microframes/sec), 48000Hz yields an exact integer 6.0 frames/packet (24 bytes),
+    // eliminating 100% of fractional packet jitter and clock-slip crackles.
+    uint32_t targetRate = isUsbDirectActive() ? 48000 : 0;
+    bool ok = mDecoder.openFile(filePath, targetRate);
     if (!ok) return false;
 
     AudioFileInfo info = mDecoder.getInfo();
-    mSampleRate = info.sampleRate > 0 ? info.sampleRate : 44100;
+    mSampleRate = info.sampleRate > 0 ? info.sampleRate : (targetRate > 0 ? targetRate : 48000);
     mChannelCount = 2;
 
     startDecoderThread();
@@ -189,8 +195,18 @@ bool AudioEngine::setUsbDevice(int fd, int acIface, int asIface, int epOut, int 
             return false;
         }
 
-        if (mDecoder.isLoaded() && mIsPlaying.load()) {
-            startUsbPlayback();
+        if (mDecoder.isLoaded()) {
+            closeStream();
+            if (mSampleRate != 48000) {
+                int64_t pos = getCurrentPositionMs();
+                bool wasPlaying = mIsPlaying.load();
+                mDecoder.reopen(48000);
+                mSampleRate = 48000;
+                seekTo(pos);
+                if (wasPlaying) play();
+            } else if (mIsPlaying.load()) {
+                startUsbPlayback();
+            }
         }
         return true;
     } else {
@@ -241,16 +257,17 @@ bool AudioEngine::startUsbPlayback() {
         // Read pre-decoded frames directly from Lock-Free Ring Buffer (0 disk I/O, 0 mutex)
         uint64_t framesRead = mRingBuffer.read(buffer, frames);
 
-        // Apply volume scaling with smooth quadratic acoustic curve
+        // Apply volume scaling with smooth quadratic acoustic curve and symmetric rounding (eliminates deadband)
         float vol = mVolume.load();
         if (vol < 0.999f) {
             float gain = vol * vol;
             size_t totalSamples = framesRead * mChannelCount;
             for (size_t i = 0; i < totalSamples; ++i) {
                 float sample = buffer[i] * gain;
-                if (sample > 32767.0f) sample = 32767.0f;
-                else if (sample < -32768.0f) sample = -32768.0f;
-                buffer[i] = static_cast<int16_t>(sample);
+                long rounded = std::lround(sample);
+                if (rounded > 32767) rounded = 32767;
+                else if (rounded < -32768) rounded = -32768;
+                buffer[i] = static_cast<int16_t>(rounded);
             }
         }
 
@@ -363,6 +380,10 @@ void AudioEngine::setExclusiveMode(bool exclusive) {
 
             if (isUsbDirectActive()) {
                 closeStream();
+                if (mSampleRate != 48000) {
+                    mDecoder.reopen(48000);
+                    mSampleRate = 48000;
+                }
                 seekTo(pos);
                 if (wasPlaying) play();
             } else {

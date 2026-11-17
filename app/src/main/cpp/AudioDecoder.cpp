@@ -7,6 +7,7 @@
 #include <media/NdkMediaExtractor.h>
 #include <media/NdkMediaFormat.h>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -23,11 +24,13 @@ AudioDecoder::~AudioDecoder() {
     close();
 }
 
-bool AudioDecoder::openFile(const std::string& filePath) {
+bool AudioDecoder::openFile(const std::string& filePath, uint32_t targetSampleRate) {
     close();
+    mFilePath = filePath;
+    mTargetSampleRate = targetSampleRate;
 
     // 1. Try miniaudio first (fast, bit-perfect for MP3, FLAC, WAV, OGG)
-    if (openWithMiniaudio(filePath)) {
+    if (openWithMiniaudio(filePath, targetSampleRate)) {
         mType = DecoderType::MINIAUDIO;
         mIsLoaded = true;
         LOGI("Opened with miniaudio: %s (SR=%u, CH=%u, dur=%lld ms)",
@@ -37,7 +40,7 @@ bool AudioDecoder::openFile(const std::string& filePath) {
 
     // 2. Fallback to Android NDK MediaCodec (for M4A, AAC, etc.)
     LOGI("Miniaudio did not accept file, attempting NDK MediaCodec: %s", filePath.c_str());
-    if (openWithNdkMediaCodec(filePath)) {
+    if (openWithNdkMediaCodec(filePath, targetSampleRate)) {
         mType = DecoderType::NDK_MEDIACODEC;
         mIsLoaded = true;
         LOGI("Opened with NDK MediaCodec: %s (SR=%u, CH=%u, dur=%lld ms)",
@@ -49,10 +52,16 @@ bool AudioDecoder::openFile(const std::string& filePath) {
     return false;
 }
 
-bool AudioDecoder::openWithMiniaudio(const std::string& filePath) {
+bool AudioDecoder::reopen(uint32_t targetSampleRate) {
+    if (mFilePath.empty()) return false;
+    std::string path = mFilePath;
+    return openFile(path, targetSampleRate);
+}
+
+bool AudioDecoder::openWithMiniaudio(const std::string& filePath, uint32_t targetSampleRate) {
     ma_decoder* dec = new ma_decoder();
-    // Decode to stereo float32, keep native sample rate
-    ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 2, 0);
+    // Decode to stereo float32, with optional target sample rate
+    ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 2, targetSampleRate);
 
     ma_result res = ma_decoder_init_file(filePath.c_str(), &config, dec);
     if (res != MA_SUCCESS) {
@@ -61,10 +70,11 @@ bool AudioDecoder::openWithMiniaudio(const std::string& filePath) {
     }
 
     // USB DACs universally reject sample rates below 44100Hz (e.g. 16kHz, 22.05kHz, 24kHz, 32kHz).
-    // Reconfigure miniaudio internal resampler to 44100Hz if the native file rate is < 44100Hz.
+    // Reconfigure miniaudio internal resampler to 48000Hz (or targetSampleRate) if the native file rate is < 44100Hz.
     if (dec->outputSampleRate < 44100) {
         ma_decoder_uninit(dec);
-        config = ma_decoder_config_init(ma_format_f32, 2, 44100);
+        uint32_t safeRate = (targetSampleRate > 0) ? targetSampleRate : 48000;
+        config = ma_decoder_config_init(ma_format_f32, 2, safeRate);
         res = ma_decoder_init_file(filePath.c_str(), &config, dec);
         if (res != MA_SUCCESS) {
             delete dec;
@@ -88,7 +98,7 @@ bool AudioDecoder::openWithMiniaudio(const std::string& filePath) {
     return true;
 }
 
-bool AudioDecoder::openWithNdkMediaCodec(const std::string& filePath) {
+bool AudioDecoder::openWithNdkMediaCodec(const std::string& filePath, uint32_t targetSampleRate) {
     AMediaExtractor* extractor = AMediaExtractor_new();
     if (!extractor) return false;
 
@@ -184,11 +194,24 @@ bool AudioDecoder::openWithNdkMediaCodec(const std::string& filePath) {
     mNdkSawInputEOS = false;
     mNdkSawOutputEOS = false;
 
-    mInfo.sampleRate = static_cast<uint32_t>(sr);
+    mInfo.sampleRate = (targetSampleRate > 0) ? targetSampleRate : static_cast<uint32_t>(sr);
     mInfo.channels = 2; // We normalize output to stereo
     mInfo.durationMs = durUs / 1000;
     if (mInfo.sampleRate > 0) {
         mInfo.totalFrameCount = (mInfo.durationMs * mInfo.sampleRate) / 1000;
+    }
+
+    if (targetSampleRate > 0 && targetSampleRate != static_cast<uint32_t>(sr)) {
+        ma_resampler_config rConfig = ma_resampler_config_init(
+            ma_format_f32, 2, static_cast<ma_uint32>(sr), static_cast<ma_uint32>(targetSampleRate), ma_resample_algorithm_linear);
+        ma_resampler* resampler = new ma_resampler();
+        if (ma_resampler_init(&rConfig, nullptr, resampler) == MA_SUCCESS) {
+            mNdkResampler = resampler;
+        } else {
+            delete resampler;
+            mNdkResampler = nullptr;
+            mInfo.sampleRate = static_cast<uint32_t>(sr);
+        }
     }
 
     mCurrentFrame = 0;
@@ -222,22 +245,41 @@ uint64_t AudioDecoder::readPcmFrames(float* outputBuffer, uint64_t frameCount) {
         while (totalFramesOutput < frameCount && !mNdkSawOutputEOS) {
             // First, drain any buffered decoded samples
             if (mNdkPcmBuffer && mNdkPcmBufferOffset < mNdkPcmBufferSize) {
-                size_t availableFrames = (mNdkPcmBufferSize - mNdkPcmBufferOffset) / 2; // stereo
-                size_t neededFrames = frameCount - totalFramesOutput;
-                size_t framesToCopy = std::min(availableFrames, neededFrames);
+                if (mNdkResampler) {
+                    ma_uint64 inFrames = (mNdkPcmBufferSize - mNdkPcmBufferOffset) / 2;
+                    ma_uint64 outFrames = frameCount - totalFramesOutput;
+                    ma_result res = ma_resampler_process_pcm_frames(
+                        static_cast<ma_resampler*>(mNdkResampler),
+                        mNdkPcmBuffer + mNdkPcmBufferOffset,
+                        &inFrames,
+                        outputBuffer + (totalFramesOutput * 2),
+                        &outFrames
+                    );
+                    mNdkPcmBufferOffset += inFrames * 2;
+                    totalFramesOutput += outFrames;
+                    mCurrentFrame += outFrames;
 
-                std::memcpy(
-                    outputBuffer + (totalFramesOutput * 2),
-                    mNdkPcmBuffer + mNdkPcmBufferOffset,
-                    framesToCopy * 2 * sizeof(float)
-                );
+                    if (totalFramesOutput >= frameCount) {
+                        return totalFramesOutput;
+                    }
+                } else {
+                    size_t availableFrames = (mNdkPcmBufferSize - mNdkPcmBufferOffset) / 2; // stereo
+                    size_t neededFrames = frameCount - totalFramesOutput;
+                    size_t framesToCopy = std::min(availableFrames, neededFrames);
 
-                mNdkPcmBufferOffset += framesToCopy * 2;
-                totalFramesOutput += framesToCopy;
-                mCurrentFrame += framesToCopy;
+                    std::memcpy(
+                        outputBuffer + (totalFramesOutput * 2),
+                        mNdkPcmBuffer + mNdkPcmBufferOffset,
+                        framesToCopy * 2 * sizeof(float)
+                    );
 
-                if (totalFramesOutput >= frameCount) {
-                    return totalFramesOutput;
+                    mNdkPcmBufferOffset += framesToCopy * 2;
+                    totalFramesOutput += framesToCopy;
+                    mCurrentFrame += framesToCopy;
+
+                    if (totalFramesOutput >= frameCount) {
+                        return totalFramesOutput;
+                    }
                 }
             }
 
@@ -340,7 +382,10 @@ uint64_t AudioDecoder::readPcmFramesInt16(int16_t* outputBuffer, uint64_t frameC
             float s = tempFloat[i];
             if (s > 1.0f) s = 1.0f;
             else if (s < -1.0f) s = -1.0f;
-            dst[i] = static_cast<int16_t>(s * 32767.0f);
+            long val = std::lround(s * 32767.0f);
+            if (val > 32767) val = 32767;
+            else if (val < -32768) val = -32768;
+            dst[i] = static_cast<int16_t>(val);
         }
 
         totalFramesRead += read;
@@ -396,6 +441,12 @@ void AudioDecoder::close() {
         ma_decoder_uninit(static_cast<ma_decoder*>(mMaDecoder));
         delete static_cast<ma_decoder*>(mMaDecoder);
         mMaDecoder = nullptr;
+    }
+
+    if (mNdkResampler) {
+        ma_resampler_uninit(static_cast<ma_resampler*>(mNdkResampler), nullptr);
+        delete static_cast<ma_resampler*>(mNdkResampler);
+        mNdkResampler = nullptr;
     }
 
     if (mNdkCodec) {
