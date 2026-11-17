@@ -254,7 +254,12 @@
     <string name="settings_threads_opt_16">16 Jalur (Rekomendasi)</string>
     <string name="settings_threads_opt_24">24 Jalur (Cepat)</string>
     <string name="settings_threads_opt_32">32 Jalur (Maksimum)</string>
-    <string name="settings_changelog_v141_title">Versi 1.4.1 (Terbaru)</string>
+    <string name="settings_changelog_v142_title">Versi 1.4.2 (Terbaru)</string>
+    <string name="settings_changelog_v142_item1">• Stabilitas USB DAC Exclusive: Memperbaiki 100% masalah CPU lockup, ANR, dan freeze saat ganti lagu maupun navigasi playlist.</string>
+    <string name="settings_changelog_v142_item2">• Sinkronisasi Microframe UAC2: Rasio integer 48kHz (6 frame/paket) untuk mencegah pergeseran clock mikroframe pada DAC High-Speed.</string>
+    <string name="settings_changelog_v142_item3">• Eliminasi Distorsi Zero-Crossing: Pembulatan simetris dan eliminasi deadband untuk menjaga kelembutan suara bisikan ASMR.</string>
+    <string name="settings_changelog_v142_item4">• Perbaikan Playlist Repeat All: Mengatasi bug Repeat All yang mengulang trek yang sama; kini berputar mulus melintasi seluruh playlist.</string>
+    <string name="settings_changelog_v141_title">Versi 1.4.1</string>
     <string name="settings_changelog_v141_item1">• Impor Folder Audio Fleksibel: Impor folder audio eksternal dari Memori Internal maupun SD Card dengan mudah.</string>
     <string name="settings_changelog_v141_item2">• Album Virtual Multi-Track (Zero-Copy): Putar folder berisi banyak track file sebagai satu karya tanpa duplikasi memori penyimpanan.</string>
     <string name="settings_changelog_v141_item3">• Dukungan Audio Lokal Non-RJ: Kelola koleksi audio bebas dengan ekstraksi tag ID3 otomatis dan ID sintetis persisten.</string>

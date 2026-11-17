@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/版本-v1.4.1-blue?style=for-the-badge" alt="版本 v1.4.1" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/版本-v1.4.2-blue?style=for-the-badge" alt="版本 v1.4.2" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/许可证-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 许可证" /></a>
     <img src="https://img.shields.io/badge/平台-Android%208.0%2B-059669?style=for-the-badge" alt="平台" />
     <img src="https://img.shields.io/badge/开发语言-Kotlin-7c3aed?style=for-the-badge" alt="开发语言" />
@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#v141-更新内容">更新日志</a> •
+    <a href="#v142-更新内容">更新日志</a> •
     <a href="#功能特性">功能特性</a> •
     <a href="#应用截图">应用截图</a> •
     <a href="#下载安装">下载安装</a> •
@@ -36,6 +36,21 @@
 ## 概述
 
 **JapaneseASMR Downloader** 是一款专为下载、归档和聆听日本 ASMR 同人音声广播剧（RJ 作品）而设计的全功能开源 Android 客户端。应用完全基于现代 Android 技术栈构建，采用 Jetpack Compose、Kotlin 协程、Room 数据库和 AndroidX Media3 (ExoPlayer)，在移动设备上带来桌面级的流式传输性能、零 OOM（内存溢出）安全保障以及稳定省电的后台音频播放体验。
+
+---
+
+## v1.4.2 更新内容
+
+* **USB DAC 独占模式稳定性增强与防卡死优化**:
+  * 彻底消除 CPU 假死、ANR 与音频线程饿死现象，优化 Linux 内核调度优先级（`nice -19` 与 `SCHED_FIFO` 优先级 3），引入非阻塞定时 `poll()` 机制。
+  * 解决在 USB DAC 独占播放期间按下下一曲、切换音轨或从收藏播放列表中点播导致的软件冻结、严重卡顿与闪退问题。
+* **UAC2 DAC 音频噪声消除与时钟微帧同步**:
+  * **48 kHz 整数微帧采样比**: 针对高速 UAC2 设备（8,000 微帧/秒）启用独占模式时，智能进行 48,000 Hz 透明重采样，确保每个传输包恒定为 6 帧（24 字节），消除由于浮点时钟漂移引发的周期性微破音。
+  * **对称四舍五入与消除过零失真**: 在解码器与音量衰减环节中全面采用 `std::lround` 对称取整与抗死区截断，杜绝微弱耳语 ASMR 音声在零电平处的削波失真。
+* **修复列表循环（Repeat All）逻辑**:
+  * 修复了开启 `Repeat All`（全曲循环）时却像单曲循环一样仅重复播放当前曲目的问题。现已支持在整个播放列表中依次流转，到达末尾后无缝跳转回到首曲继续循环。
+* **C++ NDK IntelliSense 环境配置**:
+  * 为 IDE 配置 Android NDK Clang 编译器与头文件包含路径，全面消除 Oboe 与 C++ STL 头文件的虚假报错提示。
 
 ---
 

@@ -352,8 +352,14 @@
     <string name="badge_local">IMPORT</string>
     <string name="badge_local_rj">IMPORT • %1$s</string>
 
+    <!-- Changelog v1.4.2 -->
+    <string name="settings_changelog_v142_title">版本 1.4.2（最新）</string>
+    <string name="settings_changelog_v142_item1">• USB DAC独占模式稳定性增强: 彻底修复切歌或浏览播放列表时的CPU假死、卡顿与闪退问题。</string>
+    <string name="settings_changelog_v142_item2">• UAC2微帧时钟同步: 针对高速USB DAC启用48kHz整数采样比（每包恒定6帧），抑制时钟漂移杂音。</string>
+    <string name="settings_changelog_v142_item3">• 消除过零失真: 采用对称四舍五入与防盲区截断，保留极弱微声与耳语ASMR的纯净细节。</string>
+    <string name="settings_changelog_v142_item4">• 修复列表循环（Repeat All）: 修复全曲循环时仅单曲重复的异常，支持整表无缝周而复始循环播放。</string>
     <!-- Changelog v1.4.1 -->
-    <string name="settings_changelog_v141_title">版本 1.4.1（最新）</string>
+    <string name="settings_changelog_v141_title">版本 1.4.1</string>
     <string name="settings_changelog_v141_item1">• 多文件夹音频导入: 支持从内部存储及SD卡导入外部音频文件夹。</string>
     <string name="settings_changelog_v141_item2">• 零拷贝虚拟专辑: 无需复制音频文件，无缝播放多音轨分轨作品，零空间浪费。</string>
     <string name="settings_changelog_v141_item3">• 自动音轨书签: 分轨文件自动映射为时间轴章节/书签，支持一键跳转。</string>

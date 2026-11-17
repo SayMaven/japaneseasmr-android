@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.4.1-blue?style=for-the-badge" alt="Version v1.4.1" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.4.2-blue?style=for-the-badge" alt="Version v1.4.2" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 License" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Language-Kotlin-7c3aed?style=for-the-badge" alt="Language" />
@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#whats-new-in-v141">What's New</a> •
+    <a href="#whats-new-in-v142">What's New</a> •
     <a href="#features">Features</a> •
     <a href="#screenshots">Screenshots</a> •
     <a href="#download">Download</a> •
@@ -36,6 +36,21 @@
 ## Overview
 
 JapaneseASMR Downloader is a full-featured, open-source Android application engineered specifically for downloading, archiving, and listening to Japanese ASMR voice dramas (RJ Works). Built from the ground up with Jetpack Compose, Kotlin Coroutines, Room Database, and AndroidX Media3 (ExoPlayer), the app delivers desktop-grade streaming performance, zero-OOM memory safety, and seamless background audio playback on mobile devices.
+
+---
+
+## What's New in v1.4.2
+
+* **USB DAC Exclusive Mode Stability & Freeze Prevention**:
+  * Completely eliminated 100% CPU lockup, ANR, and audio thread starvation by optimizing Linux kernel scheduler priority (`nice -19`, `SCHED_FIFO` priority 3) and introducing timed non-blocking `poll()` completions.
+  * Resolved app freeze, severe lagging, and force closes when pressing Next, switching tracks, or playing audio from the collection playlist during active USB DAC streaming.
+* **UAC2 DAC Audio Noise Reduction & Clock Synchronization**:
+  * **48 kHz Microframe Integer Ratio**: Transparently resamples audio to 48,000 Hz when USB DAC Exclusive mode is active on High-Speed UAC2 hardware (8,000 microframes/sec), ensuring an exact integer ratio of 6 frames per packet (24 bytes) and eliminating fractional timing drift and micro-slips.
+  * **Symmetric Clamping & Zero-Crossing Deadband Elimination**: Replaced truncating `int16_t` conversion with symmetric rounding (`std::lround`) and anti-deadband clamping across decoder and volume scaling routines, protecting the fine acoustic texture of soft ASMR whispers.
+* **Playlist Repeat All Cycle Fix**:
+  * Fixed an issue where `Repeat All` erroneously repeated only the current single track like `Repeat One`. The playlist now continuously advances across all tracks and smoothly wraps around to the beginning once the end of the collection is reached.
+* **C++ NDK IntelliSense Configuration**:
+  * Configured native include paths and Android NDK Clang properties for developer editors, resolving false positive linter diagnostics on Oboe headers.
 
 ---
 

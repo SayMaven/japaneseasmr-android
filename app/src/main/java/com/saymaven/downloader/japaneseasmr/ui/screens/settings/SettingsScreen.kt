@@ -1246,6 +1246,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text(stringResource(R.string.settings_changelog_title)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(stringResource(R.string.settings_changelog_v142_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_changelog_v142_item1), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v142_item2), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v142_item3), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v142_item4), style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(stringResource(R.string.settings_changelog_v141_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text(stringResource(R.string.settings_changelog_v141_item1), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.settings_changelog_v141_item2), style = MaterialTheme.typography.bodySmall)

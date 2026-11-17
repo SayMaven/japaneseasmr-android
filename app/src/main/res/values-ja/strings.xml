@@ -352,8 +352,14 @@
     <string name="badge_local">IMPORT</string>
     <string name="badge_local_rj">IMPORT • %1$s</string>
 
+    <!-- Changelog v1.4.2 -->
+    <string name="settings_changelog_v142_title">バージョン 1.4.2（最新）</string>
+    <string name="settings_changelog_v142_item1">• USB DAC Exclusiveの安定化: 曲の切り替えやプレイリスト操作時のCPU高負荷、フリーズ、強制終了を完全に解消。</string>
+    <string name="settings_changelog_v142_item2">• UAC2マイクロフレーム同期: High-Speed USB DAC向けに48kHz整数比（1パケット6フレーム）を適用し、タイミングズレによるノイズを低減。</string>
+    <string name="settings_changelog_v142_item3">• ゼロクロス歪みの解消: 対称丸め処理とデッドバンド排除により、微細なささやき声や環境音の透明感を保護。</string>
+    <string name="settings_changelog_v142_item4">• 全曲リピート（Repeat All）の修正: 全曲リピート時に同じ曲がループする不具合を修正し、リスト全体を正しく周回再生。</string>
     <!-- Changelog v1.4.1 -->
-    <string name="settings_changelog_v141_title">バージョン 1.4.1（最新）</string>
+    <string name="settings_changelog_v141_title">バージョン 1.4.1</string>
     <string name="settings_changelog_v141_item1">• マルチフォルダー音声インポート: 本体ストレージおよびSDカードから外部フォルダーを一括インポート。</string>
     <string name="settings_changelog_v141_item2">• ゼロコピー仮想アルバム: ストレージを圧迫せず、分割トラック作品をシームレスに再生。</string>
     <string name="settings_changelog_v141_item3">• 自動トラックブックマーク: 分割トラックがタイムラインのチャプターとして自動登録。</string>

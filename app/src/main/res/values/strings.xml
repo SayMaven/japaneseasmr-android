@@ -254,7 +254,12 @@
     <string name="settings_threads_opt_16">16 Threads (Recommended)</string>
     <string name="settings_threads_opt_24">24 Threads (Fast)</string>
     <string name="settings_threads_opt_32">32 Threads (Maximum)</string>
-    <string name="settings_changelog_v141_title">Version 1.4.1 (Latest)</string>
+    <string name="settings_changelog_v142_title">Version 1.4.2 (Latest)</string>
+    <string name="settings_changelog_v142_item1">• USB DAC Exclusive Stability: Completely resolved CPU lockup, ANR, and app freezing during track switching or playlist navigation.</string>
+    <string name="settings_changelog_v142_item2">• UAC2 Microframe Clock Sync: Real-time 48kHz integer microframe ratio (6 frames/packet) eliminating fractional timing drift on High-Speed USB DACs.</string>
+    <string name="settings_changelog_v142_item3">• Zero-Crossing Distortion Fix: Symmetrical rounding and anti-deadband clamping preserving soft whisper ASMR audio clarity.</string>
+    <string name="settings_changelog_v142_item4">• Playlist Repeat All Fix: Resolved issue where Repeat All looped only the current track; now seamlessly cycles through the entire playlist.</string>
+    <string name="settings_changelog_v141_title">Version 1.4.1</string>
     <string name="settings_changelog_v141_item1">• Custom Audio Folder Import: Seamlessly import external audio folders from Internal Storage and SD Card.</string>
     <string name="settings_changelog_v141_item2">• Zero-Storage Multi-Track Albums: Play multi-file ASMR folders as unified virtual albums without duplicating or merging files.</string>
     <string name="settings_changelog_v141_item3">• Non-RJ Local Audio Support: Import arbitrary audio collections with automatic ID3 tag extraction and persistent synthetic IDs.</string>

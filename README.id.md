@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.4.1-blue?style=for-the-badge" alt="Versi v1.4.1" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.4.2-blue?style=for-the-badge" alt="Versi v1.4.2" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/Lisensi-GPL%20v3.0-10b981?style=for-the-badge" alt="Lisensi GPL v3.0" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Bahasa-Kotlin-7c3aed?style=for-the-badge" alt="Bahasa" />
@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#apa-yang-baru-di-v141">Pembaruan</a> •
+    <a href="#apa-yang-baru-di-v142">Pembaruan</a> •
     <a href="#fitur-utama">Fitur Utama</a> •
     <a href="#tangkapan-layar">Tangkapan Layar</a> •
     <a href="#unduh-aplikasi">Unduh</a> •
@@ -36,6 +36,21 @@
 ## Gambaran Umum
 
 JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) lengkap yang dirancang khusus untuk mengunduh, mengarsipkan, dan mendengarkan drama suara ASMR Jepang (Karya RJ). Dibangun menggunakan teknologi modern Android seperti Jetpack Compose, Kotlin Coroutines, Room Database, dan AndroidX Media3 (ExoPlayer), aplikasi ini menghadirkan performa pengunduhan berkecepatan tinggi, keamanan memori tanpa risiko OOM (Out of Memory), serta pemutaran audio latar belakang yang stabil dan hemat daya.
+
+---
+
+## Apa yang Baru di v1.4.2
+
+* **Peningkatan Stabilitas USB DAC Exclusive & Pencegahan Freeze**:
+  * Mengeliminasi 100% CPU lockup, ANR, dan thread starvation dengan mengoptimalkan prioritas scheduler Linux (`nice -19`, `SCHED_FIFO` priority 3) serta menerapkan non-blocking timed `poll()`.
+  * Memperbaiki masalah aplikasi freeze, lag parah, dan force close saat menekan tombol Next, berganti trek, atau memutar lagu dari playlist koleksi selama streaming USB DAC aktif.
+* **Reduksi Noise Audio DAC UAC2 & Sinkronisasi Clock**:
+  * **Rasio Integer Microframe 48 kHz**: Secara cerdas melakukan resampling audio ke 48.000 Hz saat mode USB DAC Exclusive aktif pada perangkat UAC2 High-Speed (8.000 microframe/detik), memastikan rasio transfer bilangan bulat tetap 6 frame per paket (24 bytes) untuk mencegah desah akibat pergeseran clock.
+  * **Eliminasi Distorsi Crossover & Zero-Crossing Deadband**: Mengganti konversi truncating `int16_t` dengan pembulatan simetris (`std::lround`) dan saturasi clamping pada decoder dan volume scaling, menjaga kemurnian detail suara bisikan lembut ASMR.
+* **Perbaikan Siklus Playlist Repeat All**:
+  * Memperbaiki bug di mana opsi `Repeat All` hanya mengulang trek yang sedang diputar seperti `Repeat One`. Seluruh antrean lagu kini diputar secara berurutan dan otomatis berputar kembali ke awal daftar saat mencapai akhir playlist.
+* **Konfigurasi IntelliSense C++ NDK**:
+  * Mengonfigurasi include path dan properti compiler Android NDK Clang untuk editor, melenyapkan false positive error linter pada header native C++ dan Oboe.
 
 ---
 
