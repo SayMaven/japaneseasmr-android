@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.4.2-blue?style=for-the-badge" alt="Version v1.4.2" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.4.3-blue?style=for-the-badge" alt="Version v1.4.3" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 License" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Language-Kotlin-7c3aed?style=for-the-badge" alt="Language" />
@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#whats-new-in-v142">What's New</a> •
+    <a href="#whats-new-in-v143">What's New</a> •
     <a href="#features">Features</a> •
     <a href="#screenshots">Screenshots</a> •
     <a href="#download">Download</a> •
@@ -36,6 +36,16 @@
 ## Overview
 
 JapaneseASMR Downloader is a full-featured, open-source Android application engineered specifically for downloading, archiving, and listening to Japanese ASMR voice dramas (RJ Works). Built from the ground up with Jetpack Compose, Kotlin Coroutines, Room Database, and AndroidX Media3 (ExoPlayer), the app delivers desktop-grade streaming performance, zero-OOM memory safety, and seamless background audio playback on mobile devices.
+
+---
+
+## What's New in v1.4.3
+
+* **External Storage & SD Card Import Support**:
+  * **All Files Access (`MANAGE_EXTERNAL_STORAGE`)**: Integrated Android 11+ (API 30+) external storage management permission, enabling full POSIX filesystem access (`java.io.File`) to secondary storage volumes, MicroSD cards, and external drives.
+  * **Zero-File Detection Bug Fix**: Fixed an issue where selecting an SD Card folder in the folder picker displayed "Total 0 audio files detected" due to Android Scoped Storage directory listing restrictions.
+  * **Seamless Dual-Mode Scanner Fallback**: Implemented robust fallback between POSIX direct access and Android Storage Access Framework (`DocumentFile.fromTreeUri()`) ensuring folder contents and subfolders are reliably discovered regardless of permission states.
+  * **Interactive Permission Prompt**: Added a dedicated permission prompt dialog in Settings when adding or changing folders, guiding users directly to Android system settings to grant storage access.
 
 ---
 

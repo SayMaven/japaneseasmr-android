@@ -3,6 +3,8 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.settings
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -84,6 +86,17 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     var showTranslationLangDialog by remember { mutableStateOf(false) }
     var showChangelogDialog by remember { mutableStateOf(false) }
     var showGuideDialog by remember { mutableStateOf(false) }
+    var showManageStorageDialog by remember { mutableStateOf(false) }
+    var pendingFolderPickerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun checkStoragePermissionAndLaunch(action: () -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+            pendingFolderPickerAction = action
+            showManageStorageDialog = true
+        } else {
+            action()
+        }
+    }
 
     val dirPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -310,7 +323,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     },
                     leadingContent = { Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
-                        FilledTonalButton(onClick = { dirPickerLauncher.launch(null) }) {
+                        FilledTonalButton(onClick = { checkStoragePermissionAndLaunch { dirPickerLauncher.launch(null) } }) {
                             Text(stringResource(R.string.action_change))
                         }
                     }
@@ -382,7 +395,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     supportingContent = { Text(stringResource(R.string.settings_import_folders_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     trailingContent = {
-                        FilledTonalButton(onClick = { importFolderLauncher.launch(null) }) {
+                        FilledTonalButton(onClick = { checkStoragePermissionAndLaunch { importFolderLauncher.launch(null) } }) {
                             Text(stringResource(R.string.settings_import_add_btn))
                         }
                     }
@@ -1246,6 +1259,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             title = { Text(stringResource(R.string.settings_changelog_title)) },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(stringResource(R.string.settings_changelog_v143_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.settings_changelog_v143_item1), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v143_item2), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v143_item3), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.settings_changelog_v143_item4), style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(stringResource(R.string.settings_changelog_v142_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Text(stringResource(R.string.settings_changelog_v142_item1), style = MaterialTheme.typography.bodySmall)
                     Text(stringResource(R.string.settings_changelog_v142_item2), style = MaterialTheme.typography.bodySmall)
@@ -1333,6 +1352,44 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             },
             confirmButton = {
                 TextButton(onClick = { showGuideDialog = false }) { Text(stringResource(R.string.action_close)) }
+            }
+        )
+    }
+
+    if (showManageStorageDialog) {
+        AlertDialog(
+            onDismissRequest = { showManageStorageDialog = false },
+            icon = { Icon(Icons.Default.SdCard, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text(stringResource(R.string.settings_manage_storage_dialog_title)) },
+            text = { Text(stringResource(R.string.settings_manage_storage_dialog_desc)) },
+            confirmButton = {
+                Button(onClick = {
+                    showManageStorageDialog = false
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                            context.startActivity(intent)
+                        }
+                    } catch (e: Exception) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                            context.startActivity(intent)
+                        }
+                    }
+                }) {
+                    Text(stringResource(R.string.settings_manage_storage_open_btn))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showManageStorageDialog = false
+                    pendingFolderPickerAction?.invoke()
+                    pendingFolderPickerAction = null
+                }) {
+                    Text(stringResource(R.string.settings_manage_storage_cancel_btn))
+                }
             }
         )
     }

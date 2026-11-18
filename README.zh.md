@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/版本-v1.4.2-blue?style=for-the-badge" alt="版本 v1.4.2" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/版本-v1.4.3-blue?style=for-the-badge" alt="版本 v1.4.3" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/许可证-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 许可证" /></a>
     <img src="https://img.shields.io/badge/平台-Android%208.0%2B-059669?style=for-the-badge" alt="平台" />
     <img src="https://img.shields.io/badge/开发语言-Kotlin-7c3aed?style=for-the-badge" alt="开发语言" />
@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#v142-更新内容">更新日志</a> •
+    <a href="#v143-更新内容">更新日志</a> •
     <a href="#功能特性">功能特性</a> •
     <a href="#应用截图">应用截图</a> •
     <a href="#下载安装">下载安装</a> •
@@ -36,6 +36,16 @@
 ## 概述
 
 **JapaneseASMR Downloader** 是一款专为下载、归档和聆听日本 ASMR 同人音声广播剧（RJ 作品）而设计的全功能开源 Android 客户端。应用完全基于现代 Android 技术栈构建，采用 Jetpack Compose、Kotlin 协程、Room 数据库和 AndroidX Media3 (ExoPlayer)，在移动设备上带来桌面级的流式传输性能、零 OOM（内存溢出）安全保障以及稳定省电的后台音频播放体验。
+
+---
+
+## v1.4.3 更新内容
+
+* **全面支持外部存储与 SD 卡音频导入**:
+  * **所有文件访问权限 (`MANAGE_EXTERNAL_STORAGE`)**: 适配 Android 11+ (API 30+) 外部存储管理权限，完全解禁对 MicroSD 卡及外部储存卷的 POSIX 文件系统访问 (`java.io.File`)。
+  * **修复 SD 卡导入显示 0 个音频文件的 Bug**: 彻底解决因 Android Scoped Storage 分区存储限制导致从 SD 卡导入目录时预览界面显示“共检测到 0 个音频文件”的问题。
+  * **智能双模扫描回退机制**: 实现 POSIX 直接访问与 Android SAF 存储访问框架 (`DocumentFile.fromTreeUri()`) 的双向无缝回退，确保无论权限状态如何均可完整解析目录与子音轨。
+  * **设置页授权引导弹窗**: 在设置界面添加或更改音频目录时，若检测到未开启权限，将弹出友好指引对话框，一键跳转至系统设置页授权。
 
 ---
 

@@ -550,21 +550,35 @@ object AudioStorageHelper {
                             return "$primaryStorage/$relPath"
                         } else {
                             val candidate = "/storage/$type/$relPath"
-                            if (File(candidate).exists()) {
+                            val candidateFile = File(candidate)
+
+                            // Jika MANAGE_EXTERNAL_STORAGE aktif di Android 11+, path kartu SD langsung valid untuk POSIX
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R &&
+                                android.os.Environment.isExternalStorageManager() &&
+                                candidateFile.exists()
+                            ) {
                                 return candidate
                             }
+
+                            if (candidateFile.exists() && candidateFile.canRead()) {
+                                return candidate
+                            }
+
                             // Fallback scanning external directories for secondary SD card mount
                             val extDirs = context.getExternalFilesDirs(null)
                             for (extDir in extDirs) {
                                 if (extDir != null && extDir.absolutePath.contains(type, ignoreCase = true)) {
                                     val sdRoot = extDir.absolutePath.substringBefore("/Android")
                                     val possiblePath = "$sdRoot/$relPath"
-                                    if (File(possiblePath).exists()) {
+                                    val possibleFile = File(possiblePath)
+                                    if (possibleFile.exists() && possibleFile.canRead()) {
                                         return possiblePath
                                     }
                                 }
                             }
-                            return candidate
+
+                            // Jika tidak bisa dibaca via POSIX langsung, return null agar caller tetap menggunakan SAF
+                            return if (candidateFile.exists() && candidateFile.canRead()) candidate else null
                         }
                     }
                 }

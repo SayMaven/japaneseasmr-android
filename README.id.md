@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.4.2-blue?style=for-the-badge" alt="Versi v1.4.2" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.4.3-blue?style=for-the-badge" alt="Versi v1.4.3" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/Lisensi-GPL%20v3.0-10b981?style=for-the-badge" alt="Lisensi GPL v3.0" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Bahasa-Kotlin-7c3aed?style=for-the-badge" alt="Bahasa" />
@@ -18,7 +18,7 @@
   </p>
 
   <p>
-    <a href="#apa-yang-baru-di-v142">Pembaruan</a> •
+    <a href="#apa-yang-baru-di-v143">Pembaruan</a> •
     <a href="#fitur-utama">Fitur Utama</a> •
     <a href="#tangkapan-layar">Tangkapan Layar</a> •
     <a href="#unduh-aplikasi">Unduh</a> •
@@ -36,6 +36,16 @@
 ## Gambaran Umum
 
 JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) lengkap yang dirancang khusus untuk mengunduh, mengarsipkan, dan mendengarkan drama suara ASMR Jepang (Karya RJ). Dibangun menggunakan teknologi modern Android seperti Jetpack Compose, Kotlin Coroutines, Room Database, dan AndroidX Media3 (ExoPlayer), aplikasi ini menghadirkan performa pengunduhan berkecepatan tinggi, keamanan memori tanpa risiko OOM (Out of Memory), serta pemutaran audio latar belakang yang stabil dan hemat daya.
+
+---
+
+## Apa yang Baru di v1.4.3
+
+* **Dukungan Penuh Impor Audio dari Kartu SD & Penyimpanan Eksternal**:
+  * **Akses Semua Berkas (`MANAGE_EXTERNAL_STORAGE`)**: Menambahkan izin pengelolaan penyimpanan eksternal Android 11+ (API 30+), membuka akses sistem berkas POSIX (`java.io.File`) secara penuh ke kartu MicroSD dan drive eksternal tanpa batasan Scoped Storage.
+  * **Perbaikan Masalah 0 Berkas Terdeteksi**: Memperbaiki bug di mana folder audio pada Kartu SD menampilkan "Total 0 berkas audio terdeteksi" pada dialog pratinjau impor akibat pemblokiran pembacaan direktori sekunder.
+  * **Fallback Pemindaian Ganda (Dual-Mode)**: Menerapkan mekanisme pemindaian cerdas yang otomatis beralih antara akses langsung POSIX dan SAF (`DocumentFile.fromTreeUri()`), memastikan seluruh audio di folder dan sub-folder terbaca dengan sempurna.
+  * **Dialog Panduan Izin di Pengaturan**: Menambahkan dialog interaktif di menu Pengaturan saat memilih atau mengubah folder audio untuk memandu pengguna langsung ke pengaturan sistem Android guna mengaktifkan akses penyimpanan.
 
 ---
 

@@ -57,7 +57,7 @@ object StorageSyncManager {
         val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(context, uriOrPath)
         val directFile = if (!resolvedPath.isNullOrBlank()) File(resolvedPath) else null
 
-        if (directFile != null && directFile.exists() && directFile.isDirectory) {
+        if (directFile != null && directFile.exists() && directFile.isDirectory && directFile.canRead()) {
             val folderName = directFile.name.ifBlank { "Folder" }
             var singleCount = 0
             var multiAlbumCount = 0
@@ -88,14 +88,16 @@ object StorageSyncManager {
                 }
             }
 
-            return@withContext ImportPreviewData(
-                singleCount = singleCount,
-                multiAlbumCount = multiAlbumCount,
-                totalAudioTracks = totalAudioTracks,
-                unreadableCount = unreadableCount,
-                folderPathOrUri = uriOrPath,
-                folderName = folderName
-            )
+            if (totalAudioTracks > 0) {
+                return@withContext ImportPreviewData(
+                    singleCount = singleCount,
+                    multiAlbumCount = multiAlbumCount,
+                    totalAudioTracks = totalAudioTracks,
+                    unreadableCount = unreadableCount,
+                    folderPathOrUri = uriOrPath,
+                    folderName = folderName
+                )
+            }
         }
 
         // Fallback untuk SAF Content URI bila raw File tidak bisa diakses
@@ -189,7 +191,10 @@ object StorageSyncManager {
                     val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(context, dirEntry) ?: dirEntry
                     val dirFile = File(resolvedPath)
 
-                    if (dirFile.exists() && dirFile.isDirectory) {
+                    val canReadPhysical = dirFile.exists() && dirFile.isDirectory && dirFile.canRead() &&
+                        (dirFile.listFiles()?.isNotEmpty() == true || AudioStorageHelper.findLeafAudioFolders(dirFile, 5).isNotEmpty())
+
+                    if (canReadPhysical) {
                         scanPhysicalDirectory(context, dao, dirFile, isImported = importedDirs.contains(dirEntry))
                     } else if (dirEntry.startsWith("content://")) {
                         scanSafDirectory(context, dao, dirEntry)
