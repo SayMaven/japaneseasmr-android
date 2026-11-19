@@ -48,7 +48,10 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    onOpenDrawer: () -> Unit = {}
+) {
     val context = LocalContext.current
 
     val themeMode by viewModel.themeMode.collectAsState()
@@ -133,12 +136,29 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = stringResource(R.string.settings_header_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onOpenDrawer,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = "Menu",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.settings_header_title),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
+        }
 
         // ================= 0. UMUM & BAHASA =================
         SettingsCategoryHeader(title = stringResource(R.string.settings_cat_general), icon = Icons.Default.Language)

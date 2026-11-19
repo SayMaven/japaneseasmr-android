@@ -1271,6 +1271,55 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * Plays an online audio stream directly via ExoPlayer.
+     */
+    fun playOnlineStream(
+        rjid: String,
+        workTitle: String,
+        trackTitle: String,
+        cv: String,
+        streamUrl: String,
+        coverUrl: String
+    ) {
+        val p = player ?: run {
+            initMediaController()
+            return
+        }
+        viewModelScope.launch {
+            isCurrentVirtualAlbum = false
+            currentAlbumHistory = null
+
+            val metaTitle = "[$rjid] $trackTitle"
+            val metaBuilder = MediaMetadata.Builder()
+                .setTitle(metaTitle)
+                .setArtist(cv)
+                .setAlbumTitle(workTitle)
+                .setArtworkUri(Uri.parse(coverUrl))
+
+            val mediaItem = MediaItem.Builder()
+                .setUri(Uri.parse(streamUrl))
+                .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.parse(streamUrl)).build())
+                .setMediaId(streamUrl)
+                .setMediaMetadata(metaBuilder.build())
+                .build()
+
+            _currentRjId.value = rjid
+            _currentTitle.value = metaTitle
+            _currentArtist.value = cv
+            _currentCoverUrl.value = coverUrl
+            preloadCoverArtInMemory(coverUrl)
+            _currentChapters.value = emptyList()
+            _translatedTitle.value = null
+            _translatedChapters.value = emptyList()
+            _audioSpecs.value = "44.1kHz | 16bits | STREAM"
+
+            p.setMediaItems(listOf(mediaItem), 0, 0L)
+            p.prepare()
+            p.play()
+        }
+    }
+
     private suspend fun loadArtworkBytes(localFilePath: String?, coverUrl: String?): ByteArray? = withContext(Dispatchers.IO) {
         try {
             if (!localFilePath.isNullOrBlank()) {

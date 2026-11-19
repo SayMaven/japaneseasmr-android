@@ -32,7 +32,8 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 fun HistoryScreen(
     viewModel: HistoryViewModel,
     onPlayTrack: (HistoryEntity) -> Unit,
-    onRedownload: (HistoryEntity) -> Unit
+    onRedownload: (HistoryEntity) -> Unit,
+    onOpenDrawer: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val historyUiList by viewModel.historyUiList.collectAsState()
@@ -51,14 +52,25 @@ fun HistoryScreen(
         // Clean Header with Overflow Menu
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(
+                onClick = onOpenDrawer,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = "Menu",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = stringResource(R.string.history_header_title_format, historyUiList.size),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
             )
 
             Box {

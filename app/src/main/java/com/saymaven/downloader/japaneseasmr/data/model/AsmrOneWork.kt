@@ -17,5 +17,6 @@ data class AsmrOneWork(
     val price: Int? = null,
     val rating: Double? = null,
     val reviewCount: Int? = null,
-    val dlCount: Int? = null
+    val dlCount: Int? = null,
+    val tags: List<String> = emptyList()
 )

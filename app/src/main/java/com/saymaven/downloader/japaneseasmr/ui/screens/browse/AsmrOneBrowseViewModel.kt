@@ -2,9 +2,11 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.browse
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.model.AsmrOneWork
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService
+import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneTrack
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -12,10 +14,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class BrowseFilterType {
-    ALL,
+enum class BrowseTabType {
     POPULAR,
-    SUBTITLE
+    RECOMMENDED
+}
+
+enum class AsmrSortField(val apiValue: String, val labelRes: Int) {
+    RELEASE_DATE("create_date", R.string.browse_sort_release_date),
+    DL_COUNT("dl_count", R.string.browse_sort_dl_count),
+    RATING("rating", R.string.browse_sort_rating),
+    REVIEWS("review_count", R.string.browse_sort_reviews)
+}
+
+enum class AsmrSortDirection(val apiValue: String, val labelRes: Int) {
+    DESC("desc", R.string.browse_sort_desc),
+    ASC("asc", R.string.browse_sort_asc)
 }
 
 class AsmrOneBrowseViewModel : ViewModel() {
@@ -38,8 +51,27 @@ class AsmrOneBrowseViewModel : ViewModel() {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
-    private val _filterType = MutableStateFlow(BrowseFilterType.ALL)
-    val filterType = _filterType.asStateFlow()
+    private val _currentTab = MutableStateFlow(BrowseTabType.POPULAR)
+    val currentTab = _currentTab.asStateFlow()
+
+    private val _sortField = MutableStateFlow(AsmrSortField.DL_COUNT)
+    val sortField = _sortField.asStateFlow()
+
+    private val _sortDirection = MutableStateFlow(AsmrSortDirection.DESC)
+    val sortDirection = _sortDirection.asStateFlow()
+
+    // Work detail & tracks for streaming / detail sheet
+    private val _selectedWork = MutableStateFlow<AsmrOneWork?>(null)
+    val selectedWork = _selectedWork.asStateFlow()
+
+    private val _workTracks = MutableStateFlow<List<AsmrOneTrack>>(emptyList())
+    val workTracks = _workTracks.asStateFlow()
+
+    private val _isLoadingTracks = MutableStateFlow(false)
+    val isLoadingTracks = _isLoadingTracks.asStateFlow()
+
+    private val _tracksError = MutableStateFlow<String?>(null)
+    val tracksError = _tracksError.asStateFlow()
 
     private var currentPage = 1
     private val pageSize = 20
@@ -49,10 +81,23 @@ class AsmrOneBrowseViewModel : ViewModel() {
         loadInitial()
     }
 
-    fun setFilterType(type: BrowseFilterType) {
-        if (_filterType.value == type && _searchQuery.value.isEmpty()) return
-        _filterType.value = type
+    fun setTab(tab: BrowseTabType) {
+        if (_currentTab.value == tab && _searchQuery.value.isEmpty()) return
+        _currentTab.value = tab
         _searchQuery.value = ""
+        // Set default sort according to tab
+        if (tab == BrowseTabType.POPULAR) {
+            _sortField.value = AsmrSortField.DL_COUNT
+        } else {
+            _sortField.value = AsmrSortField.RATING
+        }
+        loadInitial()
+    }
+
+    fun setSort(field: AsmrSortField, direction: AsmrSortDirection) {
+        if (_sortField.value == field && _sortDirection.value == direction) return
+        _sortField.value = field
+        _sortDirection.value = direction
         loadInitial()
     }
 
@@ -65,6 +110,29 @@ class AsmrOneBrowseViewModel : ViewModel() {
         }
     }
 
+    fun selectWork(work: AsmrOneWork?) {
+        _selectedWork.value = work
+        _workTracks.value = emptyList()
+        _tracksError.value = null
+        if (work != null) {
+            loadTracks(work.id)
+        }
+    }
+
+    fun loadTracks(workId: Int) {
+        viewModelScope.launch {
+            _isLoadingTracks.value = true
+            _tracksError.value = null
+            val result = AsmrOneApiService.getWorkTracks(workId)
+            result.onSuccess { list ->
+                _workTracks.value = list
+            }.onFailure { error ->
+                _tracksError.value = error.localizedMessage ?: "Failed to load tracks"
+            }
+            _isLoadingTracks.value = false
+        }
+    }
+
     fun loadInitial() {
         currentPage = 1
         _hasMore.value = true
@@ -73,20 +141,24 @@ class AsmrOneBrowseViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             val query = _searchQuery.value.trim()
+            val orderParam = _sortField.value.apiValue
+            val sortParam = _sortDirection.value.apiValue
+
             val result = if (query.isNotEmpty()) {
-                val subtitleFlag = if (_filterType.value == BrowseFilterType.SUBTITLE) 1 else 0
                 AsmrOneApiService.searchWorks(
                     keyword = query,
                     page = currentPage,
                     pageSize = pageSize,
-                    subtitle = subtitleFlag
+                    subtitle = 0
                 )
             } else {
-                when (_filterType.value) {
-                    BrowseFilterType.POPULAR -> AsmrOneApiService.getPopularWorks(page = currentPage, pageSize = pageSize)
-                    BrowseFilterType.SUBTITLE -> AsmrOneApiService.getWorks(page = currentPage, pageSize = pageSize, subtitle = 1)
-                    BrowseFilterType.ALL -> AsmrOneApiService.getWorks(page = currentPage, pageSize = pageSize, subtitle = 0)
-                }
+                AsmrOneApiService.getWorks(
+                    page = currentPage,
+                    pageSize = pageSize,
+                    order = orderParam,
+                    sort = sortParam,
+                    subtitle = 0
+                )
             }
 
             result.onSuccess { list ->
@@ -107,20 +179,24 @@ class AsmrOneBrowseViewModel : ViewModel() {
             _isLoadingMore.value = true
             val nextPage = currentPage + 1
             val query = _searchQuery.value.trim()
+            val orderParam = _sortField.value.apiValue
+            val sortParam = _sortDirection.value.apiValue
+
             val result = if (query.isNotEmpty()) {
-                val subtitleFlag = if (_filterType.value == BrowseFilterType.SUBTITLE) 1 else 0
                 AsmrOneApiService.searchWorks(
                     keyword = query,
                     page = nextPage,
                     pageSize = pageSize,
-                    subtitle = subtitleFlag
+                    subtitle = 0
                 )
             } else {
-                when (_filterType.value) {
-                    BrowseFilterType.POPULAR -> AsmrOneApiService.getPopularWorks(page = nextPage, pageSize = pageSize)
-                    BrowseFilterType.SUBTITLE -> AsmrOneApiService.getWorks(page = nextPage, pageSize = pageSize, subtitle = 1)
-                    BrowseFilterType.ALL -> AsmrOneApiService.getWorks(page = nextPage, pageSize = pageSize, subtitle = 0)
-                }
+                AsmrOneApiService.getWorks(
+                    page = nextPage,
+                    pageSize = pageSize,
+                    order = orderParam,
+                    sort = sortParam,
+                    subtitle = 0
+                )
             }
 
             result.onSuccess { newList ->
@@ -132,7 +208,6 @@ class AsmrOneBrowseViewModel : ViewModel() {
                     _hasMore.value = newList.size >= pageSize
                 }
             }.onFailure {
-                // Keep existing items, stop more loading
             }
             _isLoadingMore.value = false
         }
@@ -144,7 +219,7 @@ class AsmrOneBrowseViewModel : ViewModel() {
             title = work.title,
             cv = work.cv,
             circle = work.circle,
-            genre = "-",
+            genre = work.tags.joinToString(", "),
             ageRating = work.ageRating,
             coverUrl = work.coverUrl
         )

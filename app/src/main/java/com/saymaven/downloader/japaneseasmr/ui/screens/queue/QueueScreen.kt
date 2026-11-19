@@ -37,7 +37,10 @@ import androidx.compose.ui.res.stringResource
 import com.saymaven.downloader.japaneseasmr.R
 
 @Composable
-fun QueueScreen(viewModel: QueueViewModel) {
+fun QueueScreen(
+    viewModel: QueueViewModel,
+    onOpenDrawer: () -> Unit = {}
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -89,10 +92,20 @@ fun QueueScreen(viewModel: QueueViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp, bottom = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                IconButton(
+                    onClick = onOpenDrawer,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Menu",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.queue_header_title),
                         style = MaterialTheme.typography.titleLarge,

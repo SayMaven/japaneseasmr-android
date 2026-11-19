@@ -139,46 +139,12 @@ fun PlaylistScreen(
             }
 
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(R.string.player_playlist_sheet_header, filteredPlaylist.size),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer
-                    ) {
-                        Text(
-                            text = stringResource(R.string.hiby_badge_bitperfect),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                        )
-                    }
-                }
-            }
-
-            // Shuffle All Quick Action
-            if (filteredPlaylist.isNotEmpty()) {
-                IconButton(
-                    onClick = {
-                        val shuffled = filteredPlaylist.shuffled()
-                        if (shuffled.isNotEmpty()) {
-                            viewModel.playLocalTrack(shuffled.first(), filteredPlaylist)
-                            onOpenPlayer()
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = stringResource(R.string.player_action_shuffle),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.player_playlist_sheet_header, filteredPlaylist.size),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
 
             // Toggle Grid / List Layout
@@ -835,28 +801,73 @@ fun LocalWorkPinterestCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp)
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                // Title - Full title without truncation
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                     color = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                 )
 
+                // Circle Name (Plain text, no badge pill)
+                if (item.circle.isNotBlank() && item.circle != "-") {
+                    Text(
+                        text = item.circle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Voice Actor (CV) Pill Badge
+                if (item.cv.isNotBlank() && item.cv != "-") {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+                    ) {
+                        Text(
+                            text = item.cv,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Genre / Tags Pill Badges
+                val genreList = remember(item.genre) {
+                    item.genre?.split(",", "/", "、", ";")
+                        ?.map { it.trim() }
+                        ?.filter { it.isNotEmpty() }
+                        ?: emptyList()
+                }
+                if (genreList.isNotEmpty()) {
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        genreList.forEach { tag ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
+                            ) {
+                                Text(
+                                    text = tag,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(2.dp))
-
-                Text(
-                    text = "CV: ${item.cv}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
 
                 // Action Row: Play/Equalizer & 3-dots Menu
                 Row(

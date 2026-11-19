@@ -169,7 +169,7 @@
     <string name="player_folder_all_empty">Belum ada audio di koleksi. Unduh kode RJ terlebih dahulu.</string>
     <string name="player_folder_empty_format">Folder \'%1$s\' masih kosong.</string>
     <string name="player_playlist_next_title">BERIKUTNYA • DAFTAR PUTAR (%1$d)</string>
-    <string name="player_playlist_sheet_header">Daftar Putar Koleksi (%1$d)</string>
+    <string name="player_playlist_sheet_header">Koleksi (%1$d)</string>
     <string name="playlist_sort_custom">Kustom</string>
     <string name="playlist_sort_date">Tanggal</string>
     <string name="playlist_sort_title">Judul</string>
@@ -372,29 +372,44 @@
     <string name="badge_local">IMPORT</string>
     <string name="badge_local_rj">IMPORT • %1$s</string>
 
-    <!-- Versi 2.0.0 Drawer & Jelajah asmr.one -->
+    <!-- Versi 2.0.0 Drawer & Jelajah asmr -->
+    <string name="tab_browse">Jelajah ASMR</string>
     <string name="drawer_title_app">Japanese ASMR</string>
     <string name="drawer_subtitle_version">Versi 2.0.0</string>
     <string name="drawer_audio_engine_status">Native miniaudio 192kHz/24bit aktif</string>
     <string name="drawer_item_local">Koleksi Lokal</string>
-    <string name="drawer_item_browse">Jelajah asmr.one</string>
+    <string name="drawer_item_browse">Jelajah ASMR</string>
     <string name="drawer_item_queue">Antrean Unduhan</string>
     <string name="drawer_item_history">Riwayat Pemutaran</string>
-    <string name="drawer_item_settings">Pengaturan &amp; DAC</string>
+    <string name="drawer_item_settings">Pengaturan</string>
 
-    <!-- Browser asmr.one -->
-    <string name="browse_header_title">Jelajah asmr.one</string>
+    <!-- Browser asmr -->
+    <string name="browse_header_title">Jelajah ASMR</string>
     <string name="browse_search_hint">Cari judul, CV, atau kode RJ…</string>
     <string name="browse_filter_all">Semua</string>
     <string name="browse_filter_popular">Populer</string>
     <string name="browse_filter_subtitled">Subtitle</string>
+    <string name="browse_btn_popular">Populer</string>
+    <string name="browse_btn_recommended">Rekomendasi</string>
+    <string name="browse_sort_title">Opsi Sortir</string>
+    <string name="browse_sort_field">Kriteria Sortir</string>
+    <string name="browse_sort_direction">Arah Urutan</string>
+    <string name="browse_sort_release_date">Tanggal Rilis</string>
+    <string name="browse_sort_dl_count">Jumlah Unduhan</string>
+    <string name="browse_sort_rating">Rating</string>
+    <string name="browse_sort_reviews">Jumlah Ulasan</string>
+    <string name="browse_sort_asc">Menaik</string>
+    <string name="browse_sort_desc">Menurun</string>
+    <string name="browse_detail_tracks">Daftar Track &amp; Putar Online</string>
+    <string name="browse_detail_download_btn">Unduh Offline</string>
+    <string name="browse_stream_playing">Memutar stream: %1$s</string>
     <string name="browse_action_copy_rj">Salin Kode RJ</string>
     <string name="browse_action_download">Unduh Karya</string>
     <string name="browse_toast_rj_copied">Kode RJ disalin: %1$s</string>
     <string name="browse_toast_enqueued">Ditambahkan ke antrean: %1$s</string>
     <string name="browse_empty_title">Karya tidak ditemukan</string>
     <string name="browse_empty_desc">Coba gunakan kata kunci atau filter lain.</string>
-    <string name="browse_error_title">Gagal terhubung ke asmr.one</string>
+    <string name="browse_error_title">Gagal terhubung ke server asmr</string>
     <string name="browse_action_retry">Coba Lagi</string>
 
     <!-- Menu Titik Tiga (Overflow Menu) & Info Audio -->

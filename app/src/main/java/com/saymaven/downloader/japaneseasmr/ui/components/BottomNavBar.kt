@@ -30,11 +30,12 @@ fun BottomNavBar(
     currentTab: NavTab,
     onTabSelected: (NavTab) -> Unit
 ) {
+    val bottomTabs = listOf(NavTab.HOME, NavTab.BROWSE, NavTab.QUEUE, NavTab.HISTORY)
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
-        NavTab.values().forEach { tab ->
+        bottomTabs.forEach { tab ->
             val labelText = stringResource(tab.titleRes)
             NavigationBarItem(
                 selected = currentTab == tab,

@@ -169,7 +169,7 @@
     <string name="player_folder_all_empty">媒体库暂无音频，请先下载RJ作品。</string>
     <string name="player_folder_empty_format">文件夹 \'%1$s\' 为空。</string>
     <string name="player_playlist_next_title">待播列表 • 播放列表 (%1$d)</string>
-    <string name="player_playlist_sheet_header">收藏播放列表 (%1$d)</string>
+    <string name="player_playlist_sheet_header">收藏 (%1$d)</string>
     <string name="playlist_sort_custom">自定义</string>
     <string name="playlist_sort_date">日期</string>
     <string name="playlist_sort_title">标题</string>
@@ -377,4 +377,70 @@
     <string name="settings_changelog_v141_item3">• 自动音轨书签: 分轨文件自动映射为时间轴章节/书签，支持一键跳转。</string>
     <string name="settings_changelog_v141_item4">• 支持非RJ音频与RJ关联: 自动生成本地唯一ID，并支持关联DLsite获取官方封面与元数据。</string>
     <string name="settings_changelog_v141_item5">• 导入前扫描预览: 导入前实时预览单文件及多音轨作品数量，防误操作。</string>
+
+    <!-- 版本 2.0.0 侧边栏与ASMR浏览 -->
+    <string name="tab_browse">浏览 ASMR</string>
+    <string name="drawer_title_app">Japanese ASMR</string>
+    <string name="drawer_subtitle_version">版本 2.0.0</string>
+    <string name="drawer_audio_engine_status">Native miniaudio 192kHz/24bit 已启用</string>
+    <string name="drawer_item_local">本地收藏</string>
+    <string name="drawer_item_browse">浏览 ASMR</string>
+    <string name="drawer_item_queue">下载队列</string>
+    <string name="drawer_item_history">播放历史</string>
+    <string name="drawer_item_settings">设置</string>
+
+    <!-- ASMR 浏览器 -->
+    <string name="browse_header_title">浏览 ASMR</string>
+    <string name="browse_search_hint">搜索作品、声优或 RJ 号…</string>
+    <string name="browse_filter_all">全部</string>
+    <string name="browse_filter_popular">热门</string>
+    <string name="browse_filter_subtitled">字幕</string>
+    <string name="browse_btn_popular">热门</string>
+    <string name="browse_btn_recommended">推荐</string>
+    <string name="browse_sort_title">排序选项</string>
+    <string name="browse_sort_field">排序字段</string>
+    <string name="browse_sort_direction">排序顺序</string>
+    <string name="browse_sort_release_date">发售日</string>
+    <string name="browse_sort_dl_count">下载量</string>
+    <string name="browse_sort_rating">评分</string>
+    <string name="browse_sort_reviews">评价数</string>
+    <string name="browse_sort_asc">升序</string>
+    <string name="browse_sort_desc">降序</string>
+    <string name="browse_detail_tracks">曲目列表与在线试听</string>
+    <string name="browse_detail_download_btn">离线下载</string>
+    <string name="browse_stream_playing">正在播放流媒体: %1$s</string>
+    <string name="browse_action_copy_rj">复制 RJ 号</string>
+    <string name="browse_action_download">下载作品</string>
+    <string name="browse_toast_rj_copied">RJ 号已复制: %1$s</string>
+    <string name="browse_toast_enqueued">已加入下载队列: %1$s</string>
+    <string name="browse_empty_title">未找到相关作品</string>
+    <string name="browse_empty_desc">请尝试使用其他关键词或筛选条件。</string>
+    <string name="browse_error_title">连接服务器失败</string>
+    <string name="browse_action_retry">重试</string>
+
+    <!-- 作品更多操作菜单与音频规格 -->
+    <string name="player_menu_more">作品操作</string>
+    <string name="player_menu_copy_rj">复制 RJ 号</string>
+    <string name="player_menu_audio_info">音频规格详情</string>
+    <string name="player_menu_play_now">从头播放</string>
+    <string name="player_menu_delete">从存储中删除</string>
+    <string name="player_audio_info_title">音频文件详情</string>
+    <string name="player_audio_info_format">格式: %1$s</string>
+    <string name="player_audio_info_samplerate">采样率: %1$s</string>
+    <string name="player_audio_info_bitdepth">位深度: %1$s</string>
+    <string name="player_audio_info_channels">声部/声道: %1$s</string>
+    <string name="player_audio_info_path">存储位置: %1$s</string>
+    <string name="player_audio_info_size">总大小: %1$s</string>
+    <string name="player_audio_info_duration">总时长: %1$s</string>
+    <string name="player_delete_confirm_title">删除作品</string>
+    <string name="player_delete_confirm_desc">确定要从存储设备中删除“%1$s”吗？此操作无法撤销。</string>
+    <string name="player_toast_deleted">作品已成功从存储中删除。</string>
+
+    <!-- HiBy Style Elements -->
+    <string name="hiby_badge_bitperfect">DAC BIT-PERFECT</string>
+    <string name="hiby_tab_all">全部作品</string>
+    <string name="hiby_tab_folders">文件夹</string>
+    <string name="hiby_tab_cv">声优 (CV)</string>
+    <string name="hiby_mode_grid">瀑布流网格</string>
+    <string name="hiby_mode_list">紧凑列表</string>
 </resources>

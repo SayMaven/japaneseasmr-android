@@ -129,6 +129,22 @@ object AsmrOneApiService {
         val reviewCount = if (obj.has("review_count")) obj.optInt("review_count") else null
         val dlCount = if (obj.has("dl_count")) obj.optInt("dl_count") else null
 
+        // Tags / Genres
+        val tagsList = mutableListOf<String>()
+        val tagsArray = obj.optJSONArray("tags")
+        if (tagsArray != null) {
+            for (i in 0 until tagsArray.length()) {
+                val tagObj = tagsArray.optJSONObject(i)
+                if (tagObj != null) {
+                    val tagName = tagObj.optString("name", "").trim()
+                    if (tagName.isNotEmpty()) tagsList.add(tagName)
+                } else {
+                    val tagName = tagsArray.optString(i, "").trim()
+                    if (tagName.isNotEmpty()) tagsList.add(tagName)
+                }
+            }
+        }
+
         val coverUrl = "$DEFAULT_HOST/api/cover/$id"
 
         return AsmrOneWork(
@@ -144,7 +160,8 @@ object AsmrOneApiService {
             price = price,
             rating = rating,
             reviewCount = reviewCount,
-            dlCount = dlCount
+            dlCount = dlCount,
+            tags = tagsList
         )
     }
 
@@ -238,4 +255,87 @@ object AsmrOneApiService {
             Result.failure(e)
         }
     }
+
+    /**
+     * Get track list for a work for streaming or offline playback.
+     */
+    suspend fun getWorkTracks(workId: Int): Result<List<AsmrOneTrack>> = withContext(Dispatchers.IO) {
+        try {
+            val endpoint = "/api/tracks/$workId"
+            val responseBody = executeRequest(endpoint)
+                ?: return@withContext Result.failure(Exception("Failed to fetch tracks for work $workId"))
+
+            val tracks = mutableListOf<AsmrOneTrack>()
+            val array = JSONArray(responseBody)
+            extractAudioTracks(array, DEFAULT_HOST, tracks)
+            Result.success(tracks)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun extractAudioTracks(
+        jsonArray: JSONArray,
+        host: String,
+        output: MutableList<AsmrOneTrack>
+    ) {
+        for (i in 0 until jsonArray.length()) {
+            val obj = jsonArray.optJSONObject(i) ?: continue
+            val type = obj.optString("type", "file")
+            if (type.equals("folder", ignoreCase = true)) {
+                val children = obj.optJSONArray("children")
+                if (children != null) {
+                    extractAudioTracks(children, host, output)
+                }
+            } else {
+                val title = obj.optString("title", "").ifBlank {
+                    obj.optString("name", "Track ${output.size + 1}")
+                }
+                val hash = obj.optString("hash", "").ifBlank { null }
+                var streamUrl = obj.optString("mediaStreamUrl", "")
+                if (streamUrl.isBlank() && hash != null) {
+                    streamUrl = "$host/api/media/stream/$hash"
+                }
+                if (streamUrl.isNotEmpty() && !streamUrl.startsWith("http")) {
+                    streamUrl = if (streamUrl.startsWith("/")) "$host$streamUrl" else "$host/$streamUrl"
+                }
+
+                val isAudio = type.contains("audio", ignoreCase = true) ||
+                        title.endsWith(".mp3", ignoreCase = true) ||
+                        title.endsWith(".wav", ignoreCase = true) ||
+                        title.endsWith(".flac", ignoreCase = true) ||
+                        title.endsWith(".m4a", ignoreCase = true) ||
+                        title.endsWith(".aac", ignoreCase = true) ||
+                        title.endsWith(".ogg", ignoreCase = true) ||
+                        (type == "file" && streamUrl.isNotEmpty())
+
+                if (isAudio && streamUrl.isNotEmpty()) {
+                    val duration = obj.optLong("duration", 0L)
+                    val size = obj.optLong("size", 0L)
+                    output.add(
+                        AsmrOneTrack(
+                            title = title,
+                            hash = hash,
+                            streamUrl = streamUrl,
+                            duration = duration,
+                            size = size,
+                            type = type
+                        )
+                    )
+                }
+            }
+        }
+    }
 }
+
+/**
+ * Audio track representation from asmr.one API
+ */
+data class AsmrOneTrack(
+    val title: String,
+    val hash: String? = null,
+    val streamUrl: String,
+    val duration: Long = 0L,
+    val size: Long = 0L,
+    val type: String = "audio"
+)

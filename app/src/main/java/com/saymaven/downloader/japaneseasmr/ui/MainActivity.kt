@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.activity.compose.BackHandler
@@ -170,12 +171,28 @@ class MainActivity : ComponentActivity() {
                     drawerScope.launch { drawerState.close() }
                 }
 
+                BackHandler(enabled = !drawerState.isOpen && currentTab == NavTab.SETTINGS) {
+                    currentTab = NavTab.HOME
+                }
+
+                val drawerItemShape = RoundedCornerShape(10.dp)
+                val drawerItemColors = NavigationDrawerItemDefaults.colors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    unselectedContainerColor = Color.Transparent,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurface
+                )
+
                 ModalNavigationDrawer(
                     drawerState = drawerState,
                     gesturesEnabled = !isPlayerExpanded,
                     drawerContent = {
                         ModalDrawerSheet(
-                            modifier = Modifier.width(300.dp)
+                            modifier = Modifier.width(300.dp),
+                            drawerContainerColor = MaterialTheme.colorScheme.surface,
+                            drawerContentColor = MaterialTheme.colorScheme.onSurface
                         ) {
                             Column(
                                 modifier = Modifier
@@ -215,6 +232,8 @@ class MainActivity : ComponentActivity() {
                                 label = { Text(stringResource(R.string.drawer_item_local)) },
                                 selected = currentTab == NavTab.HOME,
                                 icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
+                                shape = drawerItemShape,
+                                colors = drawerItemColors,
                                 onClick = {
                                     currentTab = NavTab.HOME
                                     drawerScope.launch { drawerState.close() }
@@ -226,6 +245,8 @@ class MainActivity : ComponentActivity() {
                                 label = { Text(stringResource(R.string.drawer_item_browse)) },
                                 selected = currentTab == NavTab.BROWSE,
                                 icon = { Icon(Icons.Default.Explore, contentDescription = null) },
+                                shape = drawerItemShape,
+                                colors = drawerItemColors,
                                 onClick = {
                                     if (!visitedTabs.contains(NavTab.BROWSE)) {
                                         visitedTabs.add(NavTab.BROWSE)
@@ -240,6 +261,8 @@ class MainActivity : ComponentActivity() {
                                 label = { Text(stringResource(R.string.drawer_item_queue)) },
                                 selected = currentTab == NavTab.QUEUE,
                                 icon = { Icon(Icons.Default.Download, contentDescription = null) },
+                                shape = drawerItemShape,
+                                colors = drawerItemColors,
                                 onClick = {
                                     if (!visitedTabs.contains(NavTab.QUEUE)) {
                                         visitedTabs.add(NavTab.QUEUE)
@@ -254,6 +277,8 @@ class MainActivity : ComponentActivity() {
                                 label = { Text(stringResource(R.string.drawer_item_history)) },
                                 selected = currentTab == NavTab.HISTORY,
                                 icon = { Icon(Icons.Default.History, contentDescription = null) },
+                                shape = drawerItemShape,
+                                colors = drawerItemColors,
                                 onClick = {
                                     if (!visitedTabs.contains(NavTab.HISTORY)) {
                                         visitedTabs.add(NavTab.HISTORY)
@@ -268,6 +293,8 @@ class MainActivity : ComponentActivity() {
                                 label = { Text(stringResource(R.string.drawer_item_settings)) },
                                 selected = currentTab == NavTab.SETTINGS,
                                 icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                shape = drawerItemShape,
+                                colors = drawerItemColors,
                                 onClick = {
                                     if (!visitedTabs.contains(NavTab.SETTINGS)) {
                                         visitedTabs.add(NavTab.SETTINGS)
@@ -347,6 +374,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     AsmrOneBrowseScreen(
                                         viewModel = browseViewModel,
+                                        playerViewModel = playerViewModel,
                                         onOpenDrawer = { drawerScope.launch { drawerState.open() } },
                                         onSelectWorkForDownload = { rjid ->
                                             queueViewModel.onInputChanged(rjid)
@@ -367,8 +395,11 @@ class MainActivity : ComponentActivity() {
                                             alpha = if (active) 1f else 0f
                                             translationX = if (active) 0f else 99999f
                                         }
-                                ) {
-                                    QueueScreen(viewModel = queueViewModel)
+                                 ) {
+                                    QueueScreen(
+                                        viewModel = queueViewModel,
+                                        onOpenDrawer = { drawerScope.launch { drawerState.open() } }
+                                    )
                                 }
                             }
 
@@ -386,6 +417,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     HistoryScreen(
                                         viewModel = historyViewModel,
+                                        onOpenDrawer = { drawerScope.launch { drawerState.open() } },
                                         onPlayTrack = { historyEntity ->
                                             playerViewModel.playLocalTrack(historyEntity)
                                             isPlayerExpanded = true
@@ -427,7 +459,10 @@ class MainActivity : ComponentActivity() {
                                             translationX = if (active) 0f else 99999f
                                         }
                                 ) {
-                                    SettingsScreen(viewModel = settingsViewModel)
+                                    SettingsScreen(
+                                        viewModel = settingsViewModel,
+                                        onOpenDrawer = { drawerScope.launch { drawerState.open() } }
+                                    )
                                 }
                             }
                         }

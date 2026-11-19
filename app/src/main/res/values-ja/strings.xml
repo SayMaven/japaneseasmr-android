@@ -169,7 +169,7 @@
     <string name="player_folder_all_empty">コレクションに音声がありません。まずRJ作品をダウンロードしてください。</string>
     <string name="player_folder_empty_format">フォルダ「%1$s」は空です。</string>
     <string name="player_playlist_next_title">再生リスト (%1$d)</string>
-    <string name="player_playlist_sheet_header">コレクション再生リスト (%1$d)</string>
+    <string name="player_playlist_sheet_header">コレクション (%1$d)</string>
     <string name="playlist_sort_custom">カスタム</string>
     <string name="playlist_sort_date">日付</string>
     <string name="playlist_sort_title">タイトル</string>
@@ -377,4 +377,70 @@
     <string name="settings_changelog_v141_item3">• 自動トラックブックマーク: 分割トラックがタイムラインのチャプターとして自動登録。</string>
     <string name="settings_changelog_v141_item4">• 非RJ音声対応＆RJ連携: 独自IDの付与と、DLsite公式サムネイル・メタデータのワンタップ連携。</string>
     <string name="settings_changelog_v141_item5">• インポート確認プレビュー: 保存前に検出ファイル数と作品数を事前に確認可能。</string>
+
+    <!-- バージョン 2.0.0 サイドバーとASMR探索 -->
+    <string name="tab_browse">ASMR探索</string>
+    <string name="drawer_title_app">Japanese ASMR</string>
+    <string name="drawer_subtitle_version">バージョン 2.0.0</string>
+    <string name="drawer_audio_engine_status">Native miniaudio 192kHz/24bit 有効</string>
+    <string name="drawer_item_local">ローカルコレクション</string>
+    <string name="drawer_item_browse">ASMR探索</string>
+    <string name="drawer_item_queue">ダウンロードキュー</string>
+    <string name="drawer_item_history">再生履歴</string>
+    <string name="drawer_item_settings">設定</string>
+
+    <!-- ASMR Explorer -->
+    <string name="browse_header_title">ASMR探索</string>
+    <string name="browse_search_hint">作品名、声優、RJコードを検索…</string>
+    <string name="browse_filter_all">すべて</string>
+    <string name="browse_filter_popular">人気</string>
+    <string name="browse_filter_subtitled">字幕付き</string>
+    <string name="browse_btn_popular">人気</string>
+    <string name="browse_btn_recommended">おすすめ</string>
+    <string name="browse_sort_title">並び替えオプション</string>
+    <string name="browse_sort_field">ソート項目</string>
+    <string name="browse_sort_direction">ソート順</string>
+    <string name="browse_sort_release_date">発売日</string>
+    <string name="browse_sort_dl_count">ダウンロード数</string>
+    <string name="browse_sort_rating">評価</string>
+    <string name="browse_sort_reviews">レビュー数</string>
+    <string name="browse_sort_asc">昇順</string>
+    <string name="browse_sort_desc">降順</string>
+    <string name="browse_detail_tracks">トラック一覧・オンライン再生</string>
+    <string name="browse_detail_download_btn">オフライン保存</string>
+    <string name="browse_stream_playing">ストリーミング再生中: %1$s</string>
+    <string name="browse_action_copy_rj">RJコードをコピー</string>
+    <string name="browse_action_download">作品をダウンロード</string>
+    <string name="browse_toast_rj_copied">RJコードをコピーしました: %1$s</string>
+    <string name="browse_toast_enqueued">キューに追加しました: %1$s</string>
+    <string name="browse_empty_title">作品が見つかりません</string>
+    <string name="browse_empty_desc">別のキーワードやフィルターをお試しください。</string>
+    <string name="browse_error_title">サーバーに接続できません</string>
+    <string name="browse_action_retry">再試行</string>
+
+    <!-- 作品オーバーフローメニュー（3点リーダー）＆オーディオ詳細 -->
+    <string name="player_menu_more">作品オプション</string>
+    <string name="player_menu_copy_rj">RJコードをコピー</string>
+    <string name="player_menu_audio_info">音声フォーマット詳細</string>
+    <string name="player_menu_play_now">最初から再生</string>
+    <string name="player_menu_delete">ストレージから削除</string>
+    <string name="player_audio_info_title">音声ファイル仕様</string>
+    <string name="player_audio_info_format">フォーマット: %1$s</string>
+    <string name="player_audio_info_samplerate">サンプリングレート: %1$s</string>
+    <string name="player_audio_info_bitdepth">ビット深度: %1$s</string>
+    <string name="player_audio_info_channels">チャンネル: %1$s</string>
+    <string name="player_audio_info_path">保存場所: %1$s</string>
+    <string name="player_audio_info_size">合計サイズ: %1$s</string>
+    <string name="player_audio_info_duration">総再生時間: %1$s</string>
+    <string name="player_delete_confirm_title">作品の削除</string>
+    <string name="player_delete_confirm_desc">「%1$s」を端末ストレージから完全に削除しますか？この操作は元に戻せません。</string>
+    <string name="player_toast_deleted">ストレージから作品を削除しました。</string>
+
+    <!-- HiBy Style Elements -->
+    <string name="hiby_badge_bitperfect">DAC BIT-PERFECT</string>
+    <string name="hiby_tab_all">すべての作品</string>
+    <string name="hiby_tab_folders">フォルダー</string>
+    <string name="hiby_tab_cv">声優 (CV)</string>
+    <string name="hiby_mode_grid">スタッガードグリッド</string>
+    <string name="hiby_mode_list">コンパクトリスト</string>
 </resources>
