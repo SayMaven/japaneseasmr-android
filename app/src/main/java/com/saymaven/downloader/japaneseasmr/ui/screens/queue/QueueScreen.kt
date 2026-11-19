@@ -375,7 +375,8 @@ fun QueueScreen(
             items(queue, key = { it.rjid }) { item ->
                 QueueItemCard(
                     item = item,
-                    onDismiss = { viewModel.removeItem(item.rjid) }
+                    onDismiss = { viewModel.removeItem(item.rjid) },
+                    onCancel = { viewModel.cancelItem(item.rjid) }
                 )
             }
         }
@@ -490,7 +491,8 @@ fun QueueScreen(
 @Composable
 fun QueueItemCard(
     item: DownloadQueueItem,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onCancel: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -577,7 +579,20 @@ fun QueueItemCard(
                     }
                 }
 
-                if (item.status != DownloadStatus.DOWNLOADING && item.status != DownloadStatus.PROCESSING) {
+                if (item.status == DownloadStatus.DOWNLOADING || item.status == DownloadStatus.PROCESSING) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = onCancel,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Stop,
+                            contentDescription = stringResource(R.string.queue_action_cancel_current),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                } else {
                     Spacer(modifier = Modifier.width(6.dp))
                     IconButton(
                         onClick = onDismiss,

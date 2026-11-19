@@ -294,6 +294,10 @@ class QueueViewModel : ViewModel() {
         DownloadService.removeItem(rjid)
     }
 
+    fun cancelItem(rjid: String) {
+        DownloadService.cancelActiveDownload(rjid)
+    }
+
     private fun extractRjIds(input: String): List<String> {
         val tokens = input.split(Regex("[\\s,;]+"))
         val result = mutableListOf<String>()

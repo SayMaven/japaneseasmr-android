@@ -103,6 +103,7 @@ fun PlayerScreen(
     val isTranslating by viewModel.isTranslating.collectAsState()
     val translatedTitle by viewModel.translatedTitle.collectAsState()
     val translatedChapters by viewModel.translatedChapters.collectAsState()
+    val isOnlineStreaming by viewModel.isOnlineStreaming.collectAsState()
     val currentDisplayBadge by viewModel.currentDisplayBadge.collectAsState()
 
     val activity = context as? Activity
@@ -619,12 +620,17 @@ fun PlayerScreen(
                     }
                 }
 
-                // Shuffle Mode Button
-                IconButton(onClick = { viewModel.toggleShuffleMode() }) {
+                // Shuffle Mode Button (Disabled during online streaming)
+                IconButton(
+                    onClick = { if (!isOnlineStreaming) viewModel.toggleShuffleMode() },
+                    enabled = !isOnlineStreaming
+                ) {
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = stringResource(R.string.player_action_shuffle),
-                        tint = if (shuffleMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                        tint = if (isOnlineStreaming) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                               else if (shuffleMode) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                     )
                 }
             }

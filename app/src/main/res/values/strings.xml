@@ -437,4 +437,38 @@
     <string name="hiby_tab_cv">Voice Actors</string>
     <string name="hiby_mode_grid">Staggered Grid</string>
     <string name="hiby_mode_list">Compact List</string>
+
+    <!-- Phase 3 Refinements -->
+    <string name="browse_sort_added_date">Added Date</string>
+    <string name="browse_sort_catalog_date">Catalog Date</string>
+    <string name="browse_sort_sales">Sales / Downloads</string>
+    <string name="browse_sort_random">Random</string>
+    <string name="browse_sort_id">ID / RJ Code</string>
+    <string name="browse_sort_all_ages">All Ages</string>
+
+    <string name="browse_tab_all">All</string>
+    <string name="browse_detail_circle_cv">Circle | Voice Actors</string>
+    <string name="browse_detail_tags">Tags</string>
+    <string name="browse_detail_release_date">Release Date</string>
+    <string name="browse_detail_resource_files">File list</string>
+    <string name="browse_detail_related_works">Related Works</string>
+    <string name="browse_detail_sold">Sold: %1$s</string>
+    <string name="browse_detail_trans">Trans</string>
+    <string name="browse_detail_view_file">View File</string>
+
+    <string name="pagination_prev">Previous</string>
+    <string name="pagination_next">Next</string>
+    <string name="pagination_page_info">Page %1$d / %2$d</string>
+    <string name="pagination_jump_to">Jump to Page</string>
+    <string name="pagination_enter_page">Enter page number (1 - %1$d):</string>
+    <string name="pagination_go">Go</string>
+    <string name="pagination_jump_action">Jump</string>
+    <string name="pagination_items_total">%1$d items total</string>
+
+    <string name="queue_action_cancel_current">Cancel download</string>
+    <string name="player_stream_badge">STREAM</string>
+
+    <string name="translate_toggle_title">Translate Titles</string>
+    <string name="translate_active_toast">Translation enabled</string>
+    <string name="translate_inactive_toast">Original titles shown</string>
 </resources>

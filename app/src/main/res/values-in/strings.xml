@@ -437,4 +437,38 @@
     <string name="hiby_tab_cv">Pengisi Suara (CV)</string>
     <string name="hiby_mode_grid">Staggered Grid</string>
     <string name="hiby_mode_list">List Kompak</string>
+
+    <!-- Phase 3 Refinements -->
+    <string name="browse_sort_added_date">Tanggal Ditambahkan</string>
+    <string name="browse_sort_catalog_date">Tanggal Katalog</string>
+    <string name="browse_sort_sales">Penjualan / Unduhan</string>
+    <string name="browse_sort_random">Acak</string>
+    <string name="browse_sort_id">ID / Kode RJ</string>
+    <string name="browse_sort_all_ages">Semua Usia</string>
+
+    <string name="browse_tab_all">Semua</string>
+    <string name="browse_detail_circle_cv">Circle | Pengisi Suara</string>
+    <string name="browse_detail_tags">Tag Genre</string>
+    <string name="browse_detail_release_date">Tanggal Rilis</string>
+    <string name="browse_detail_resource_files">Berkas file</string>
+    <string name="browse_detail_related_works">Karya Terkait</string>
+    <string name="browse_detail_sold">Terjual: %1$s</string>
+    <string name="browse_detail_trans">Terjemah</string>
+    <string name="browse_detail_view_file">Buka Berkas</string>
+
+    <string name="pagination_prev">Sebelumnya</string>
+    <string name="pagination_next">Selanjutnya</string>
+    <string name="pagination_page_info">Halaman %1$d / %2$d</string>
+    <string name="pagination_jump_to">Loncat ke Halaman</string>
+    <string name="pagination_enter_page">Masukkan nomor halaman (1 - %1$d):</string>
+    <string name="pagination_go">Buka</string>
+    <string name="pagination_jump_action">Lompat</string>
+    <string name="pagination_items_total">%1$d karya total</string>
+
+    <string name="queue_action_cancel_current">Batalkan unduhan</string>
+    <string name="player_stream_badge">STREAM</string>
+
+    <string name="translate_toggle_title">Terjemahkan Judul</string>
+    <string name="translate_active_toast">Terjemahan aktif</string>
+    <string name="translate_inactive_toast">Judul asli ditampilkan</string>
 </resources>

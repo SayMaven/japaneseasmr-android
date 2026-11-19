@@ -443,4 +443,38 @@
     <string name="hiby_tab_cv">声優 (CV)</string>
     <string name="hiby_mode_grid">スタッガードグリッド</string>
     <string name="hiby_mode_list">コンパクトリスト</string>
+
+    <!-- Phase 3 Refinements -->
+    <string name="browse_sort_added_date">追加日</string>
+    <string name="browse_sort_catalog_date">カタログ日</string>
+    <string name="browse_sort_sales">販売数・DL数</string>
+    <string name="browse_sort_random">ランダム</string>
+    <string name="browse_sort_id">ID番号</string>
+    <string name="browse_sort_all_ages">全年齢</string>
+
+    <string name="browse_tab_all">すべて</string>
+    <string name="browse_detail_circle_cv">サークル | 声優</string>
+    <string name="browse_detail_tags">タグ</string>
+    <string name="browse_detail_release_date">発売日</string>
+    <string name="browse_detail_resource_files">ファイル一覧</string>
+    <string name="browse_detail_related_works">関連作品</string>
+    <string name="browse_detail_sold">販売数: %1$s</string>
+    <string name="browse_detail_trans">翻訳</string>
+    <string name="browse_detail_view_file">ファイルを表示</string>
+
+    <string name="pagination_prev">前へ</string>
+    <string name="pagination_next">次へ</string>
+    <string name="pagination_page_info">%1$d / %2$d ページ</string>
+    <string name="pagination_jump_to">ページ移動</string>
+    <string name="pagination_enter_page">ページ番号を入力 (1 - %1$d):</string>
+    <string name="pagination_go">移動</string>
+    <string name="pagination_jump_action">移動</string>
+    <string name="pagination_items_total">合計 %1$d 件</string>
+
+    <string name="queue_action_cancel_current">ダウンロード中止</string>
+    <string name="player_stream_badge">STREAM</string>
+
+    <string name="translate_toggle_title">タイトル翻訳</string>
+    <string name="translate_active_toast">翻訳が有効化されました</string>
+    <string name="translate_inactive_toast">元のタイトルを表示中</string>
 </resources>

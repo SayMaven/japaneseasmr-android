@@ -129,18 +129,22 @@ object AsmrOneApiService {
         val reviewCount = if (obj.has("review_count")) obj.optInt("review_count") else null
         val dlCount = if (obj.has("dl_count")) obj.optInt("dl_count") else null
 
-        // Tags / Genres
+        // Tags / Genres (localized to English)
         val tagsList = mutableListOf<String>()
         val tagsArray = obj.optJSONArray("tags")
         if (tagsArray != null) {
             for (i in 0 until tagsArray.length()) {
                 val tagObj = tagsArray.optJSONObject(i)
                 if (tagObj != null) {
-                    val tagName = tagObj.optString("name", "").trim()
-                    if (tagName.isNotEmpty()) tagsList.add(tagName)
+                    val tagId = if (tagObj.has("id")) tagObj.optInt("id") else null
+                    val directEn = tagObj.optJSONObject("i18n")?.optJSONObject("en-us")?.optString("name", "")?.trim()
+                    val rawName = tagObj.optString("name", "").trim()
+                    val localized = if (!directEn.isNullOrEmpty()) directEn else com.saymaven.downloader.japaneseasmr.service.TagLocalizer.localize(tagId, rawName)
+                    if (localized.isNotEmpty()) tagsList.add(localized)
                 } else {
-                    val tagName = tagsArray.optString(i, "").trim()
-                    if (tagName.isNotEmpty()) tagsList.add(tagName)
+                    val rawName = tagsArray.optString(i, "").trim()
+                    val localized = com.saymaven.downloader.japaneseasmr.service.TagLocalizer.localize(null, rawName)
+                    if (localized.isNotEmpty()) tagsList.add(localized)
                 }
             }
         }
@@ -195,6 +199,61 @@ object AsmrOneApiService {
         return worksList
     }
 
+    private fun parseWorksPage(rawJson: String, defaultPage: Int, pageSize: Int): AsmrOneWorksPage {
+        val works = parseWorksList(rawJson)
+        var currentPage = defaultPage
+        var totalCount = 0
+        var totalPages = 1
+
+        try {
+            val root = JSONObject(rawJson)
+            val pagObj = root.optJSONObject("pagination")
+            if (pagObj != null) {
+                currentPage = pagObj.optInt("currentPage", defaultPage)
+                val pSize = pagObj.optInt("pageSize", pageSize).coerceAtLeast(1)
+                totalCount = pagObj.optInt("total", 0)
+                if (totalCount > 0) {
+                    totalPages = kotlin.math.ceil(totalCount.toDouble() / pSize.toDouble()).toInt().coerceAtLeast(1)
+                }
+            }
+        } catch (ignored: Exception) {
+        }
+
+        if (totalCount == 0 && works.isNotEmpty()) {
+            totalCount = works.size
+            totalPages = currentPage.coerceAtLeast(1)
+        }
+
+        return AsmrOneWorksPage(
+            works = works,
+            currentPage = currentPage,
+            totalCount = totalCount,
+            totalPages = totalPages
+        )
+    }
+
+    /**
+     * Get works catalog page with real pagination total count.
+     */
+    suspend fun getWorksPage(
+        page: Int = 1,
+        pageSize: Int = 20,
+        order: String = "create_date",
+        sort: String = "desc",
+        subtitle: Int = 0
+    ): Result<AsmrOneWorksPage> = withContext(Dispatchers.IO) {
+        try {
+            val endpoint = "/api/works?page=$page&pageSize=$pageSize&order=$order&sort=$sort&subtitle=$subtitle"
+            val responseBody = executeRequest(endpoint)
+                ?: return@withContext Result.failure(Exception("Failed to fetch works from server"))
+
+            val pageData = parseWorksPage(responseBody, page, pageSize)
+            Result.success(pageData)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     /**
      * Get works catalog with pagination and sorting.
      */
@@ -205,16 +264,7 @@ object AsmrOneApiService {
         sort: String = "desc",
         subtitle: Int = 0
     ): Result<List<AsmrOneWork>> = withContext(Dispatchers.IO) {
-        try {
-            val endpoint = "/api/works?page=$page&pageSize=$pageSize&order=$order&sort=$sort&subtitle=$subtitle"
-            val responseBody = executeRequest(endpoint)
-                ?: return@withContext Result.failure(Exception("Failed to fetch works from server"))
-
-            val list = parseWorksList(responseBody)
-            Result.success(list)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        getWorksPage(page, pageSize, order, sort, subtitle).map { it.works }
     }
 
     /**
@@ -235,6 +285,28 @@ object AsmrOneApiService {
     }
 
     /**
+     * Search works page by keyword with real pagination total count.
+     */
+    suspend fun searchWorksPage(
+        keyword: String,
+        page: Int = 1,
+        pageSize: Int = 20,
+        subtitle: Int = 0
+    ): Result<AsmrOneWorksPage> = withContext(Dispatchers.IO) {
+        try {
+            val encodedKeyword = URLEncoder.encode(keyword.trim(), "UTF-8")
+            val endpoint = "/api/search/$encodedKeyword?page=$page&pageSize=$pageSize&subtitle=$subtitle"
+            val responseBody = executeRequest(endpoint)
+                ?: return@withContext Result.failure(Exception("Failed to search works from server"))
+
+            val pageData = parseWorksPage(responseBody, page, pageSize)
+            Result.success(pageData)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Search works by keyword (CV, RJ code, or title).
      */
     suspend fun searchWorks(
@@ -243,17 +315,78 @@ object AsmrOneApiService {
         pageSize: Int = 20,
         subtitle: Int = 0
     ): Result<List<AsmrOneWork>> = withContext(Dispatchers.IO) {
-        try {
-            val encodedKeyword = URLEncoder.encode(keyword.trim(), "UTF-8")
-            val endpoint = "/api/search/$encodedKeyword?page=$page&pageSize=$pageSize&subtitle=$subtitle"
-            val responseBody = executeRequest(endpoint)
-                ?: return@withContext Result.failure(Exception("Failed to search works from server"))
+        searchWorksPage(keyword, page, pageSize, subtitle).map { it.works }
+    }
 
-            val list = parseWorksList(responseBody)
-            Result.success(list)
+    /**
+     * Get file and folder tree for a work for KikoFlu-style Resource Files view.
+     */
+    suspend fun getWorkFileTree(workId: Int): Result<List<AsmrOneFileNode>> = withContext(Dispatchers.IO) {
+        try {
+            val endpoint = "/api/tracks/$workId"
+            val responseBody = executeRequest(endpoint)
+                ?: return@withContext Result.failure(Exception("Failed to fetch file tree for work $workId"))
+
+            val array = JSONArray(responseBody)
+            val tree = parseFileNodes(array, DEFAULT_HOST)
+            Result.success(tree)
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private fun parseFileNodes(jsonArray: JSONArray, host: String): List<AsmrOneFileNode> {
+        val list = mutableListOf<AsmrOneFileNode>()
+        for (i in 0 until jsonArray.length()) {
+            val obj = jsonArray.optJSONObject(i) ?: continue
+            val rawType = obj.optString("type", "file").lowercase()
+            val title = obj.optString("title", "").ifBlank {
+                obj.optString("name", "Item")
+            }
+            val hash = obj.optString("hash", "").ifBlank { null }
+            var streamUrl = obj.optString("mediaStreamUrl", "")
+            if (streamUrl.isBlank() && hash != null) {
+                streamUrl = "$host/api/media/stream/$hash"
+            }
+            if (streamUrl.isNotEmpty() && !streamUrl.startsWith("http")) {
+                streamUrl = if (streamUrl.startsWith("/")) "$host$streamUrl" else "$host/$streamUrl"
+            }
+
+            if (rawType == "folder") {
+                val rawChildren = obj.optJSONArray("children")
+                val children = if (rawChildren != null) parseFileNodes(rawChildren, host) else emptyList()
+                list.add(
+                    AsmrOneFileNode(
+                        title = title,
+                        type = "folder",
+                        hash = hash,
+                        streamUrl = streamUrl,
+                        children = children
+                    )
+                )
+            } else {
+                val ext = title.substringAfterLast('.', "").lowercase()
+                val detectedType = when {
+                    rawType.contains("audio") || ext in listOf("mp3", "wav", "flac", "m4a", "aac", "ogg") -> "audio"
+                    rawType.contains("image") || ext in listOf("jpg", "jpeg", "png", "webp", "gif") -> "image"
+                    rawType.contains("text") || ext in listOf("txt", "pdf", "lrc", "srt", "vtt") -> "text"
+                    else -> "other"
+                }
+                val duration = obj.optLong("duration", 0L)
+                val size = obj.optLong("size", 0L)
+                list.add(
+                    AsmrOneFileNode(
+                        title = title,
+                        type = detectedType,
+                        hash = hash,
+                        streamUrl = streamUrl,
+                        duration = duration,
+                        size = size
+                    )
+                )
+            }
+        }
+        return list
     }
 
     /**
@@ -328,6 +461,13 @@ object AsmrOneApiService {
     }
 }
 
+data class AsmrOneWorksPage(
+    val works: List<AsmrOneWork>,
+    val currentPage: Int,
+    val totalCount: Int,
+    val totalPages: Int
+)
+
 /**
  * Audio track representation from asmr.one API
  */
@@ -338,4 +478,17 @@ data class AsmrOneTrack(
     val duration: Long = 0L,
     val size: Long = 0L,
     val type: String = "audio"
+)
+
+/**
+ * File node representation (folder or file) for KikoFlu-style Resource Files view
+ */
+data class AsmrOneFileNode(
+    val title: String,
+    val type: String, // "folder", "audio", "image", "text", "other"
+    val hash: String? = null,
+    val streamUrl: String = "",
+    val duration: Long = 0L,
+    val size: Long = 0L,
+    val children: List<AsmrOneFileNode> = emptyList()
 )

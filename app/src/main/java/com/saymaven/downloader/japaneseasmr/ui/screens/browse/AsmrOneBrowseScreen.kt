@@ -4,6 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,7 +15,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -36,7 +37,10 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.model.AsmrOneWork
-import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneTrack
+import com.saymaven.downloader.japaneseasmr.service.TagLocalizer
+import com.saymaven.downloader.japaneseasmr.ui.components.PaginationBar
+import com.saymaven.downloader.japaneseasmr.ui.components.SortOptionItem
+import com.saymaven.downloader.japaneseasmr.ui.components.SortOptionsSheet
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +49,7 @@ fun AsmrOneBrowseScreen(
     viewModel: AsmrOneBrowseViewModel,
     playerViewModel: PlayerViewModel,
     onOpenDrawer: () -> Unit,
+    onOpenPlayer: () -> Unit = {},
     onSelectWorkForDownload: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -53,34 +58,52 @@ fun AsmrOneBrowseScreen(
 
     val works by viewModel.works.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
-    val hasMore by viewModel.hasMore.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val currentTab by viewModel.currentTab.collectAsState()
     val sortField by viewModel.sortField.collectAsState()
     val sortDirection by viewModel.sortDirection.collectAsState()
+    val currentPage by viewModel.currentPage.collectAsState()
+    val totalPages by viewModel.totalPages.collectAsState()
+    val totalCount by viewModel.totalCount.collectAsState()
 
     val selectedWork by viewModel.selectedWork.collectAsState()
     val workTracks by viewModel.workTracks.collectAsState()
+    val fileTree by viewModel.fileTree.collectAsState()
     val isLoadingTracks by viewModel.isLoadingTracks.collectAsState()
-    val tracksError by viewModel.tracksError.collectAsState()
+
+    val isTranslationActive by viewModel.isTranslationActive.collectAsState()
+    val translatedTitles by viewModel.translatedTitles.collectAsState()
 
     var isSearchExpanded by remember { mutableStateOf(false) }
     var showSortSheet by remember { mutableStateOf(false) }
-    val gridState = rememberLazyStaggeredGridState()
+    var isListView by remember { mutableStateOf(false) }
 
-    // Detect when scrolling near the bottom to trigger loadMore
-    LaunchedEffect(gridState) {
-        snapshotFlow {
-            val totalItems = gridState.layoutInfo.totalItemsCount
-            val lastVisibleItemIndex = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            totalItems > 0 && lastVisibleItemIndex >= totalItems - 6
-        }.collect { shouldLoadMore ->
-            if (shouldLoadMore && !isLoading && !isLoadingMore && hasMore) {
-                viewModel.loadMore()
-            }
+    // If a work is selected, show KikoFlu-style full Work Detail screen
+    if (selectedWork != null) {
+        val work = selectedWork!!
+        BackHandler {
+            viewModel.selectWork(null)
         }
+        AsmrOneWorkDetailScreen(
+            work = work,
+            fileTree = fileTree,
+            audioTracks = workTracks,
+            isLoadingFiles = isLoadingTracks,
+            playerViewModel = playerViewModel,
+            onBack = { viewModel.selectWork(null) },
+            onOpenPlayer = onOpenPlayer,
+            onDownload = {
+                viewModel.enqueueDownload(work)
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.browse_toast_enqueued, work.rjid),
+                    Toast.LENGTH_SHORT
+                ).show()
+            },
+            modifier = modifier
+        )
+        return
     }
 
     Column(
@@ -88,7 +111,7 @@ fun AsmrOneBrowseScreen(
             .fillMaxSize()
             .padding(horizontal = 12.dp)
     ) {
-        // Top Navigation Header with Hamburger, Popular & Recommended Pills, Search and Sort buttons
+        // Top Navigation Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -109,45 +132,119 @@ fun AsmrOneBrowseScreen(
             Spacer(modifier = Modifier.width(6.dp))
 
             if (!isSearchExpanded) {
-                // Two Category Pill Buttons: [Popular] and [Recommended]
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val isPopular = (currentTab == BrowseTabType.POPULAR)
+                // Category Dropdown Button (Semua / Populer / Rekomendasi)
+                var showTabDropdown by remember { mutableStateOf(false) }
+                val currentTabLabel = when (currentTab) {
+                    BrowseTabType.ALL -> stringResource(R.string.browse_tab_all)
+                    BrowseTabType.POPULAR -> stringResource(R.string.browse_btn_popular)
+                    BrowseTabType.RECOMMENDED -> stringResource(R.string.browse_btn_recommended)
+                }
+
+                Box(modifier = Modifier.weight(1f)) {
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = if (isPopular) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable { viewModel.setTab(BrowseTabType.POPULAR) }
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showTabDropdown = true }
                     ) {
-                        Text(
-                            text = stringResource(R.string.browse_btn_popular),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isPopular) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isPopular) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = currentTabLabel,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
-                    val isRecommended = (currentTab == BrowseTabType.RECOMMENDED)
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = if (isRecommended) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable { viewModel.setTab(BrowseTabType.RECOMMENDED) }
+                    DropdownMenu(
+                        expanded = showTabDropdown,
+                        onDismissRequest = { showTabDropdown = false }
                     ) {
-                        Text(
-                            text = stringResource(R.string.browse_btn_recommended),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isRecommended) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isRecommended) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.browse_tab_all),
+                                    fontWeight = if (currentTab == BrowseTabType.ALL) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                showTabDropdown = false
+                                viewModel.setTab(BrowseTabType.ALL)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.browse_btn_popular),
+                                    fontWeight = if (currentTab == BrowseTabType.POPULAR) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                showTabDropdown = false
+                                viewModel.setTab(BrowseTabType.POPULAR)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.browse_btn_recommended),
+                                    fontWeight = if (currentTab == BrowseTabType.RECOMMENDED) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                showTabDropdown = false
+                                viewModel.setTab(BrowseTabType.RECOMMENDED)
+                            }
                         )
                     }
+                }
+
+                // Dynamic Title Translate Button
+                IconButton(
+                    onClick = { viewModel.toggleTranslation(context) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Translate,
+                        contentDescription = stringResource(R.string.translate_toggle_title),
+                        tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // View Toggle Button (Grid / List)
+                IconButton(
+                    onClick = { isListView = !isListView },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isListView) Icons.Default.GridView else Icons.Default.ViewAgenda,
+                        contentDescription = "Toggle View",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Sort Options Button
+                IconButton(
+                    onClick = { showSortSheet = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Sort,
+                        contentDescription = stringResource(R.string.browse_sort_title),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 // Search Icon Button
@@ -158,18 +255,6 @@ fun AsmrOneBrowseScreen(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Sort Icon Button (KikoFlu style sort options)
-                IconButton(
-                    onClick = { showSortSheet = true },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FilterList,
-                        contentDescription = stringResource(R.string.browse_sort_title),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -207,7 +292,7 @@ fun AsmrOneBrowseScreen(
             modifier = Modifier.padding(bottom = 6.dp)
         )
 
-        // Main Content Area
+        // Main Content Area with Grid or List and Pagination
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -249,7 +334,7 @@ fun AsmrOneBrowseScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.loadInitial() }) {
+                        Button(onClick = { viewModel.loadPage(1) }) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(stringResource(R.string.browse_action_retry))
@@ -285,436 +370,116 @@ fun AsmrOneBrowseScreen(
                     }
                 }
                 else -> {
-                    LazyVerticalStaggeredGrid(
-                        columns = StaggeredGridCells.Fixed(2),
-                        state = gridState,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalItemSpacing = 8.dp,
-                        contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(works, key = { it.rjid }) { work ->
-                            AsmrOneWorkCard(
-                                work = work,
-                                onCopyRj = {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = ClipData.newPlainText("RJ Code", work.rjid)
-                                    clipboard.setPrimaryClip(clip)
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.browse_toast_rj_copied, work.rjid),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                },
-                                onDownloadClick = {
-                                    viewModel.enqueueDownload(work)
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.browse_toast_enqueued, work.rjid),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                },
-                                onCardClick = {
-                                    viewModel.selectWork(work)
-                                }
-                            )
-                        }
-
-                        if (isLoadingMore) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (isListView) {
+                                // KikoFlu List View style
+                                LazyColumn(
+                                    contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxSize()
                                 ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // KikoFlu-style Sort Options Bottom Sheet
-    if (showSortSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showSortSheet = false },
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-            containerColor = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Sort,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.browse_sort_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    IconButton(onClick = { showSortSheet = false }) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = stringResource(R.string.browse_sort_field),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                AsmrSortField.values().forEach { field ->
-                    val isSelected = (sortField == field)
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                viewModel.setSort(field, sortDirection)
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = { viewModel.setSort(field, sortDirection) }
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = stringResource(field.labelRes),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
-
-                Text(
-                    text = stringResource(R.string.browse_sort_direction),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                AsmrSortDirection.values().forEach { dir ->
-                    val isSelected = (sortDirection == dir)
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                viewModel.setSort(sortField, dir)
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = { viewModel.setSort(sortField, dir) }
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = stringResource(dir.labelRes),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-        }
-    }
-
-    // Work Detail & Online Audio Streaming ModalBottomSheet
-    if (selectedWork != null) {
-        val work = selectedWork!!
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.selectWork(null) },
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-            containerColor = MaterialTheme.colorScheme.surface
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
-                    .fillMaxHeight(0.85f)
-            ) {
-                // Header with Cover thumbnail, Title, Circle, CV, and Actions
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(work.coverUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = work.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(90.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "[${work.rjid}] ${work.title}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        if (work.circle != "-") {
-                            Text(
-                                text = work.circle,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        if (work.cv != "-") {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
-                            ) {
-                                Text(
-                                    text = work.cv,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Genre Tags in Detail Sheet
-                if (work.tags.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        work.tags.forEach { tag ->
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
-                            ) {
-                                Text(
-                                    text = tag,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Action Buttons: Download Offline and Copy RJ
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            viewModel.enqueueDownload(work)
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.browse_toast_enqueued, work.rjid),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.browse_detail_download_btn))
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("RJ Code", work.rjid)
-                            clipboard.setPrimaryClip(clip)
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.browse_toast_rj_copied, work.rjid),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    ) {
-                        Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("RJ")
-                    }
-                }
-
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-
-                // Tracks Section Header
-                Text(
-                    text = stringResource(R.string.browse_detail_tracks),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Track list content
-                when {
-                    isLoadingTracks -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                        }
-                    }
-                    tracksError != null -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = tracksError ?: "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = { viewModel.loadTracks(work.id) }) {
-                                Text(stringResource(R.string.browse_action_retry))
-                            }
-                        }
-                    }
-                    workTracks.isEmpty() -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(100.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = stringResource(R.string.browse_empty_title),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    else -> {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            items(workTracks) { track ->
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        IconButton(
-                                            onClick = {
-                                                playerViewModel.playOnlineStream(
-                                                    rjid = work.rjid,
-                                                    workTitle = work.title,
-                                                    trackTitle = track.title,
-                                                    cv = work.cv,
-                                                    streamUrl = track.streamUrl,
-                                                    coverUrl = work.coverUrl
-                                                )
+                                    items(works, key = { it.rjid }) { work ->
+                                        val displayTitle = if (isTranslationActive) {
+                                            translatedTitles[work.rjid] ?: work.title
+                                        } else {
+                                            work.title
+                                        }
+                                        AsmrOneWorkListItem(
+                                            work = work,
+                                            displayTitle = displayTitle,
+                                            onCopyRj = {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                val clip = ClipData.newPlainText("RJ Code", work.rjid)
+                                                clipboard.setPrimaryClip(clip)
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                 Toast.makeText(
                                                     context,
-                                                    context.getString(R.string.browse_stream_playing, track.title),
+                                                    context.getString(R.string.browse_toast_rj_copied, work.rjid),
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             },
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.PlayArrow,
-                                                contentDescription = "Play",
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
+                                            onDownloadClick = {
+                                                viewModel.enqueueDownload(work)
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.browse_toast_enqueued, work.rjid),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            },
+                                            onCardClick = {
+                                                viewModel.selectWork(work)
+                                            }
+                                        )
+                                    }
 
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = track.title,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Medium,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
+                                    item {
+                                        PaginationBar(
+                                            currentPage = currentPage,
+                                            totalPages = totalPages,
+                                            totalCount = totalCount,
+                                            onPageSelected = { viewModel.goToPage(it) },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 10.dp, bottom = 20.dp)
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Pinterest Grid style
+                                LazyVerticalStaggeredGrid(
+                                    columns = StaggeredGridCells.Fixed(2),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalItemSpacing = 8.dp,
+                                    contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(works, key = { it.rjid }) { work ->
+                                        val displayTitle = if (isTranslationActive) {
+                                            translatedTitles[work.rjid] ?: work.title
+                                        } else {
+                                            work.title
                                         }
+                                        AsmrOneWorkCard(
+                                            work = work,
+                                            displayTitle = displayTitle,
+                                            onCopyRj = {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                val clip = ClipData.newPlainText("RJ Code", work.rjid)
+                                                clipboard.setPrimaryClip(clip)
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.browse_toast_rj_copied, work.rjid),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            },
+                                            onDownloadClick = {
+                                                viewModel.enqueueDownload(work)
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.browse_toast_enqueued, work.rjid),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            },
+                                            onCardClick = {
+                                                viewModel.selectWork(work)
+                                            }
+                                        )
+                                    }
+
+                                    item(span = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.FullLine) {
+                                        PaginationBar(
+                                            currentPage = currentPage,
+                                            totalPages = totalPages,
+                                            totalCount = totalCount,
+                                            onPageSelected = { viewModel.goToPage(it) },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 10.dp, bottom = 20.dp)
+                                        )
                                     }
                                 }
                             }
@@ -724,15 +489,44 @@ fun AsmrOneBrowseScreen(
             }
         }
     }
+
+    // Sort Options Bottom Sheet
+    if (showSortSheet) {
+        val fieldOptions = remember {
+            AsmrSortField.values().map {
+                SortOptionItem(value = it, labelRes = it.labelRes)
+            }
+        }
+        val directionOptions = remember {
+            AsmrSortDirection.values().map {
+                SortOptionItem(value = it, labelRes = it.labelRes)
+            }
+        }
+
+        SortOptionsSheet(
+            title = stringResource(R.string.browse_sort_title),
+            fieldOptions = fieldOptions,
+            selectedField = sortField,
+            onFieldSelected = { field ->
+                viewModel.setSort(field, sortDirection)
+            },
+            directionOptions = directionOptions,
+            selectedDirection = sortDirection,
+            onDirectionSelected = { dir ->
+                viewModel.setSort(sortField, dir)
+            },
+            onDismissRequest = { showSortSheet = false }
+        )
+    }
 }
 
 /**
  * Pinterest-style work card benchmarked from KikoFlu's EnhancedWorkCard.
- * Uses 1.3:1 aspect ratio with full title, plain circle, pill CV, and pill genre tags.
  */
 @Composable
 fun AsmrOneWorkCard(
     work: AsmrOneWork,
+    displayTitle: String,
     onCopyRj: () -> Unit,
     onDownloadClick: () -> Unit,
     onCardClick: () -> Unit,
@@ -771,7 +565,7 @@ fun AsmrOneWorkCard(
                 // Top-Left Badge: RJ Code
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                     modifier = Modifier
                         .padding(6.dp)
                         .align(Alignment.TopStart)
@@ -852,15 +646,15 @@ fun AsmrOneWorkCard(
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Title - Full title without truncation
+                // Title
                 Text(
-                    text = work.title,
+                    text = displayTitle,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                // Circle Name - Plain text, no badge pill
+                // Circle Name
                 if (work.circle.isNotBlank() && work.circle != "-") {
                     Text(
                         text = work.circle,
@@ -885,7 +679,7 @@ fun AsmrOneWorkCard(
                     }
                 }
 
-                // Genre / Tags - Pill Badges in FlowRow
+                // Genre / Tags - English Pill Badges
                 if (work.tags.isNotEmpty()) {
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(
@@ -893,13 +687,14 @@ fun AsmrOneWorkCard(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        work.tags.forEach { tag ->
+                        work.tags.forEach { rawTag ->
+                            val localizedTag = TagLocalizer.localize(null, rawTag)
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
                             ) {
                                 Text(
-                                    text = tag,
+                                    text = localizedTag,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -917,7 +712,6 @@ fun AsmrOneWorkCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Copy RJ Button
                     FilledTonalButton(
                         onClick = onCopyRj,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -937,7 +731,6 @@ fun AsmrOneWorkCard(
                         )
                     }
 
-                    // Direct Download Button
                     IconButton(
                         onClick = onDownloadClick,
                         modifier = Modifier.size(32.dp)
@@ -949,6 +742,171 @@ fun AsmrOneWorkCard(
                             modifier = Modifier.size(20.dp)
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * KikoFlu-style Horizontal Work List Item matching Screenshot 5.
+ */
+@Composable
+fun AsmrOneWorkListItem(
+    work: AsmrOneWork,
+    displayTitle: String,
+    onCopyRj: () -> Unit,
+    onDownloadClick: () -> Unit,
+    onCardClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardShape = RoundedCornerShape(12.dp)
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(cardShape)
+            .clickable { onCardClick() },
+        shape = cardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Square Cover image on left with RJ tag overlay
+            Box(
+                modifier = Modifier
+                    .size(92.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(work.coverUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = work.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(bottomEnd = 6.dp),
+                    color = Color.Black.copy(alpha = 0.75f),
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    Text(
+                        text = work.rjid,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Right side metadata column
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = displayTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                if (work.circle.isNotBlank() && work.circle != "-") {
+                    Text(
+                        text = work.circle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (!work.releaseDate.isNullOrBlank()) {
+                    Text(
+                        text = work.releaseDate,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
+
+                if (work.cv.isNotBlank() && work.cv != "-") {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+                    ) {
+                        Text(
+                            text = work.cv,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                if (work.tags.isNotEmpty()) {
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        work.tags.forEach { rawTag ->
+                            val localizedTag = TagLocalizer.localize(null, rawTag)
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
+                            ) {
+                                Text(
+                                    text = localizedTag,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Quick Download & Copy RJ buttons on right
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                IconButton(
+                    onClick = onDownloadClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = stringResource(R.string.browse_action_download),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onCopyRj,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = stringResource(R.string.browse_action_copy_rj),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }

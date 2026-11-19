@@ -50,6 +50,18 @@ class DownloadService : Service() {
         private val _logsState = MutableStateFlow<List<String>>(emptyList())
         val logsState = _logsState.asStateFlow()
 
+        @Volatile private var activeItemJob: Job? = null
+        @Volatile private var activeItemRjid: String? = null
+
+        fun updateItem(rjid: String, transform: (DownloadQueueItem) -> DownloadQueueItem) {
+            val current = _queueState.value.toMutableList()
+            val index = current.indexOfFirst { it.rjid.equals(rjid, ignoreCase = true) }
+            if (index != -1) {
+                current[index] = transform(current[index])
+                _queueState.value = current
+            }
+        }
+
         fun log(msg: String) {
             val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
             val formatted = "[$time] $msg"
@@ -93,6 +105,23 @@ class DownloadService : Service() {
             current.removeAll { it.rjid.equals(rjid, ignoreCase = true) }
             _queueState.value = current
             log(DownloadLogHelper.removedFromQueue(rjid))
+        }
+
+        fun cancelActiveDownload(rjid: String) {
+            val target = rjid.trim()
+            updateItem(target) {
+                it.copy(
+                    status = DownloadStatus.CANCELLED,
+                    statusText = "Dibatalkan",
+                    progress = 0f,
+                    speed = "-",
+                    eta = "-"
+                )
+            }
+            if (activeItemRjid.equals(target, ignoreCase = true)) {
+                activeItemJob?.cancel()
+                log("Unduhan $target dibatalkan oleh pengguna.")
+            }
         }
 
         fun startDownload(context: Context) {
@@ -178,6 +207,14 @@ class DownloadService : Service() {
             }
 
             val itemRjid = nextItem.rjid
+            activeItemRjid = itemRjid
+
+            val initialCheckStatus = _queueState.value.firstOrNull { it.rjid == itemRjid }?.status
+            if (initialCheckStatus == DownloadStatus.CANCELLED) {
+                activeItemRjid = null
+                continue
+            }
+
             val totalInQueue = _queueState.value.size
             val finishedCount = _queueState.value.count {
                 it.status == DownloadStatus.COMPLETED || it.status == DownloadStatus.FAILED || it.status == DownloadStatus.CANCELLED
@@ -320,6 +357,11 @@ class DownloadService : Service() {
             val fileExtension = sourceExtension
 
             for (tIdx in tracks.indices) {
+                if (_queueState.value.firstOrNull { it.rjid == itemRjid }?.status == DownloadStatus.CANCELLED) {
+                    isFailed = true
+                    log("Unduhan $itemRjid dibatalkan.")
+                    break
+                }
                 val track = tracks[tIdx]
                 val trackExt = when {
                     track.url.contains(".m3u8", ignoreCase = true) -> "m4a"
@@ -346,6 +388,9 @@ class DownloadService : Service() {
                     parallelConnections = parallelConn,
                     referer = track.referer,
                     onProgress = { pct, speed, eta, downStr, totStr ->
+                        if (_queueState.value.firstOrNull { it.rjid == itemRjid }?.status == DownloadStatus.CANCELLED) {
+                            return@downloadTrack
+                        }
                         val overallPct = (tIdx.toFloat() + pct) / tracks.size.toFloat()
                         updateItem(itemRjid) {
                             it.copy(
@@ -378,6 +423,18 @@ class DownloadService : Service() {
                 }
             }
 
+            val isCancelled = (_queueState.value.firstOrNull { it.rjid == itemRjid }?.status == DownloadStatus.CANCELLED)
+            if (isCancelled) {
+                tempDir.listFiles()?.forEach { f ->
+                    if (f.name.startsWith(itemRjid)) {
+                        try { f.delete() } catch (ignored: Exception) {}
+                    }
+                }
+                log("Berkas sementara untuk $itemRjid dibersihkan.")
+                activeItemRjid = null
+                continue
+            }
+
             if (isFailed || downloadedTracks.isEmpty()) {
                 updateItem(itemRjid) {
                     it.copy(
@@ -387,6 +444,7 @@ class DownloadService : Service() {
                     )
                 }
                 log(DownloadLogHelper.processFailed(itemRjid))
+                activeItemRjid = null
                 continue
             }
 
@@ -490,20 +548,12 @@ class DownloadService : Service() {
 
             downloadedTracks.forEach { it.delete() }
             coverFile.delete()
+            activeItemRjid = null
         }
 
         log("===================================================")
         log(DownloadLogHelper.allCompleted())
         _isDownloading.value = false
-    }
-
-    private fun updateItem(rjid: String, transform: (DownloadQueueItem) -> DownloadQueueItem) {
-        val current = _queueState.value.toMutableList()
-        val index = current.indexOfFirst { it.rjid.equals(rjid, ignoreCase = true) }
-        if (index != -1) {
-            current[index] = transform(current[index])
-            _queueState.value = current
-        }
     }
 
     private fun buildNotification(content: String, progress: Int, indeterminate: Boolean): android.app.Notification {

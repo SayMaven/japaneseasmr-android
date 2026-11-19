@@ -44,6 +44,23 @@ object TranslationService {
         memoryCache.clear()
     }
 
+    /**
+     * Resolves target translation language based on active UI app language or system locale.
+     */
+    fun getActiveTargetLanguage(context: Context): String {
+        val lang = com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager.getFastCachedLanguage(context).lowercase()
+        val effectiveLang = if (lang == "system") {
+            java.util.Locale.getDefault().language.lowercase()
+        } else lang
+
+        return when {
+            effectiveLang.startsWith("in") || effectiveLang.startsWith("id") -> "id"
+            effectiveLang.startsWith("zh") -> "zh-CN"
+            effectiveLang.startsWith("ja") -> "ja"
+            else -> "en"
+        }
+    }
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(6, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)

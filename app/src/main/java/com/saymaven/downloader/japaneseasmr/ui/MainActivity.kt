@@ -376,6 +376,7 @@ class MainActivity : ComponentActivity() {
                                         viewModel = browseViewModel,
                                         playerViewModel = playerViewModel,
                                         onOpenDrawer = { drawerScope.launch { drawerState.open() } },
+                                        onOpenPlayer = { isPlayerExpanded = true },
                                         onSelectWorkForDownload = { rjid ->
                                             queueViewModel.onInputChanged(rjid)
                                             currentTab = NavTab.QUEUE

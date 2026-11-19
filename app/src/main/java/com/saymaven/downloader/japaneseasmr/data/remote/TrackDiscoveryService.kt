@@ -131,15 +131,7 @@ object TrackDiscoveryService {
         }
 
         // =========================================================================
-        // 1. TAHAP 1: PROBING SUMBER UTAMA (JapaneseASMR weeab0o)
-        // =========================================================================
-        val jasmrTracks = probeJapaneseAsmrTracks(cleanId, preferredFormat)
-        if (jasmrTracks.isNotEmpty()) {
-            return@withContext jasmrTracks
-        }
-
-        // =========================================================================
-        // 2. TAHAP 2: FALLBACK KE SUMBER KEDUA (asmr.one API via Smart Filter)
+        // 1. TAHAP 1: SUMBER UTAMA (asmr.one API via Smart Filter)
         // =========================================================================
         val numericId = cleanId.replace(Regex("^[A-Za-z]+"), "")
         if (numericId.isNotBlank()) {
@@ -150,6 +142,14 @@ object TrackDiscoveryService {
                     return@withContext filteredTracks
                 }
             }
+        }
+
+        // =========================================================================
+        // 2. TAHAP 2: FALLBACK KE SUMBER KEDUA (JapaneseASMR weeab0o)
+        // =========================================================================
+        val jasmrTracks = probeJapaneseAsmrTracks(cleanId, preferredFormat)
+        if (jasmrTracks.isNotEmpty()) {
+            return@withContext jasmrTracks
         }
 
         // =========================================================================

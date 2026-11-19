@@ -23,6 +23,7 @@ import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
 import com.saymaven.downloader.japaneseasmr.data.model.SourceType
+import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneTrack
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
 import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
@@ -186,6 +187,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun setSort(type: PlaylistSortType, isAscending: Boolean) {
+        _sortState.value = PlaylistSortState(type = type, isAscending = isAscending)
+        sp.edit()
+            .putString("playlist_sort_type", type.name)
+            .putBoolean("playlist_sort_asc", isAscending)
+            .apply()
+    }
+
     private fun parseFileSizeToBytes(sizeStr: String?): Long {
         if (sizeStr.isNullOrBlank()) return 0L
         return try {
@@ -270,8 +279,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _currentRjId = MutableStateFlow<String?>(if (isAutoResumeActive) sp.getString("cached_rjid", null) else null)
     val currentRjId = _currentRjId.asStateFlow()
 
-    val currentDisplayBadge = combine(_currentRjId, _playlist) { rj, list ->
+    private val _isOnlineStreaming = MutableStateFlow(false)
+    val isOnlineStreaming = _isOnlineStreaming.asStateFlow()
+
+    val currentDisplayBadge = combine(_currentRjId, _playlist, _isOnlineStreaming) { rj, list, isStream ->
         if (rj.isNullOrBlank()) return@combine ""
+        if (isStream) return@combine "STREAM | $rj"
         val entity = list.firstOrNull { it.rjid == rj }
         if (entity == null) {
             if (rj.startsWith("LOCAL_")) "IMPORT" else rj
@@ -338,6 +351,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _translatedChapters = MutableStateFlow<List<ChapterItem>>(emptyList())
     val translatedChapters = _translatedChapters.asStateFlow()
+
+    private val _playlistTranslatedTitles = MutableStateFlow<Map<String, String>>(emptyMap())
+    val playlistTranslatedTitles = _playlistTranslatedTitles.asStateFlow()
 
     val activeChapterIndex = combine(_currentPosition, _currentChapters) { pos, chapters ->
         if (chapters.isEmpty()) -1
@@ -773,6 +789,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun prepareTrackSilently(history: HistoryEntity, fullList: List<HistoryEntity>, startPositionMs: Long) {
         viewModelScope.launch {
             val p = player ?: return@launch
+            _isOnlineStreaming.value = false
             val customDirStr = prefs.downloadDirFlow.first()
             val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
 
@@ -922,12 +939,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         }
                         saveCurrentState()
                     } else {
+                        val rawId = mediaItem.mediaId
+                        val cleanId = when {
+                            rawId.contains('_') -> rawId.substringBefore('_')
+                            rawId.startsWith("http") || rawId.contains('/') -> _currentRjId.value ?: ""
+                            else -> rawId
+                        }
                         val prevRj = _currentRjId.value
-                        _currentRjId.value = mediaItem.mediaId
-                        if (prevRj != mediaItem.mediaId) {
-                            loadChaptersForCurrentTrack(mediaItem.mediaId)
+                        _currentRjId.value = cleanId
+                        if (prevRj != cleanId && !cleanId.startsWith("http") && !cleanId.contains('/')) {
+                            loadChaptersForCurrentTrack(cleanId)
                             if (_isTranslationActive.value) {
-                                loadOrFetchTranslations(mediaItem.mediaId)
+                                loadOrFetchTranslations(cleanId)
                             } else {
                                 _translatedTitle.value = null
                                 _translatedChapters.value = emptyList()
@@ -937,8 +960,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             _currentTitle.value = meta.title?.toString() ?: ""
                             _currentArtist.value = meta.artist?.toString() ?: "-"
                             val cover = meta.artworkUri?.toString()
-                            _currentCoverUrl.value = cover
-                            preloadCoverArtInMemory(cover)
+                            if (!cover.isNullOrBlank()) {
+                                _currentCoverUrl.value = cover
+                                preloadCoverArtInMemory(cover)
+                            }
                         }
                         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
                             _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
@@ -1091,6 +1116,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         viewModelScope.launch {
             val p = player ?: return@launch
+            _isOnlineStreaming.value = false
             val customDirStr = prefs.downloadDirFlow.first()
             val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()
 
@@ -1272,6 +1298,73 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
+     * Plays an online work with all audio tracks mapped into chapters.
+     */
+    fun playOnlineWork(
+        rjid: String,
+        workTitle: String,
+        cv: String,
+        coverUrl: String,
+        tracks: List<AsmrOneTrack>,
+        startIndex: Int = 0
+    ) {
+        val p = player ?: run {
+            initMediaController()
+            return
+        }
+        if (tracks.isEmpty()) return
+
+        viewModelScope.launch {
+            _isOnlineStreaming.value = true
+            isCurrentVirtualAlbum = false
+            currentAlbumHistory = null
+
+            val targetIndex = startIndex.coerceIn(0, tracks.size - 1)
+            val currentTrack = tracks[targetIndex]
+            val initialTitle = "[$rjid] ${currentTrack.title}"
+
+            _currentRjId.value = rjid
+            _currentTitle.value = initialTitle
+            _currentArtist.value = cv
+            _currentCoverUrl.value = coverUrl
+            preloadCoverArtInMemory(coverUrl)
+
+            // Populate chapter drawer with all tracks of the online work
+            val chapters = tracks.mapIndexed { idx, tr ->
+                ChapterItem(
+                    startMs = idx * 1000L,
+                    endMs = (idx + 1) * 1000L,
+                    title = tr.title
+                )
+            }
+            _currentChapters.value = chapters
+            _translatedTitle.value = null
+            _translatedChapters.value = emptyList()
+            _audioSpecs.value = "44.1kHz | 16bits | STREAM"
+
+            val mediaItems = tracks.mapIndexed { idx, tr ->
+                val metaTitle = "[$rjid] ${tr.title}"
+                val metaBuilder = MediaMetadata.Builder()
+                    .setTitle(metaTitle)
+                    .setArtist(cv)
+                    .setAlbumTitle(workTitle)
+                    .setArtworkUri(Uri.parse(coverUrl))
+
+                MediaItem.Builder()
+                    .setUri(Uri.parse(tr.streamUrl))
+                    .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.parse(tr.streamUrl)).build())
+                    .setMediaId("${rjid}_$idx")
+                    .setMediaMetadata(metaBuilder.build())
+                    .build()
+            }
+
+            p.setMediaItems(mediaItems, targetIndex, 0L)
+            p.prepare()
+            p.play()
+        }
+    }
+
+    /**
      * Plays an online audio stream directly via ExoPlayer.
      */
     fun playOnlineStream(
@@ -1282,42 +1375,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         streamUrl: String,
         coverUrl: String
     ) {
-        val p = player ?: run {
-            initMediaController()
-            return
-        }
-        viewModelScope.launch {
-            isCurrentVirtualAlbum = false
-            currentAlbumHistory = null
-
-            val metaTitle = "[$rjid] $trackTitle"
-            val metaBuilder = MediaMetadata.Builder()
-                .setTitle(metaTitle)
-                .setArtist(cv)
-                .setAlbumTitle(workTitle)
-                .setArtworkUri(Uri.parse(coverUrl))
-
-            val mediaItem = MediaItem.Builder()
-                .setUri(Uri.parse(streamUrl))
-                .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.parse(streamUrl)).build())
-                .setMediaId(streamUrl)
-                .setMediaMetadata(metaBuilder.build())
-                .build()
-
-            _currentRjId.value = rjid
-            _currentTitle.value = metaTitle
-            _currentArtist.value = cv
-            _currentCoverUrl.value = coverUrl
-            preloadCoverArtInMemory(coverUrl)
-            _currentChapters.value = emptyList()
-            _translatedTitle.value = null
-            _translatedChapters.value = emptyList()
-            _audioSpecs.value = "44.1kHz | 16bits | STREAM"
-
-            p.setMediaItems(listOf(mediaItem), 0, 0L)
-            p.prepare()
-            p.play()
-        }
+        val singleTrack = AsmrOneTrack(title = trackTitle, streamUrl = streamUrl)
+        playOnlineWork(rjid, workTitle, cv, coverUrl, listOf(singleTrack), 0)
     }
 
     private suspend fun loadArtworkBytes(localFilePath: String?, coverUrl: String?): ByteArray? = withContext(Dispatchers.IO) {
@@ -1368,12 +1427,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playNext() {
+        val p = player
+        if (_isOnlineStreaming.value && p != null) {
+            if (p.hasNextMediaItem()) {
+                p.seekToNextMediaItem()
+            } else if (_repeatMode.value == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
+                p.seekTo(0, 0L)
+            }
+            return
+        }
         playAdjacentWork(forward = true)
         saveCurrentState()
     }
 
     fun playPrevious() {
         val p = player
+        if (_isOnlineStreaming.value && p != null) {
+            if (p.currentPosition > 3000) {
+                p.seekTo(0)
+            } else if (p.hasPreviousMediaItem()) {
+                p.seekToPreviousMediaItem()
+            } else if (_repeatMode.value == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
+                p.seekTo(p.mediaItemCount - 1, 0L)
+            }
+            return
+        }
         if (p != null && p.currentPosition > 3000) {
             p.seekTo(0)
         } else {
@@ -1442,9 +1520,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             else -> Player.REPEAT_MODE_OFF
         }
         _repeatMode.value = nextMode
-        // Only set REPEAT_MODE_ONE on internal ExoPlayer so that REPEAT_MODE_ALL reaches STATE_ENDED
-        // to seamlessly trigger playAdjacentWork() across the full playlist.
-        p.repeatMode = if (nextMode == Player.REPEAT_MODE_ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+        p.repeatMode = if (nextMode == Player.REPEAT_MODE_ONE) {
+            Player.REPEAT_MODE_ONE
+        } else if (_isOnlineStreaming.value && nextMode == Player.REPEAT_MODE_ALL) {
+            Player.REPEAT_MODE_ALL
+        } else {
+            Player.REPEAT_MODE_OFF
+        }
         saveCurrentState()
     }
 
@@ -1458,9 +1540,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun seekToChapter(chapter: ChapterItem) {
         val p = player ?: return
-        if (isCurrentVirtualAlbum && _currentChapters.value.isNotEmpty()) {
+        if ((isCurrentVirtualAlbum || p.mediaItemCount > 1) && _currentChapters.value.isNotEmpty()) {
             val idx = _currentChapters.value.indexOf(chapter)
-            if (idx != -1) {
+            if (idx != -1 && idx < p.mediaItemCount) {
                 p.seekToDefaultPosition(idx)
                 _currentPosition.value = chapter.startMs
                 saveCurrentState()
@@ -1619,17 +1701,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun toggleTranslation() {
+    fun toggleTranslation(context: Context? = null) {
         val next = !_isTranslationActive.value
         _isTranslationActive.value = next
         viewModelScope.launch {
             prefs.setTranslationActive(next)
-            if (next && !_currentRjId.value.isNullOrBlank()) {
-                loadOrFetchTranslations(_currentRjId.value)
-            } else if (!next) {
+            if (next) {
+                val targetLang = context?.let { TranslationService.getActiveTargetLanguage(it) } ?: "en"
+                translatePlaylistTitles(targetLang)
+                if (!_currentRjId.value.isNullOrBlank()) {
+                    loadOrFetchTranslations(_currentRjId.value)
+                }
+            } else {
                 _translatedTitle.value = null
                 _translatedChapters.value = emptyList()
+                _playlistTranslatedTitles.value = emptyMap()
             }
+        }
+    }
+
+    fun translatePlaylistTitles(targetLang: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val items = _playlist.value
+            val currentMap = _playlistTranslatedTitles.value.toMutableMap()
+            items.forEach { item ->
+                if (!currentMap.containsKey(item.rjid)) {
+                    val dbHistory = historyDao.getHistoryById(item.rjid)
+                    if (!dbHistory?.translatedTitle.isNullOrBlank()) {
+                        currentMap[item.rjid] = dbHistory!!.translatedTitle!!
+                    } else {
+                        val translated = TranslationService.translateText(item.title, targetLang)
+                        if (translated.isNotBlank() && translated != item.title) {
+                            currentMap[item.rjid] = translated
+                            historyDao.updateTranslations(item.rjid, translated, dbHistory?.translatedChaptersJson)
+                        }
+                    }
+                }
+            }
+            _playlistTranslatedTitles.value = currentMap
         }
     }
 

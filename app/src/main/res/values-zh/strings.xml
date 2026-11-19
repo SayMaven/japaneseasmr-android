@@ -443,4 +443,38 @@
     <string name="hiby_tab_cv">声优 (CV)</string>
     <string name="hiby_mode_grid">瀑布流网格</string>
     <string name="hiby_mode_list">紧凑列表</string>
+
+    <!-- Phase 3 Refinements -->
+    <string name="browse_sort_added_date">添加日期</string>
+    <string name="browse_sort_catalog_date">收录日期</string>
+    <string name="browse_sort_sales">销量・下载数</string>
+    <string name="browse_sort_random">随机</string>
+    <string name="browse_sort_id">ID编号</string>
+    <string name="browse_sort_all_ages">全年龄</string>
+
+    <string name="browse_tab_all">全部</string>
+    <string name="browse_detail_circle_cv">社团 | 声优</string>
+    <string name="browse_detail_tags">标签</string>
+    <string name="browse_detail_release_date">发售日</string>
+    <string name="browse_detail_resource_files">文件列表</string>
+    <string name="browse_detail_related_works">相关作品</string>
+    <string name="browse_detail_sold">销量: %1$s</string>
+    <string name="browse_detail_trans">翻译</string>
+    <string name="browse_detail_view_file">查看文件</string>
+
+    <string name="pagination_prev">上一页</string>
+    <string name="pagination_next">下一页</string>
+    <string name="pagination_page_info">第 %1$d / %2$d 页</string>
+    <string name="pagination_jump_to">跳转页码</string>
+    <string name="pagination_enter_page">输入页码 (1 - %1$d):</string>
+    <string name="pagination_go">确定</string>
+    <string name="pagination_jump_action">跳转</string>
+    <string name="pagination_items_total">共 %1$d 部作品</string>
+
+    <string name="queue_action_cancel_current">取消下载</string>
+    <string name="player_stream_badge">STREAM</string>
+
+    <string name="translate_toggle_title">翻译标题</string>
+    <string name="translate_active_toast">已开启翻译</string>
+    <string name="translate_inactive_toast">已显示原文</string>
 </resources>

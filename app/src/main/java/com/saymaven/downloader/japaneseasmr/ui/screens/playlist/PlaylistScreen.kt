@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -49,6 +50,10 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
+import com.saymaven.downloader.japaneseasmr.service.TagLocalizer
+import com.saymaven.downloader.japaneseasmr.ui.components.PaginationBar
+import com.saymaven.downloader.japaneseasmr.ui.components.SortOptionItem
+import com.saymaven.downloader.japaneseasmr.ui.components.SortOptionsSheet
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlayerViewModel
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlaylistSortType
 import kotlinx.coroutines.delay
@@ -71,9 +76,27 @@ fun PlaylistScreen(
     val currentRjId by viewModel.currentRjId.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val sortState by viewModel.sortState.collectAsState()
+    val isTranslationActive by viewModel.isTranslationActive.collectAsState()
+    val playlistTranslatedTitles by viewModel.playlistTranslatedTitles.collectAsState()
 
     var isGridMode by rememberSaveable { mutableStateOf(true) }
     var selectedCategoryTab by rememberSaveable { mutableStateOf(0) } // 0: All, 1: Folder, 2: CV
+    var showSortSheet by remember { mutableStateOf(false) }
+
+    val pageSize = 20
+    var currentPage by rememberSaveable { mutableIntStateOf(1) }
+    val totalPages = maxOf(1, (filteredPlaylist.size + pageSize - 1) / pageSize)
+
+    LaunchedEffect(filteredPlaylist.size, selectedFolder) {
+        if (currentPage > totalPages) {
+            currentPage = 1
+        }
+    }
+
+    val pagedPlaylist = remember(filteredPlaylist, currentPage, pageSize) {
+        val start = (currentPage - 1) * pageSize
+        filteredPlaylist.drop(start).take(pageSize)
+    }
 
     var showNewFolderDialog by remember { mutableStateOf(false) }
     var newFolderNameInput by remember { mutableStateOf("") }
@@ -123,35 +146,66 @@ fun PlaylistScreen(
             .fillMaxSize()
             .padding(start = 12.dp, end = 12.dp, top = 2.dp)
     ) {
-        // Top HiBy Header with Drawer Button, Title, Audiophile Badge & Quick Actions
+        // Top Header matching Jelajah ASMR
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp, bottom = 4.dp),
+                .padding(top = 8.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onOpenDrawer) {
+            IconButton(
+                onClick = onOpenDrawer,
+                modifier = Modifier.size(36.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Default.Menu,
                     contentDescription = "Open Drawer",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.onSurface
                 )
             }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.player_playlist_sheet_header, filteredPlaylist.size),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+            Spacer(modifier = Modifier.width(6.dp))
+
+            Text(
+                text = stringResource(R.string.player_playlist_sheet_header, filteredPlaylist.size),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Dynamic Title Translate Button
+            IconButton(
+                onClick = { viewModel.toggleTranslation(context) },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Translate,
+                    contentDescription = stringResource(R.string.translate_toggle_title),
+                    tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             // Toggle Grid / List Layout
-            IconButton(onClick = { isGridMode = !isGridMode }) {
+            IconButton(
+                onClick = { isGridMode = !isGridMode },
+                modifier = Modifier.size(36.dp)
+            ) {
                 Icon(
                     imageVector = if (isGridMode) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
                     contentDescription = if (isGridMode) stringResource(R.string.hiby_mode_list) else stringResource(R.string.hiby_mode_grid),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Sort Options Button
+            IconButton(
+                onClick = { showSortSheet = true },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = stringResource(R.string.browse_sort_title),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -221,56 +275,6 @@ fun PlaylistScreen(
             }
         }
 
-        // Sorting Selector Row (Chips)
-        val sortOptions = remember {
-            listOf(
-                PlaylistSortType.CUSTOM to R.string.playlist_sort_custom,
-                PlaylistSortType.DATE to R.string.playlist_sort_date,
-                PlaylistSortType.TITLE to R.string.playlist_sort_title,
-                PlaylistSortType.DURATION to R.string.playlist_sort_duration,
-                PlaylistSortType.RJID to R.string.playlist_sort_rj
-            )
-        }
-
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            items(sortOptions, key = { it.first.name }) { (type, resId) ->
-                val label = stringResource(resId)
-                val isSelected = (sortState.type == type)
-                val arrow = if (isSelected && type != PlaylistSortType.CUSTOM) {
-                    if (sortState.isAscending) " ▲" else " ▼"
-                } else ""
-
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { viewModel.toggleSort(type) },
-                    label = {
-                        Text(
-                            text = "$label$arrow",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    leadingIcon = {
-                        val icon = when (type) {
-                            PlaylistSortType.CUSTOM -> Icons.Default.DragHandle
-                            PlaylistSortType.DATE -> if (isSelected && sortState.isAscending) Icons.Default.ArrowUpward else Icons.Default.Schedule
-                            PlaylistSortType.TITLE -> if (isSelected && !sortState.isAscending) Icons.Default.ArrowDownward else Icons.Default.SortByAlpha
-                            PlaylistSortType.DURATION -> Icons.Default.AccessTime
-                            PlaylistSortType.RJID -> Icons.Default.Tag
-                        }
-                        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(15.dp))
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                )
-            }
-        }
-
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
         // Main Track Content (Pinterest Grid or List)
@@ -331,119 +335,86 @@ fun PlaylistScreen(
                 }
             }
 
-            if (isGridMode) {
-                // Pinterest Staggered Grid Layout (2 Columns)
-                LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Fixed(2),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalItemSpacing = 8.dp,
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    items(filteredPlaylist, key = { it.rjid }) { item ->
-                        val isCurrentTrack = (item.rjid == currentRjId)
-                        LocalWorkPinterestCard(
-                            item = item,
-                            isCurrentTrack = isCurrentTrack,
-                            isPlaying = (isCurrentTrack && isPlaying),
-                            onClick = { onItemClickAction(item) },
-                            onMoveFolder = { onMoveFolderClick(item) },
-                            onCopyRj = { onCopyRjClick(item) },
-                            onAudioInfo = { onAudioInfoClick(item) },
-                            onDelete = { onDeleteClick(item) }
-                        )
-                    }
-                }
-            } else {
-                // Compact List Mode with Drag-and-Drop Reordering
-                val onDragStartAction = remember {
-                    { rjid: String ->
-                        val currentIdx = filteredPlaylist.indexOfFirst { it.rjid == rjid }
-                        if (currentIdx != -1) {
-                            draggedRjid = rjid
-                            dragAccumulatedY = 0f
-                        }
-                    }
-                }
-                val onDragAction = remember {
-                    { dragAmount: Float ->
-                        dragAccumulatedY += dragAmount
-
-                        val targetRjid = draggedRjid ?: return@remember
-                        val visibleItems = listState.layoutInfo.visibleItemsInfo
-                        val draggedInfo = visibleItems.firstOrNull { it.key == targetRjid }
-
-                        if (draggedInfo != null) {
-                            val draggedCenterY = (draggedInfo.offset + dragAccumulatedY) + (draggedInfo.size / 2f)
-
-                            val targetItem = visibleItems.firstOrNull { item ->
-                                item.key != targetRjid &&
-                                draggedCenterY in item.offset.toFloat()..(item.offset + item.size).toFloat()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    if (isGridMode) {
+                        // Pinterest Staggered Grid Layout (2 Columns)
+                        LazyVerticalStaggeredGrid(
+                            columns = StaggeredGridCells.Fixed(2),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalItemSpacing = 8.dp,
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(pagedPlaylist, key = { it.rjid }) { item ->
+                                val isCurrentTrack = (item.rjid == currentRjId)
+                                val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
+                                LocalWorkPinterestCard(
+                                    item = item,
+                                    displayTitle = displayTitle,
+                                    isCurrentTrack = isCurrentTrack,
+                                    isPlaying = (isCurrentTrack && isPlaying),
+                                    onClick = { onItemClickAction(item) },
+                                    onMoveFolder = { onMoveFolderClick(item) },
+                                    onCopyRj = { onCopyRjClick(item) },
+                                    onAudioInfo = { onAudioInfoClick(item) },
+                                    onDelete = { onDeleteClick(item) }
+                                )
                             }
 
-                            if (targetItem != null) {
-                                val fromIdx = filteredPlaylist.indexOfFirst { it.rjid == targetRjid }
-                                val toIdx = filteredPlaylist.indexOfFirst { it.rjid == targetItem.key }
-                                if (fromIdx != -1 && toIdx != -1 && fromIdx != toIdx) {
-                                    val distance = targetItem.offset - draggedInfo.offset
-                                    dragAccumulatedY -= distance
-                                    viewModel.reorderPlaylistInMemory(fromIdx, toIdx)
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                }
+                            item(span = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.FullLine) {
+                                PaginationBar(
+                                    currentPage = currentPage,
+                                    totalPages = totalPages,
+                                    totalCount = filteredPlaylist.size,
+                                    onPageSelected = { currentPage = it },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 10.dp, bottom = 20.dp)
+                                )
                             }
                         }
-                    }
-                }
-                val onDragEndAction = remember {
-                    {
-                        viewModel.commitPlaylistReorder()
-                        draggedRjid = null
-                        dragAccumulatedY = 0f
-                    }
-                }
+                    } else {
+                        // KikoFlu-style Horizontal List View
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
+                        ) {
+                            items(pagedPlaylist, key = { it.rjid }) { item ->
+                                val isCurrentTrack = (item.rjid == currentRjId)
+                                val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
+                                LocalWorkListViewItem(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    item = item,
+                                    displayTitle = displayTitle,
+                                    isCurrentTrack = isCurrentTrack,
+                                    isPlaying = (isCurrentTrack && isPlaying),
+                                    onClick = onItemClickAction,
+                                    onMoveFolder = { onMoveFolderClick(item) },
+                                    onCopyRj = { onCopyRjClick(item) },
+                                    onAudioInfo = { onAudioInfoClick(item) },
+                                    onDelete = { onDeleteClick(item) }
+                                )
+                            }
 
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp)
-                ) {
-                    items(
-                        items = filteredPlaylist,
-                        key = { it.rjid },
-                        contentType = { "playlist_item" }
-                    ) { item ->
-                        val isCurrentTrack = (item.rjid == currentRjId)
-                        val isDragged = (draggedRjid == item.rjid)
-
-                        val itemModifier = if (isDragged) {
-                            Modifier.fillMaxWidth()
-                        } else {
-                            Modifier
-                                .animateItem()
-                                .fillMaxWidth()
+                            item {
+                                PaginationBar(
+                                    currentPage = currentPage,
+                                    totalPages = totalPages,
+                                    totalCount = filteredPlaylist.size,
+                                    onPageSelected = { currentPage = it },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 10.dp, bottom = 20.dp)
+                                )
+                            }
                         }
-
-                        PlaylistItemCard(
-                            modifier = itemModifier,
-                            item = item,
-                            isCurrentTrack = isCurrentTrack,
-                            isPlaying = (isCurrentTrack && isPlaying),
-                            isDragged = isDragged,
-                            dragOffsetY = if (isDragged) dragAccumulatedY else 0f,
-                            onDragStart = onDragStartAction,
-                            onDrag = onDragAction,
-                            onDragEnd = onDragEndAction,
-                            onClick = onItemClickAction,
-                            onMoveFolder = { onMoveFolderClick(item) },
-                            onCopyRj = { onCopyRjClick(item) },
-                            onAudioInfo = { onAudioInfoClick(item) },
-                            onDelete = { onDeleteClick(item) }
-                        )
                     }
                 }
             }
@@ -651,6 +622,40 @@ fun PlaylistScreen(
             }
         )
     }
+
+    // Sort Options Bottom Sheet
+    if (showSortSheet) {
+        val fieldOptions = remember {
+            listOf(
+                SortOptionItem(value = PlaylistSortType.DATE, labelRes = R.string.playlist_sort_date),
+                SortOptionItem(value = PlaylistSortType.TITLE, labelRes = R.string.playlist_sort_title),
+                SortOptionItem(value = PlaylistSortType.DURATION, labelRes = R.string.playlist_sort_duration),
+                SortOptionItem(value = PlaylistSortType.RJID, labelRes = R.string.playlist_sort_rj),
+                SortOptionItem(value = PlaylistSortType.CUSTOM, labelRes = R.string.playlist_sort_custom)
+            )
+        }
+        val directionOptions = remember {
+            listOf(
+                SortOptionItem(value = true, labelRes = R.string.browse_sort_asc),
+                SortOptionItem(value = false, labelRes = R.string.browse_sort_desc)
+            )
+        }
+
+        SortOptionsSheet(
+            title = stringResource(R.string.browse_sort_title),
+            fieldOptions = fieldOptions,
+            selectedField = sortState.type,
+            onFieldSelected = { field ->
+                viewModel.setSort(field, sortState.isAscending)
+            },
+            directionOptions = directionOptions,
+            selectedDirection = sortState.isAscending,
+            onDirectionSelected = { isAsc ->
+                viewModel.setSort(sortState.type, isAsc)
+            },
+            onDismissRequest = { showSortSheet = false }
+        )
+    }
 }
 
 /**
@@ -677,6 +682,7 @@ private fun detectAudioFormat(path: String?): String {
 @Composable
 fun LocalWorkPinterestCard(
     item: HistoryEntity,
+    displayTitle: String = item.title,
     isCurrentTrack: Boolean,
     isPlaying: Boolean,
     onClick: () -> Unit,
@@ -806,7 +812,7 @@ fun LocalWorkPinterestCard(
             ) {
                 // Title - Full title without truncation
                 Text(
-                    text = item.title,
+                    text = displayTitle,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
                     color = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
@@ -851,7 +857,8 @@ fun LocalWorkPinterestCard(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        genreList.forEach { tag ->
+                        genreList.forEach { rawTag ->
+                            val tag = TagLocalizer.localize(null, rawTag)
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
@@ -972,6 +979,295 @@ fun LocalWorkPinterestCard(
                                 }
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * KikoFlu-style Horizontal Work List Item for Local Collection matching Screenshot 4.
+ */
+@Composable
+fun LocalWorkListViewItem(
+    modifier: Modifier = Modifier,
+    item: HistoryEntity,
+    displayTitle: String = item.title,
+    isCurrentTrack: Boolean,
+    isPlaying: Boolean,
+    onClick: (HistoryEntity) -> Unit,
+    onMoveFolder: () -> Unit,
+    onCopyRj: () -> Unit,
+    onAudioInfo: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val context = LocalContext.current
+    var isMenuExpanded by remember { mutableStateOf(false) }
+    val cardShape = RoundedCornerShape(12.dp)
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(cardShape)
+            .clickable { onClick(item) },
+        shape = cardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrentTrack) 4.dp else 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCurrentTrack) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Left: Square Cover art (90dp x 90dp) with RJ code overlay badge at top-left
+            Box(
+                modifier = Modifier
+                    .size(90.dp)
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                val cover = item.coverUrl
+                if (!cover.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(cover)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+
+                // Top-Left Badge: RJ Code
+                val isLocal = item.sourceType != "DL_SITE" || item.rjid.startsWith("LOCAL_")
+                val displayTag = when {
+                    isLocal && !item.linkedRjId.isNullOrBlank() -> item.linkedRjId!!
+                    isLocal -> "IMPORT"
+                    else -> item.rjid
+                }
+                Surface(
+                    shape = RoundedCornerShape(bottomEnd = 6.dp),
+                    color = Color.Black.copy(alpha = 0.75f),
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    Text(
+                        text = displayTag,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Right side metadata column
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Title (full title)
+                Text(
+                    text = displayTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isCurrentTrack) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+
+                // Circle Name & Date
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (item.circle.isNotBlank() && item.circle != "-") {
+                        Text(
+                            text = item.circle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
+                    if (item.downloadDate.isNotBlank()) {
+                        Text(
+                            text = item.downloadDate.take(10),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+
+                // CV Pill Badge
+                if (item.cv.isNotBlank() && item.cv != "-") {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+                    ) {
+                        Text(
+                            text = item.cv,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Genre / Tags in English Pill Badges
+                val genreList = remember(item.genre) {
+                    item.genre?.split(",", "/", "、", ";")
+                        ?.map { it.trim() }
+                        ?.filter { it.isNotEmpty() }
+                        ?: emptyList()
+                }
+                if (genreList.isNotEmpty()) {
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        genreList.forEach { rawTag ->
+                            val tag = TagLocalizer.localize(null, rawTag)
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
+                            ) {
+                                Text(
+                                    text = tag,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Trailing Actions: Play / Equalizer and 3-dots Menu
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (isCurrentTrack) {
+                    AnimatedEqualizerWave(
+                        isPlaying = isPlaying,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    IconButton(
+                        onClick = { onClick(item) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = stringResource(R.string.player_action_play),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                Box {
+                    IconButton(
+                        onClick = { isMenuExpanded = true },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = stringResource(R.string.player_menu_more),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = isMenuExpanded,
+                        onDismissRequest = { isMenuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.player_action_move_folder)) },
+                            onClick = {
+                                isMenuExpanded = false
+                                onMoveFolder()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = null)
+                            }
+                        )
+
+                        val rjToCopy = item.linkedRjId ?: item.rjid
+                        if (rjToCopy.isNotBlank()) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.player_menu_copy_rj, rjToCopy)) },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onCopyRj()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null)
+                                }
+                            )
+                        }
+
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.player_menu_audio_info)) },
+                            onClick = {
+                                isMenuExpanded = false
+                                onAudioInfo()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Info, contentDescription = null)
+                            }
+                        )
+
+                        HorizontalDivider()
+
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.player_menu_delete),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                onDelete()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        )
                     }
                 }
             }

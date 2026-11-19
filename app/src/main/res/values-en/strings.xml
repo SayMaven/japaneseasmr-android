@@ -156,7 +156,7 @@
     <string name="queue_toast_empty_input">Please enter an RJ code first</string>
     <string name="queue_toast_added">Successfully added to queue</string>
     <string name="queue_toast_invalid_rj">Invalid RJ code format</string>
-    <string name="queue_btn_enqueue">Queue</string>
+    <string name="queue_btn_enqueue">+ Queue</string>
     <string name="queue_fetching_info">Fetching info…</string>
     <string name="queue_remove_item">Remove from Queue</string>
     <string name="history_dialog_delete_msg_format">Delete [%1$s] %2$s from your collection history?</string>
@@ -169,7 +169,7 @@
     <string name="player_folder_all_empty">No audio in collection yet. Download an RJ code first.</string>
     <string name="player_folder_empty_format">Folder \'%1$s\' is empty.</string>
     <string name="player_playlist_next_title">UP NEXT • PLAYLIST (%1$d)</string>
-    <string name="player_playlist_sheet_header">Collection Playlist (%1$d)</string>
+    <string name="player_playlist_sheet_header">Collection (%1$d)</string>
     <string name="playlist_sort_custom">Custom</string>
     <string name="playlist_sort_date">Date</string>
     <string name="playlist_sort_title">Title</string>
@@ -371,4 +371,104 @@
     <string name="player_cover_success_toast">Thumbnail updated successfully!</string>
     <string name="badge_local">IMPORT</string>
     <string name="badge_local_rj">IMPORT • %1$s</string>
+
+    <!-- Version 2.0.0 Drawer & Browsing Strings -->
+    <string name="tab_browse">Browse ASMR</string>
+    <string name="drawer_title_app">Japanese ASMR</string>
+    <string name="drawer_subtitle_version">Version 2.0.0</string>
+    <string name="drawer_audio_engine_status">Native miniaudio 192kHz/24bit active</string>
+    <string name="drawer_item_local">Local Collection</string>
+    <string name="drawer_item_browse">Browse ASMR</string>
+    <string name="drawer_item_queue">Download Queue</string>
+    <string name="drawer_item_history">Playback History</string>
+    <string name="drawer_item_settings">Settings</string>
+
+    <!-- ASMR Browser -->
+    <string name="browse_header_title">Browse ASMR</string>
+    <string name="browse_search_hint">Search title, CV, or RJ code…</string>
+    <string name="browse_filter_all">All</string>
+    <string name="browse_filter_popular">Popular</string>
+    <string name="browse_filter_subtitled">Subtitled</string>
+    <string name="browse_btn_popular">Popular</string>
+    <string name="browse_btn_recommended">Recommended</string>
+    <string name="browse_sort_title">Sort Options</string>
+    <string name="browse_sort_field">Sort Field</string>
+    <string name="browse_sort_direction">Sort Direction</string>
+    <string name="browse_sort_release_date">Release Date</string>
+    <string name="browse_sort_dl_count">Download Count</string>
+    <string name="browse_sort_rating">Rating</string>
+    <string name="browse_sort_reviews">Reviews</string>
+    <string name="browse_sort_asc">Ascending</string>
+    <string name="browse_sort_desc">Descending</string>
+    <string name="browse_detail_tracks">Track List &amp; Online Playback</string>
+    <string name="browse_detail_download_btn">Download Offline</string>
+    <string name="browse_stream_playing">Streaming: %1$s</string>
+    <string name="browse_action_copy_rj">Copy RJ Code</string>
+    <string name="browse_action_download">Download Work</string>
+    <string name="browse_toast_rj_copied">RJ Code copied: %1$s</string>
+    <string name="browse_toast_enqueued">Added to queue: %1$s</string>
+    <string name="browse_empty_title">No works found</string>
+    <string name="browse_empty_desc">Try searching with a different keyword or filter.</string>
+    <string name="browse_error_title">Failed to connect to asmr server</string>
+    <string name="browse_action_retry">Retry</string>
+
+    <!-- Work Overflow Menu (3-dots) & Audio Specs -->
+    <string name="player_menu_more">Work Options</string>
+    <string name="player_menu_copy_rj">Copy RJ Code</string>
+    <string name="player_menu_audio_info">Audio Format Details</string>
+    <string name="player_menu_play_now">Play from Beginning</string>
+    <string name="player_menu_delete">Delete from Storage</string>
+    <string name="player_audio_info_title">Audio File Specification</string>
+    <string name="player_audio_info_format">Format: %1$s</string>
+    <string name="player_audio_info_samplerate">Sample Rate: %1$s</string>
+    <string name="player_audio_info_bitdepth">Bit Depth: %1$s</string>
+    <string name="player_audio_info_channels">Channels: %1$s</string>
+    <string name="player_audio_info_path">Storage Location: %1$s</string>
+    <string name="player_audio_info_size">Total Size: %1$s</string>
+    <string name="player_audio_info_duration">Total Duration: %1$s</string>
+    <string name="player_delete_confirm_title">Delete Work</string>
+    <string name="player_delete_confirm_desc">Are you sure you want to delete \"%1$s\" from storage? This action cannot be undone.</string>
+    <string name="player_toast_deleted">Work deleted from storage.</string>
+
+    <!-- HiBy Style Elements -->
+    <string name="hiby_badge_bitperfect">BIT-PERFECT DAC</string>
+    <string name="hiby_tab_all">All Works</string>
+    <string name="hiby_tab_folders">Folders</string>
+    <string name="hiby_tab_cv">Voice Actors</string>
+    <string name="hiby_mode_grid">Staggered Grid</string>
+    <string name="hiby_mode_list">Compact List</string>
+
+    <!-- Phase 3 Refinements -->
+    <string name="browse_sort_added_date">Added Date</string>
+    <string name="browse_sort_catalog_date">Catalog Date</string>
+    <string name="browse_sort_sales">Sales / Downloads</string>
+    <string name="browse_sort_random">Random</string>
+    <string name="browse_sort_id">ID / RJ Code</string>
+    <string name="browse_sort_all_ages">All Ages</string>
+
+    <string name="browse_tab_all">All</string>
+    <string name="browse_detail_circle_cv">Circle | Voice Actors</string>
+    <string name="browse_detail_tags">Tags</string>
+    <string name="browse_detail_release_date">Release Date</string>
+    <string name="browse_detail_resource_files">File list</string>
+    <string name="browse_detail_related_works">Related Works</string>
+    <string name="browse_detail_sold">Sold: %1$s</string>
+    <string name="browse_detail_trans">Trans</string>
+    <string name="browse_detail_view_file">View File</string>
+
+    <string name="pagination_prev">Previous</string>
+    <string name="pagination_next">Next</string>
+    <string name="pagination_page_info">Page %1$d / %2$d</string>
+    <string name="pagination_jump_to">Jump to Page</string>
+    <string name="pagination_enter_page">Enter page number (1 - %1$d):</string>
+    <string name="pagination_go">Go</string>
+    <string name="pagination_jump_action">Jump</string>
+    <string name="pagination_items_total">%1$d items total</string>
+
+    <string name="queue_action_cancel_current">Cancel download</string>
+    <string name="player_stream_badge">STREAM</string>
+
+    <string name="translate_toggle_title">Translate Titles</string>
+    <string name="translate_active_toast">Translation enabled</string>
+    <string name="translate_inactive_toast">Original titles shown</string>
 </resources>
