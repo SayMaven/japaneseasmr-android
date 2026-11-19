@@ -567,6 +567,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun deleteTrack(track: HistoryEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val file = File(track.localFilePath)
+                if (file.exists()) {
+                    if (file.isDirectory) file.deleteRecursively() else file.delete()
+                }
+            } catch (ignored: Exception) {}
+            historyDao.deleteById(track.rjid)
+            refreshPlaylist()
+        }
+    }
+
     private fun observeAudioSettings() {
         viewModelScope.launch {
             prefs.defaultSpeedFlow.collect { speed ->

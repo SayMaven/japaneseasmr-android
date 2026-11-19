@@ -371,4 +371,55 @@
     <string name="player_cover_success_toast">Thumbnail updated successfully!</string>
     <string name="badge_local">IMPORT</string>
     <string name="badge_local_rj">IMPORT • %1$s</string>
+
+    <!-- Version 2.0.0 Drawer & Browsing Strings -->
+    <string name="drawer_title_app">Japanese ASMR</string>
+    <string name="drawer_subtitle_version">Version 2.0.0</string>
+    <string name="drawer_audio_engine_status">Native miniaudio 192kHz/24bit active</string>
+    <string name="drawer_item_local">Local Collection</string>
+    <string name="drawer_item_browse">Browse asmr.one</string>
+    <string name="drawer_item_queue">Download Queue</string>
+    <string name="drawer_item_history">Playback History</string>
+    <string name="drawer_item_settings">Settings &amp; DAC</string>
+
+    <!-- asmr.one Browser -->
+    <string name="browse_header_title">asmr.one Explorer</string>
+    <string name="browse_search_hint">Search title, CV, or RJ code…</string>
+    <string name="browse_filter_all">All</string>
+    <string name="browse_filter_popular">Popular</string>
+    <string name="browse_filter_subtitled">Subtitled</string>
+    <string name="browse_action_copy_rj">Copy RJ Code</string>
+    <string name="browse_action_download">Download Work</string>
+    <string name="browse_toast_rj_copied">RJ Code copied: %1$s</string>
+    <string name="browse_toast_enqueued">Added to queue: %1$s</string>
+    <string name="browse_empty_title">No works found</string>
+    <string name="browse_empty_desc">Try searching with a different keyword or filter.</string>
+    <string name="browse_error_title">Failed to connect to asmr.one</string>
+    <string name="browse_action_retry">Retry</string>
+
+    <!-- Work Overflow Menu (3-dots) & Audio Specs -->
+    <string name="player_menu_more">Work Options</string>
+    <string name="player_menu_copy_rj">Copy RJ Code</string>
+    <string name="player_menu_audio_info">Audio Format Details</string>
+    <string name="player_menu_play_now">Play from Beginning</string>
+    <string name="player_menu_delete">Delete from Storage</string>
+    <string name="player_audio_info_title">Audio File Specification</string>
+    <string name="player_audio_info_format">Format: %1$s</string>
+    <string name="player_audio_info_samplerate">Sample Rate: %1$s</string>
+    <string name="player_audio_info_bitdepth">Bit Depth: %1$s</string>
+    <string name="player_audio_info_channels">Channels: %1$s</string>
+    <string name="player_audio_info_path">Storage Location: %1$s</string>
+    <string name="player_audio_info_size">Total Size: %1$s</string>
+    <string name="player_audio_info_duration">Total Duration: %1$s</string>
+    <string name="player_delete_confirm_title">Delete Work</string>
+    <string name="player_delete_confirm_desc">Are you sure you want to delete \"%1$s\" from storage? This action cannot be undone.</string>
+    <string name="player_toast_deleted">Work deleted from storage.</string>
+
+    <!-- HiBy Style Elements -->
+    <string name="hiby_badge_bitperfect">BIT-PERFECT DAC</string>
+    <string name="hiby_tab_all">All Works</string>
+    <string name="hiby_tab_folders">Folders</string>
+    <string name="hiby_tab_cv">Voice Actors</string>
+    <string name="hiby_mode_grid">Staggered Grid</string>
+    <string name="hiby_mode_list">Compact List</string>
 </resources>

@@ -2,6 +2,7 @@ package com.saymaven.downloader.japaneseasmr.ui.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -18,6 +19,7 @@ import com.saymaven.downloader.japaneseasmr.R
 
 enum class NavTab(val titleRes: Int, val icon: ImageVector) {
     HOME(R.string.tab_player, Icons.Default.Home),
+    BROWSE(R.string.drawer_item_browse, Icons.Default.Explore),
     QUEUE(R.string.tab_queue, Icons.Default.Download),
     HISTORY(R.string.tab_history, Icons.Default.History),
     SETTINGS(R.string.tab_settings, Icons.Default.Settings)

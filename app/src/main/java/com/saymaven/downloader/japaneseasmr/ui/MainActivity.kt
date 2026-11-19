@@ -44,6 +44,19 @@ import com.saymaven.downloader.japaneseasmr.ui.screens.queue.QueueScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.queue.QueueViewModel
 import com.saymaven.downloader.japaneseasmr.ui.screens.settings.SettingsScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.settings.SettingsViewModel
+import com.saymaven.downloader.japaneseasmr.ui.screens.browse.AsmrOneBrowseScreen
+import com.saymaven.downloader.japaneseasmr.ui.screens.browse.AsmrOneBrowseViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.saymaven.downloader.japaneseasmr.R
@@ -65,6 +78,7 @@ class MainActivity : ComponentActivity() {
     private val historyViewModel: HistoryViewModel by viewModels()
     private val playerViewModel: PlayerViewModel by viewModels()
     private val settingsViewModel: SettingsViewModel by viewModels()
+    private val browseViewModel: AsmrOneBrowseViewModel by viewModels()
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -136,7 +150,7 @@ class MainActivity : ComponentActivity() {
                 // Pre-warm sisa tab di background secara bertahap untuk transisi instan 0ms
                 LaunchedEffect(Unit) {
                     kotlinx.coroutines.delay(350)
-                    listOf(NavTab.QUEUE, NavTab.HISTORY, NavTab.SETTINGS).forEach { tab ->
+                    listOf(NavTab.BROWSE, NavTab.QUEUE, NavTab.HISTORY, NavTab.SETTINGS).forEach { tab ->
                         if (!visitedTabs.contains(tab)) {
                             visitedTabs.add(tab)
                             kotlinx.coroutines.delay(120)
@@ -148,6 +162,123 @@ class MainActivity : ComponentActivity() {
                     themeMode = themeMode,
                     dynamicColor = dynamicColor,
                     colorPalette = colorPalette
+                ) {
+                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                val drawerScope = rememberCoroutineScope()
+
+                BackHandler(enabled = drawerState.isOpen) {
+                    drawerScope.launch { drawerState.close() }
+                }
+
+                ModalNavigationDrawer(
+                    drawerState = drawerState,
+                    gesturesEnabled = !isPlayerExpanded,
+                    drawerContent = {
+                        ModalDrawerSheet(
+                            modifier = Modifier.width(300.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.drawer_title_app),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = stringResource(R.string.drawer_subtitle_version),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.drawer_audio_engine_status),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider()
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            NavigationDrawerItem(
+                                label = { Text(stringResource(R.string.drawer_item_local)) },
+                                selected = currentTab == NavTab.HOME,
+                                icon = { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
+                                onClick = {
+                                    currentTab = NavTab.HOME
+                                    drawerScope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+
+                            NavigationDrawerItem(
+                                label = { Text(stringResource(R.string.drawer_item_browse)) },
+                                selected = currentTab == NavTab.BROWSE,
+                                icon = { Icon(Icons.Default.Explore, contentDescription = null) },
+                                onClick = {
+                                    if (!visitedTabs.contains(NavTab.BROWSE)) {
+                                        visitedTabs.add(NavTab.BROWSE)
+                                    }
+                                    currentTab = NavTab.BROWSE
+                                    drawerScope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+
+                            NavigationDrawerItem(
+                                label = { Text(stringResource(R.string.drawer_item_queue)) },
+                                selected = currentTab == NavTab.QUEUE,
+                                icon = { Icon(Icons.Default.Download, contentDescription = null) },
+                                onClick = {
+                                    if (!visitedTabs.contains(NavTab.QUEUE)) {
+                                        visitedTabs.add(NavTab.QUEUE)
+                                    }
+                                    currentTab = NavTab.QUEUE
+                                    drawerScope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+
+                            NavigationDrawerItem(
+                                label = { Text(stringResource(R.string.drawer_item_history)) },
+                                selected = currentTab == NavTab.HISTORY,
+                                icon = { Icon(Icons.Default.History, contentDescription = null) },
+                                onClick = {
+                                    if (!visitedTabs.contains(NavTab.HISTORY)) {
+                                        visitedTabs.add(NavTab.HISTORY)
+                                    }
+                                    currentTab = NavTab.HISTORY
+                                    drawerScope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+
+                            NavigationDrawerItem(
+                                label = { Text(stringResource(R.string.drawer_item_settings)) },
+                                selected = currentTab == NavTab.SETTINGS,
+                                icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                onClick = {
+                                    if (!visitedTabs.contains(NavTab.SETTINGS)) {
+                                        visitedTabs.add(NavTab.SETTINGS)
+                                    }
+                                    currentTab = NavTab.SETTINGS
+                                    drawerScope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                            )
+                        }
+                    }
                 ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     Scaffold(
@@ -197,8 +328,32 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 PlaylistScreen(
                                     viewModel = playerViewModel,
-                                    onOpenPlayer = { isPlayerExpanded = true }
+                                    onOpenPlayer = { isPlayerExpanded = true },
+                                    onOpenDrawer = { drawerScope.launch { drawerState.open() } }
                                 )
+                            }
+
+                            // Tab Browse: asmr.one Explorer
+                            if (visitedTabs.contains(NavTab.BROWSE)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .zIndex(if (currentTab == NavTab.BROWSE) 1f else 0f)
+                                        .graphicsLayer {
+                                            val active = (currentTab == NavTab.BROWSE)
+                                            alpha = if (active) 1f else 0f
+                                            translationX = if (active) 0f else 99999f
+                                        }
+                                ) {
+                                    AsmrOneBrowseScreen(
+                                        viewModel = browseViewModel,
+                                        onOpenDrawer = { drawerScope.launch { drawerState.open() } },
+                                        onSelectWorkForDownload = { rjid ->
+                                            queueViewModel.onInputChanged(rjid)
+                                            currentTab = NavTab.QUEUE
+                                        }
+                                    )
+                                }
                             }
 
                             // Tab 1: Unduhan / Queue
@@ -311,6 +466,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
     }
     }
 

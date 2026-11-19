@@ -371,4 +371,55 @@
     <string name="player_cover_success_toast">Thumbnail berhasil diubah!</string>
     <string name="badge_local">IMPORT</string>
     <string name="badge_local_rj">IMPORT • %1$s</string>
+
+    <!-- Versi 2.0.0 Drawer & Jelajah asmr.one -->
+    <string name="drawer_title_app">Japanese ASMR</string>
+    <string name="drawer_subtitle_version">Versi 2.0.0</string>
+    <string name="drawer_audio_engine_status">Native miniaudio 192kHz/24bit aktif</string>
+    <string name="drawer_item_local">Koleksi Lokal</string>
+    <string name="drawer_item_browse">Jelajah asmr.one</string>
+    <string name="drawer_item_queue">Antrean Unduhan</string>
+    <string name="drawer_item_history">Riwayat Pemutaran</string>
+    <string name="drawer_item_settings">Pengaturan &amp; DAC</string>
+
+    <!-- Browser asmr.one -->
+    <string name="browse_header_title">Jelajah asmr.one</string>
+    <string name="browse_search_hint">Cari judul, CV, atau kode RJ…</string>
+    <string name="browse_filter_all">Semua</string>
+    <string name="browse_filter_popular">Populer</string>
+    <string name="browse_filter_subtitled">Subtitle</string>
+    <string name="browse_action_copy_rj">Salin Kode RJ</string>
+    <string name="browse_action_download">Unduh Karya</string>
+    <string name="browse_toast_rj_copied">Kode RJ disalin: %1$s</string>
+    <string name="browse_toast_enqueued">Ditambahkan ke antrean: %1$s</string>
+    <string name="browse_empty_title">Karya tidak ditemukan</string>
+    <string name="browse_empty_desc">Coba gunakan kata kunci atau filter lain.</string>
+    <string name="browse_error_title">Gagal terhubung ke asmr.one</string>
+    <string name="browse_action_retry">Coba Lagi</string>
+
+    <!-- Menu Titik Tiga (Overflow Menu) & Info Audio -->
+    <string name="player_menu_more">Opsi Karya</string>
+    <string name="player_menu_copy_rj">Salin Kode RJ</string>
+    <string name="player_menu_audio_info">Detail Format Audio</string>
+    <string name="player_menu_play_now">Putar dari Awal</string>
+    <string name="player_menu_delete">Hapus dari Penyimpanan</string>
+    <string name="player_audio_info_title">Spesifikasi Berkas Audio</string>
+    <string name="player_audio_info_format">Format: %1$s</string>
+    <string name="player_audio_info_samplerate">Sample Rate: %1$s</string>
+    <string name="player_audio_info_bitdepth">Bit Depth: %1$s</string>
+    <string name="player_audio_info_channels">Kanal: %1$s</string>
+    <string name="player_audio_info_path">Lokasi: %1$s</string>
+    <string name="player_audio_info_size">Ukuran Total: %1$s</string>
+    <string name="player_audio_info_duration">Durasi Total: %1$s</string>
+    <string name="player_delete_confirm_title">Hapus Karya</string>
+    <string name="player_delete_confirm_desc">Yakin ingin menghapus \"%1$s\" dari penyimpanan perangkat? Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="player_toast_deleted">Karya berhasil dihapus dari penyimpanan.</string>
+
+    <!-- Elemen HiBy Style -->
+    <string name="hiby_badge_bitperfect">DAC BIT-PERFECT</string>
+    <string name="hiby_tab_all">Semua Karya</string>
+    <string name="hiby_tab_folders">Folder</string>
+    <string name="hiby_tab_cv">Pengisi Suara (CV)</string>
+    <string name="hiby_mode_grid">Staggered Grid</string>
+    <string name="hiby_mode_list">List Kompak</string>
 </resources>
