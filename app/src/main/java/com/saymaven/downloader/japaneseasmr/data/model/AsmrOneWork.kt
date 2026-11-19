@@ -14,6 +14,7 @@ data class AsmrOneWork(
     val releaseDate: String? = null,
     val hasSubtitle: Boolean = false,
     val ageRating: String = "ALL",
+    val nsfw: Boolean = false,
     val price: Int? = null,
     val rating: Double? = null,
     val reviewCount: Int? = null,

@@ -15,7 +15,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
+import com.saymaven.downloader.japaneseasmr.ui.components.PlaylistSelectionSheet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,6 +60,9 @@ fun AsmrOneWorkDetailScreen(
     var translatedTitleText by remember { mutableStateOf<String?>(null) }
     var isTranslating by remember { mutableStateOf(false) }
 
+    // Playlist picker state
+    var showPlaylistPickerSheet by remember { mutableStateOf(false) }
+
     // File tree translation state
     var isFileTreeTranslated by remember { mutableStateOf(false) }
     var translatedNodeTitles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -77,7 +82,7 @@ fun AsmrOneWorkDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -89,12 +94,31 @@ fun AsmrOneWorkDetailScreen(
                     )
                 }
 
-                Text(
-                    text = work.rjid,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                // RJ Code clickable to copy
+                Surface(
+                    onClick = {
+                        val match = Regex("(?:RJ|VJ|BJ)\\d+", RegexOption.IGNORE_CASE).find(work.rjid)?.value
+                        val rjToCopy = match ?: work.rjid
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("RJ Code", rjToCopy)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.browse_toast_rj_copied, rjToCopy),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                ) {
+                    Text(
+                        text = work.rjid,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onDownload) {
@@ -105,22 +129,12 @@ fun AsmrOneWorkDetailScreen(
                         )
                     }
 
-                    IconButton(
-                        onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("RJ Code", work.rjid)
-                            clipboard.setPrimaryClip(clip)
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.browse_toast_rj_copied, work.rjid),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    ) {
+                    // Save to playlist button
+                    IconButton(onClick = { showPlaylistPickerSheet = true }) {
                         Icon(
-                            imageVector = Icons.Default.BookmarkBorder,
-                            contentDescription = "Bookmark / Copy",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                            contentDescription = stringResource(R.string.browse_action_add_to_playlist),
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -134,8 +148,8 @@ fun AsmrOneWorkDetailScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            contentPadding = PaddingValues(top = 2.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 1. Large Top Cover Banner with standard 4:3 Aspect Ratio (KikoFlu Benchmark)
             item {
@@ -343,10 +357,10 @@ fun AsmrOneWorkDetailScreen(
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = if (isFileTreeTranslated) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(10.dp))
                             .clickable {
                                 if (!isFileTreeTranslated && translatedNodeTitles.isEmpty()) {
                                     coroutineScope.launch {
@@ -360,14 +374,13 @@ fun AsmrOneWorkDetailScreen(
                                             }
                                         }
                                         collectTitles(fileTree)
-
-                                        val map = mutableMapOf<String, String>()
-                                        for (t in titlesToTranslate) {
-                                            val tr = TranslationService.translateText(t, targetLang)
-                                            if (tr.isNotBlank()) {
-                                                map[t] = tr
+                                        if (audioTracks.isNotEmpty()) {
+                                            for (tr in audioTracks) {
+                                                titlesToTranslate.add(tr.title)
                                             }
                                         }
+
+                                        val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLang)
                                         translatedNodeTitles = map
                                         isFileTreeTranslated = true
                                         isTranslatingFileTree = false
@@ -378,16 +391,16 @@ fun AsmrOneWorkDetailScreen(
                             }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (isTranslatingFileTree) {
-                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.Translate,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(18.dp),
                                     tint = if (isFileTreeTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -395,7 +408,7 @@ fun AsmrOneWorkDetailScreen(
                             Text(
                                 text = stringResource(R.string.browse_detail_trans),
                                 style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
                                 color = if (isFileTreeTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -462,6 +475,18 @@ fun AsmrOneWorkDetailScreen(
                     }
                 }
             }
+        }
+
+        if (showPlaylistPickerSheet) {
+            PlaylistSelectionSheet(
+                workRjid = work.rjid,
+                workTitle = work.title,
+                coverUrl = work.coverUrl,
+                circle = work.circle,
+                cv = work.cv,
+                playerViewModel = playerViewModel,
+                onDismiss = { showPlaylistPickerSheet = false }
+            )
         }
     }
 }

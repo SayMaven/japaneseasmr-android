@@ -1,9 +1,11 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.browse
 
+import android.app.Application
 import android.content.Context
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.saymaven.downloader.japaneseasmr.R
+import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.model.AsmrOneWork
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService
@@ -14,7 +16,9 @@ import com.saymaven.downloader.japaneseasmr.service.TranslationService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 enum class BrowseTabType {
@@ -28,7 +32,6 @@ enum class AsmrSortField(val apiValue: String, val labelRes: Int) {
     ADDED_DATE("insert_date", R.string.browse_sort_added_date),
     CATALOG_DATE("release", R.string.browse_sort_catalog_date),
     REVIEWS("review_count", R.string.browse_sort_reviews),
-    DL_COUNT("dl_count", R.string.browse_sort_sales),
     RANDOM("random", R.string.browse_sort_random),
     ALL_AGES("nsfw", R.string.browse_sort_all_ages),
     ID("id", R.string.browse_sort_id)
@@ -39,7 +42,9 @@ enum class AsmrSortDirection(val apiValue: String, val labelRes: Int) {
     ASC("asc", R.string.browse_sort_asc)
 }
 
-class AsmrOneBrowseViewModel : ViewModel() {
+class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val prefs = PreferencesManager(application)
 
     private val _works = MutableStateFlow<List<AsmrOneWork>>(emptyList())
     val works = _works.asStateFlow()
@@ -56,23 +61,66 @@ class AsmrOneBrowseViewModel : ViewModel() {
     private val _currentTab = MutableStateFlow(BrowseTabType.ALL)
     val currentTab = _currentTab.asStateFlow()
 
-    private val _sortField = MutableStateFlow(AsmrSortField.RELEASE_DATE)
+    private val initialSortField = when (prefs.getInitialBrowseSortField()) {
+        "insert_date" -> AsmrSortField.ADDED_DATE
+        "release" -> AsmrSortField.CATALOG_DATE
+        "review_count" -> AsmrSortField.REVIEWS
+        "random" -> AsmrSortField.RANDOM
+        "nsfw" -> AsmrSortField.ALL_AGES
+        "id" -> AsmrSortField.ID
+        else -> AsmrSortField.RELEASE_DATE
+    }
+    private val initialSortDir = if (prefs.getInitialBrowseSortAsc()) AsmrSortDirection.ASC else AsmrSortDirection.DESC
+
+    private val _sortField = MutableStateFlow(initialSortField)
     val sortField = _sortField.asStateFlow()
 
-    private val _sortDirection = MutableStateFlow(AsmrSortDirection.DESC)
+    private val _sortDirection = MutableStateFlow(initialSortDir)
     val sortDirection = _sortDirection.asStateFlow()
+
+    // Persistent View Mode (Grid / List)
+    val browseViewMode = prefs.browseViewModeFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialBrowseViewMode())
+    fun setViewMode(mode: String) {
+        viewModelScope.launch { prefs.setBrowseViewMode(mode) }
+    }
+
+    // Persistent Page Size (default 40)
+    val browsePageSize = prefs.pageSizeFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialPageSize())
+    fun setPageSize(size: Int) {
+        viewModelScope.launch {
+            prefs.setPageSize(size)
+            loadPage(1)
+        }
+    }
+
+    // Blacklist & Content Filtering Flows
+    val blockedTags = prefs.blockedTagsFlow.stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
+    val blockedCvs = prefs.blockedCvsFlow.stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
+    val blockedCircles = prefs.blockedCirclesFlow.stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
+
+    // Work Card Display Toggles from UI Settings
+    val showCardRating = prefs.cardShowRatingFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val showCardPrice = prefs.cardShowPriceFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val showCardDuration = prefs.cardShowDurationFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showCardSales = prefs.cardShowSalesFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val showCardReleaseDate = prefs.cardShowReleaseDateFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showCardCircle = prefs.cardShowCircleFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showCardSubtitle = prefs.cardShowSubtitleTagFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showCardAgeRating = prefs.cardShowAgeRatingFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
 
     // Pagination
     private val _currentPage = MutableStateFlow(1)
     val currentPage = _currentPage.asStateFlow()
 
-    private val _totalPages = MutableStateFlow(50)
+    private val _totalPages = MutableStateFlow(1)
     val totalPages = _totalPages.asStateFlow()
 
     private val _totalCount = MutableStateFlow(0)
     val totalCount = _totalCount.asStateFlow()
 
-    private val pageSize = 20
+    // Scroll Position Preservation
+    var scrollIndex: Int = 0
+    var scrollOffset: Int = 0
 
     // Work detail & file tree for KikoFlu-style detail view
     private val _selectedWork = MutableStateFlow<AsmrOneWork?>(null)
@@ -114,7 +162,7 @@ class AsmrOneBrowseViewModel : ViewModel() {
                 _sortDirection.value = AsmrSortDirection.DESC
             }
             BrowseTabType.POPULAR -> {
-                _sortField.value = AsmrSortField.DL_COUNT
+                _sortField.value = AsmrSortField.REVIEWS
                 _sortDirection.value = AsmrSortDirection.DESC
             }
             BrowseTabType.RECOMMENDED -> {
@@ -130,6 +178,9 @@ class AsmrOneBrowseViewModel : ViewModel() {
         if (_sortField.value == field && _sortDirection.value == direction) return
         _sortField.value = field
         _sortDirection.value = direction
+        viewModelScope.launch {
+            prefs.saveBrowseSort(field.apiValue, direction == AsmrSortDirection.ASC)
+        }
         _currentPage.value = 1
         loadPage(1)
     }
@@ -156,20 +207,22 @@ class AsmrOneBrowseViewModel : ViewModel() {
             _errorMessage.value = null
 
             val query = _searchQuery.value.trim()
-            val orderParam = _sortField.value.apiValue
-            val sortParam = _sortDirection.value.apiValue
+            val isAllAges = _sortField.value == AsmrSortField.ALL_AGES
+            val orderParam = if (isAllAges) "nsfw" else _sortField.value.apiValue
+            val sortParam = if (isAllAges) "asc" else _sortDirection.value.apiValue
+            val effectivePageSize = browsePageSize.value.coerceIn(20, 100)
 
             val result = if (query.isNotEmpty()) {
                 AsmrOneApiService.searchWorksPage(
                     keyword = query,
                     page = page,
-                    pageSize = pageSize,
+                    pageSize = effectivePageSize,
                     subtitle = 0
                 )
             } else {
                 AsmrOneApiService.getWorksPage(
                     page = page,
-                    pageSize = pageSize,
+                    pageSize = effectivePageSize,
                     order = orderParam,
                     sort = sortParam,
                     subtitle = 0
@@ -177,12 +230,25 @@ class AsmrOneBrowseViewModel : ViewModel() {
             }
 
             result.onSuccess { pageData ->
-                val filteredList = if (_sortField.value == AsmrSortField.ALL_AGES) {
-                    pageData.works.filter { it.ageRating == "ALL" }
+                val baseFiltered = if (isAllAges) {
+                    pageData.works.filter { !it.nsfw }
                 } else {
                     pageData.works
                 }
-                _works.value = filteredList
+
+                // Blacklist content filtering
+                val bTags = blockedTags.value
+                val bCvs = blockedCvs.value
+                val bCircles = blockedCircles.value
+
+                val cleanWorks = baseFiltered.filter { w ->
+                    val tagHit = w.tags.any { t -> bTags.any { bt -> bt.equals(t, ignoreCase = true) } }
+                    val cvHit = bCvs.any { bc -> w.cv.contains(bc, ignoreCase = true) }
+                    val circleHit = bCircles.any { bc -> w.circle.contains(bc, ignoreCase = true) }
+                    !tagHit && !cvHit && !circleHit
+                }
+
+                _works.value = cleanWorks
                 _errorMessage.value = null
                 _totalCount.value = pageData.totalCount
                 _totalPages.value = pageData.totalPages.coerceAtLeast(1)
@@ -241,17 +307,17 @@ class AsmrOneBrowseViewModel : ViewModel() {
 
             val currentMap = _translatedTitles.value.toMutableMap()
             val worksToTranslate = _works.value.filter { it.rjid !in currentMap }
+            if (worksToTranslate.isEmpty()) return@launch
 
+            val titles = worksToTranslate.map { it.title }
+            val batchResults = TranslationService.translateBatch(titles, targetLang)
             for (w in worksToTranslate) {
-                try {
-                    val translated = TranslationService.translateText(w.title, targetLang)
-                    if (translated.isNotBlank()) {
-                        currentMap[w.rjid] = translated
-                        _translatedTitles.value = HashMap(currentMap)
-                    }
-                } catch (ignored: Exception) {
+                val tr = batchResults[w.title]
+                if (!tr.isNullOrBlank()) {
+                    currentMap[w.rjid] = tr
                 }
             }
+            _translatedTitles.value = HashMap(currentMap)
         }
     }
 

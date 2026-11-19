@@ -1445,4 +1445,9 @@ object TagLocalizer {
         val lower = cleanName.lowercase()
         return nameToEnglish[lower] ?: cleanName
     }
+
+    /**
+     * Returns all known unique tag names.
+     */
+    fun getAllKnownTags(): List<String> = nameToEnglish.keys.toList()
 }

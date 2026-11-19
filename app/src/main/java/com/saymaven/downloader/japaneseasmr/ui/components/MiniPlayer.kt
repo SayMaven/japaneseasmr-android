@@ -47,6 +47,8 @@ fun MiniPlayer(
     val isPlaying by viewModel.isPlaying.collectAsState()
     val currentPosition by viewModel.currentPosition.collectAsState()
     val duration by viewModel.duration.collectAsState()
+    val isOnlineStreaming by viewModel.isOnlineStreaming.collectAsState()
+    val currentStreamTrackTitle by viewModel.currentStreamTrackTitle.collectAsState()
 
     val isVisible = currentTitle != "-" && currentTitle.isNotBlank()
 
@@ -138,8 +140,13 @@ fun MiniPlayer(
                             overflow = TextOverflow.Ellipsis,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        val subText = if (isOnlineStreaming && !currentStreamTrackTitle.isNullOrBlank()) {
+                            if (currentArtist.isNotBlank() && currentArtist != "-") "$currentStreamTrackTitle • CV: $currentArtist" else currentStreamTrackTitle!!
+                        } else {
+                            if (currentArtist.isNotBlank() && currentArtist != "-") "CV: $currentArtist" else stringResource(R.string.player_audio_player)
+                        }
                         Text(
-                            text = if (currentArtist.isNotBlank() && currentArtist != "-") "CV: $currentArtist" else stringResource(R.string.player_audio_player),
+                            text = subText,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

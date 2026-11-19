@@ -124,6 +124,7 @@ object AsmrOneApiService {
             else -> ageRaw.ifBlank { "ALL" }.uppercase()
         }
 
+        val nsfw = obj.optBoolean("nsfw", false)
         val price = if (obj.has("price")) obj.optInt("price") else null
         val rating = if (obj.has("rate_average_2dp")) obj.optDouble("rate_average_2dp") else null
         val reviewCount = if (obj.has("review_count")) obj.optInt("review_count") else null
@@ -161,6 +162,7 @@ object AsmrOneApiService {
             releaseDate = releaseDate,
             hasSubtitle = hasSubtitle,
             ageRating = ageRating,
+            nsfw = nsfw,
             price = price,
             rating = rating,
             reviewCount = reviewCount,
@@ -211,7 +213,7 @@ object AsmrOneApiService {
             if (pagObj != null) {
                 currentPage = pagObj.optInt("currentPage", defaultPage)
                 val pSize = pagObj.optInt("pageSize", pageSize).coerceAtLeast(1)
-                totalCount = pagObj.optInt("total", 0)
+                totalCount = pagObj.optInt("totalCount", pagObj.optInt("total", 0))
                 if (totalCount > 0) {
                     totalPages = kotlin.math.ceil(totalCount.toDouble() / pSize.toDouble()).toInt().coerceAtLeast(1)
                 }

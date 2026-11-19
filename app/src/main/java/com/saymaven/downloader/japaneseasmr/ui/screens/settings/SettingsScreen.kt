@@ -46,6 +46,18 @@ import com.saymaven.downloader.japaneseasmr.service.UpdateManager
 import kotlinx.coroutines.launch
 import java.io.File
 
+enum class SettingsSubScreen {
+    MAIN,
+    UI_SETTINGS,
+    PLAYER_BUTTONS,
+    WORK_CARD,
+    WORK_DETAIL,
+    PRIVACY_MODE,
+    BLOCKED_ITEMS,
+    AUDIO_FORMAT,
+    LLM_SETTINGS
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -53,6 +65,70 @@ fun SettingsScreen(
     onOpenDrawer: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    var subScreen by remember { mutableStateOf(SettingsSubScreen.MAIN) }
+
+    when (subScreen) {
+        SettingsSubScreen.UI_SETTINGS -> {
+            UiSettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.MAIN },
+                onNavigateToPlayerButtons = { subScreen = SettingsSubScreen.PLAYER_BUTTONS },
+                onNavigateToWorkCard = { subScreen = SettingsSubScreen.WORK_CARD },
+                onNavigateToWorkDetail = { subScreen = SettingsSubScreen.WORK_DETAIL }
+            )
+            return
+        }
+        SettingsSubScreen.PLAYER_BUTTONS -> {
+            PlayerButtonsSettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.UI_SETTINGS }
+            )
+            return
+        }
+        SettingsSubScreen.WORK_CARD -> {
+            WorkCardDisplaySettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.UI_SETTINGS }
+            )
+            return
+        }
+        SettingsSubScreen.WORK_DETAIL -> {
+            WorkDetailDisplaySettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.UI_SETTINGS }
+            )
+            return
+        }
+        SettingsSubScreen.PRIVACY_MODE -> {
+            PrivacyModeSettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.MAIN }
+            )
+            return
+        }
+        SettingsSubScreen.BLOCKED_ITEMS -> {
+            BlockedItemsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.MAIN }
+            )
+            return
+        }
+        SettingsSubScreen.AUDIO_FORMAT -> {
+            AudioFormatSettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.MAIN }
+            )
+            return
+        }
+        SettingsSubScreen.LLM_SETTINGS -> {
+            LLMSettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.MAIN }
+            )
+            return
+        }
+        SettingsSubScreen.MAIN -> { /* proceed with normal main settings list */ }
+    }
 
     val themeMode by viewModel.themeMode.collectAsState()
     val dynamicColor by viewModel.dynamicColor.collectAsState()
@@ -193,6 +269,48 @@ fun SettingsScreen(
             )
         }
 
+        Card(
+            onClick = { subScreen = SettingsSubScreen.BLOCKED_ITEMS },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+        ) {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_blocked_items), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_blocked_items_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.Block, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+        }
+
+        Card(
+            onClick = { subScreen = SettingsSubScreen.LLM_SETTINGS },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+        ) {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_llm_config), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_llm_config_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.Psychology, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+        }
+
         // ================= 1. PENGATURAN PEMUTAR AUDIO =================
         SettingsCategoryHeader(title = stringResource(R.string.settings_cat_player), icon = Icons.AutoMirrored.Filled.VolumeUp)
 
@@ -309,13 +427,49 @@ fun SettingsScreen(
                     headlineContent = { Text(stringResource(R.string.settings_target_lang_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = {
                         val langLabel = when (translationLanguage) {
+                            "auto" -> stringResource(R.string.settings_trans_lang_auto)
+                            "id" -> stringResource(R.string.settings_trans_lang_in)
                             "en" -> stringResource(R.string.settings_trans_lang_en)
-                            else -> stringResource(R.string.settings_trans_lang_in)
+                            "ja" -> stringResource(R.string.settings_trans_lang_ja)
+                            "zh-CN", "zh" -> stringResource(R.string.settings_trans_lang_zh)
+                            else -> stringResource(R.string.settings_trans_lang_auto)
                         }
                         Text(langLabel, style = MaterialTheme.typography.bodySmall)
                     },
                     leadingContent = { Icon(Icons.Default.Translate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.clickable { showTranslationLangDialog = true }
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_cat_privacy), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_privacy_enable_desc), style = MaterialTheme.typography.bodySmall) },
+                    leadingContent = { Icon(Icons.Default.Security, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.clickable { subScreen = SettingsSubScreen.PRIVACY_MODE }
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_audio_format_priority), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text(stringResource(R.string.settings_audio_format_priority_desc), style = MaterialTheme.typography.bodySmall) },
+                    leadingContent = { Icon(Icons.Default.AudioFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.clickable { subScreen = SettingsSubScreen.AUDIO_FORMAT }
                 )
             }
         }
@@ -567,6 +721,27 @@ fun SettingsScreen(
                     }
                 }
             }
+        }
+
+        Card(
+            onClick = { subScreen = SettingsSubScreen.UI_SETTINGS },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+        ) {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_cat_ui), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_ui_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.DashboardCustomize, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
         }
 
         // ================= 4. TENTANG & INFORMASI =================
@@ -1114,8 +1289,11 @@ fun SettingsScreen(
 
     if (showTranslationLangDialog) {
         val langOptions = listOf(
+            "auto" to stringResource(R.string.settings_trans_lang_auto),
             "id" to stringResource(R.string.settings_trans_lang_in),
-            "en" to stringResource(R.string.settings_trans_lang_en)
+            "en" to stringResource(R.string.settings_trans_lang_en),
+            "ja" to stringResource(R.string.settings_trans_lang_ja),
+            "zh-CN" to stringResource(R.string.settings_trans_lang_zh)
         )
         AlertDialog(
             onDismissRequest = { showTranslationLangDialog = false },

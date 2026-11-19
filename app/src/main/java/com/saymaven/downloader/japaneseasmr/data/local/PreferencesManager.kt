@@ -51,6 +51,63 @@ class PreferencesManager(private val context: Context) {
         val KEY_SHUFFLE_MODE = booleanPreferencesKey("shuffle_mode")
         val KEY_SHOW_REMAINING_TIME = booleanPreferencesKey("show_remaining_time")
 
+        // View Mode & Layout Persistence
+        val KEY_HOME_VIEW_MODE = stringPreferencesKey("home_view_mode")
+        val KEY_BROWSE_VIEW_MODE = stringPreferencesKey("browse_view_mode")
+        val KEY_HOME_SORT_FIELD = stringPreferencesKey("home_sort_field")
+        val KEY_HOME_SORT_ASC = booleanPreferencesKey("home_sort_asc")
+        val KEY_BROWSE_SORT_FIELD = stringPreferencesKey("browse_sort_field")
+        val KEY_BROWSE_SORT_ASC = booleanPreferencesKey("browse_sort_asc")
+        val KEY_PAGE_SIZE = intPreferencesKey("browse_page_size")
+
+        // UI Settings Toggles (Work Card & Detail Display)
+        val KEY_WORK_CARD_SIZE = stringPreferencesKey("work_card_size")
+        val KEY_WORK_CARD_FONT_SCALE = stringPreferencesKey("work_card_font_scale")
+        val KEY_CARD_SHOW_RATING = booleanPreferencesKey("card_show_rating")
+        val KEY_CARD_SHOW_PRICE = booleanPreferencesKey("card_show_price")
+        val KEY_CARD_SHOW_DURATION = booleanPreferencesKey("card_show_duration")
+        val KEY_CARD_SHOW_SALES = booleanPreferencesKey("card_show_sales")
+        val KEY_CARD_SHOW_RELEASE_DATE = booleanPreferencesKey("card_show_release_date")
+        val KEY_CARD_SHOW_CIRCLE = booleanPreferencesKey("card_show_circle")
+        val KEY_CARD_SHOW_SUBTITLE_TAG = booleanPreferencesKey("card_show_subtitle_tag")
+        val KEY_CARD_SHOW_AGE_RATING = booleanPreferencesKey("card_show_age_rating")
+
+        val KEY_DETAIL_SHOW_RATING = booleanPreferencesKey("detail_show_rating")
+        val KEY_DETAIL_SHOW_PRICE = booleanPreferencesKey("detail_show_price")
+        val KEY_DETAIL_SHOW_DURATION = booleanPreferencesKey("detail_show_duration")
+        val KEY_DETAIL_SHOW_SALES = booleanPreferencesKey("detail_show_sales")
+        val KEY_DETAIL_SHOW_EXTERNAL_LINKS = booleanPreferencesKey("detail_show_external_links")
+        val KEY_DETAIL_SHOW_RELEASE_DATE = booleanPreferencesKey("detail_show_release_date")
+        val KEY_DETAIL_SHOW_TRANSLATE_BUTTON = booleanPreferencesKey("detail_show_translate_button")
+        val KEY_DETAIL_SHOW_SUBTITLE_TAG = booleanPreferencesKey("detail_show_subtitle_tag")
+        val KEY_DETAIL_SHOW_AGE_RATING = booleanPreferencesKey("detail_show_age_rating")
+        val KEY_DETAIL_SHOW_RECOMMENDATIONS = booleanPreferencesKey("detail_show_recommendations")
+
+        val KEY_PLAYER_BUTTON_ORDER = stringPreferencesKey("player_button_order")
+
+        // Privacy Mode (Anti-Malu)
+        val KEY_PRIVACY_ENABLED = booleanPreferencesKey("privacy_enabled")
+        val KEY_PRIVACY_BLUR_NOTIF = booleanPreferencesKey("privacy_blur_notif")
+        val KEY_PRIVACY_BLUR_INAPP = booleanPreferencesKey("privacy_blur_inapp")
+        val KEY_PRIVACY_MASK_TITLE = booleanPreferencesKey("privacy_mask_title")
+        val KEY_PRIVACY_CUSTOM_MASK = stringPreferencesKey("privacy_custom_mask")
+
+        // Audio Lanjutan
+        val KEY_AUDIO_GAIN_DB = floatPreferencesKey("audio_gain_db")
+        val KEY_AUDIO_FORMAT_PRIORITY = stringPreferencesKey("audio_format_priority")
+        val KEY_AUDIO_PRELOAD_SECONDS = intPreferencesKey("audio_preload_seconds")
+
+        // Blocked Items (Blacklist)
+        val KEY_BLOCKED_TAGS = stringSetPreferencesKey("blocked_tags")
+        val KEY_BLOCKED_CVS = stringSetPreferencesKey("blocked_cvs")
+        val KEY_BLOCKED_CIRCLES = stringSetPreferencesKey("blocked_circles")
+
+        // LLM Configuration
+        val KEY_LLM_API_URL = stringPreferencesKey("llm_api_url")
+        val KEY_LLM_API_KEY = stringPreferencesKey("llm_api_key")
+        val KEY_LLM_MODEL = stringPreferencesKey("llm_model")
+        val KEY_LLM_PROMPT = stringPreferencesKey("llm_prompt")
+
         fun getFastCachedUsbVolume(context: Context): Float {
             return try {
                 val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
@@ -73,6 +130,15 @@ class PreferencesManager(private val context: Context) {
                 sp.getString("cached_app_language", "system") ?: "system"
             } catch (e: Exception) {
                 "system"
+            }
+        }
+
+        fun getFastCachedTranslationLanguage(context: Context): String {
+            return try {
+                val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+                sp.getString("cached_trans_language", "auto") ?: "auto"
+            } catch (e: Exception) {
+                "auto"
             }
         }
     }
@@ -163,7 +229,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     val translationLanguageFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[KEY_TRANSLATION_LANGUAGE] ?: "id"
+        preferences[KEY_TRANSLATION_LANGUAGE] ?: "auto"
     }
 
     val isTranslationActiveFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -223,6 +289,253 @@ class PreferencesManager(private val context: Context) {
 
     val showRemainingTimeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_SHOW_REMAINING_TIME] ?: false
+    }
+
+    // Persistent Layout View Modes (Grid vs List)
+    val homeViewModeFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[KEY_HOME_VIEW_MODE] ?: "grid"
+    }
+
+    val browseViewModeFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[KEY_BROWSE_VIEW_MODE] ?: "grid"
+    }
+
+    fun getInitialHomeViewMode(): String = fastSp.getString("cached_home_view_mode", "grid") ?: "grid"
+    fun getInitialBrowseViewMode(): String = fastSp.getString("cached_browse_view_mode", "grid") ?: "grid"
+
+    suspend fun setHomeViewMode(mode: String) {
+        fastSp.edit().putString("cached_home_view_mode", mode).apply()
+        context.dataStore.edit { it[KEY_HOME_VIEW_MODE] = mode }
+    }
+
+    suspend fun setBrowseViewMode(mode: String) {
+        fastSp.edit().putString("cached_browse_view_mode", mode).apply()
+        context.dataStore.edit { it[KEY_BROWSE_VIEW_MODE] = mode }
+    }
+
+    // Persistent Sort Preferences
+    val homeSortFieldFlow: Flow<String> = context.dataStore.data.map { it[KEY_HOME_SORT_FIELD] ?: "DATE" }
+    val homeSortAscFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_HOME_SORT_ASC] ?: false }
+
+    val browseSortFieldFlow: Flow<String> = context.dataStore.data.map { it[KEY_BROWSE_SORT_FIELD] ?: "release" }
+    val browseSortAscFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_BROWSE_SORT_ASC] ?: false }
+
+    fun getInitialBrowseSortField(): String = fastSp.getString("cached_browse_sort_field", "release") ?: "release"
+    fun getInitialBrowseSortAsc(): Boolean = fastSp.getBoolean("cached_browse_sort_asc", false)
+
+    suspend fun saveHomeSort(field: String, isAsc: Boolean) {
+        fastSp.edit().putString("cached_home_sort_field", field).putBoolean("cached_home_sort_asc", isAsc).apply()
+        context.dataStore.edit {
+            it[KEY_HOME_SORT_FIELD] = field
+            it[KEY_HOME_SORT_ASC] = isAsc
+        }
+    }
+
+    suspend fun saveBrowseSort(field: String, isAsc: Boolean) {
+        fastSp.edit().putString("cached_browse_sort_field", field).putBoolean("cached_browse_sort_asc", isAsc).apply()
+        context.dataStore.edit {
+            it[KEY_BROWSE_SORT_FIELD] = field
+            it[KEY_BROWSE_SORT_ASC] = isAsc
+        }
+    }
+
+    // Page Size Preference
+    val pageSizeFlow: Flow<Int> = context.dataStore.data.map { it[KEY_PAGE_SIZE] ?: 40 }
+    fun getInitialPageSize(): Int = fastSp.getInt("cached_page_size", 40)
+
+    suspend fun setPageSize(size: Int) {
+        fastSp.edit().putInt("cached_page_size", size).apply()
+        context.dataStore.edit { it[KEY_PAGE_SIZE] = size }
+    }
+
+    // Privacy Mode (Anti-Malu) Flows & Setters
+    val privacyEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_ENABLED] ?: false }
+    val privacyBlurNotifFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_BLUR_NOTIF] ?: true }
+    val privacyBlurInAppFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_BLUR_INAPP] ?: false }
+    val privacyMaskTitleFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_MASK_TITLE] ?: true }
+    val privacyCustomMaskFlow: Flow<String> = context.dataStore.data.map { it[KEY_PRIVACY_CUSTOM_MASK] ?: "Audio Relaksasi" }
+
+    fun getInitialPrivacyEnabled(): Boolean = fastSp.getBoolean("cached_privacy_enabled", false)
+    fun getInitialPrivacyMaskTitle(): Boolean = fastSp.getBoolean("cached_privacy_mask_title", true)
+    fun getInitialPrivacyCustomMask(): String = fastSp.getString("cached_privacy_custom_mask", "Audio Relaksasi") ?: "Audio Relaksasi"
+    fun getInitialPrivacyBlurNotif(): Boolean = fastSp.getBoolean("cached_privacy_blur_notif", true)
+    fun getInitialPrivacyBlurInApp(): Boolean = fastSp.getBoolean("cached_privacy_blur_inapp", false)
+
+    suspend fun setPrivacyEnabled(enabled: Boolean) {
+        fastSp.edit().putBoolean("cached_privacy_enabled", enabled).apply()
+        context.dataStore.edit { it[KEY_PRIVACY_ENABLED] = enabled }
+    }
+
+    suspend fun setPrivacyBlurNotif(blur: Boolean) {
+        fastSp.edit().putBoolean("cached_privacy_blur_notif", blur).apply()
+        context.dataStore.edit { it[KEY_PRIVACY_BLUR_NOTIF] = blur }
+    }
+
+    suspend fun setPrivacyBlurInApp(blur: Boolean) {
+        fastSp.edit().putBoolean("cached_privacy_blur_inapp", blur).apply()
+        context.dataStore.edit { it[KEY_PRIVACY_BLUR_INAPP] = blur }
+    }
+
+    suspend fun setPrivacyMaskTitle(mask: Boolean) {
+        fastSp.edit().putBoolean("cached_privacy_mask_title", mask).apply()
+        context.dataStore.edit { it[KEY_PRIVACY_MASK_TITLE] = mask }
+    }
+
+    suspend fun setPrivacyCustomMask(text: String) {
+        fastSp.edit().putString("cached_privacy_custom_mask", text).apply()
+        context.dataStore.edit { it[KEY_PRIVACY_CUSTOM_MASK] = text }
+    }
+
+    // Audio Gain Slider (-12dB to +12dB)
+    val audioGainDbFlow: Flow<Float> = context.dataStore.data.map { it[KEY_AUDIO_GAIN_DB] ?: 0.0f }
+    fun getInitialAudioGainDb(): Float = fastSp.getFloat("cached_audio_gain_db", 0.0f)
+
+    suspend fun setAudioGainDb(gainDb: Float) {
+        val clamped = gainDb.coerceIn(-12.0f, 12.0f)
+        fastSp.edit().putFloat("cached_audio_gain_db", clamped).apply()
+        context.dataStore.edit { it[KEY_AUDIO_GAIN_DB] = clamped }
+    }
+
+    // Audio Format Priority
+    val audioFormatPriorityFlow: Flow<String> = context.dataStore.data.map {
+        it[KEY_AUDIO_FORMAT_PRIORITY] ?: "mp3,flac,wav,opus,m4a,aac"
+    }
+
+    fun getInitialAudioFormatPriority(): List<String> {
+        val s = fastSp.getString("cached_audio_format_priority", "mp3,flac,wav,opus,m4a,aac") ?: "mp3,flac,wav,opus,m4a,aac"
+        return s.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }
+    }
+
+    suspend fun setAudioFormatPriority(priority: String) {
+        fastSp.edit().putString("cached_audio_format_priority", priority).apply()
+        context.dataStore.edit { it[KEY_AUDIO_FORMAT_PRIORITY] = priority }
+    }
+
+    // Audio Preload
+    val audioPreloadSecondsFlow: Flow<Int> = context.dataStore.data.map { it[KEY_AUDIO_PRELOAD_SECONDS] ?: 15 }
+
+    suspend fun setAudioPreloadSeconds(seconds: Int) {
+        context.dataStore.edit { it[KEY_AUDIO_PRELOAD_SECONDS] = seconds }
+    }
+
+    // Blocked Items (Blacklist)
+    val blockedTagsFlow: Flow<Set<String>> = context.dataStore.data.map { it[KEY_BLOCKED_TAGS] ?: emptySet() }
+    val blockedCvsFlow: Flow<Set<String>> = context.dataStore.data.map { it[KEY_BLOCKED_CVS] ?: emptySet() }
+    val blockedCirclesFlow: Flow<Set<String>> = context.dataStore.data.map { it[KEY_BLOCKED_CIRCLES] ?: emptySet() }
+
+    suspend fun addBlockedTag(tag: String) {
+        if (tag.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val set = prefs[KEY_BLOCKED_TAGS]?.toMutableSet() ?: mutableSetOf()
+            set.add(tag.trim().lowercase())
+            prefs[KEY_BLOCKED_TAGS] = set
+        }
+    }
+
+    suspend fun removeBlockedTag(tag: String) {
+        context.dataStore.edit { prefs ->
+            val set = prefs[KEY_BLOCKED_TAGS]?.toMutableSet() ?: mutableSetOf()
+            set.remove(tag.trim().lowercase())
+            prefs[KEY_BLOCKED_TAGS] = set
+        }
+    }
+
+    suspend fun addBlockedCv(cv: String) {
+        if (cv.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val set = prefs[KEY_BLOCKED_CVS]?.toMutableSet() ?: mutableSetOf()
+            set.add(cv.trim())
+            prefs[KEY_BLOCKED_CVS] = set
+        }
+    }
+
+    suspend fun removeBlockedCv(cv: String) {
+        context.dataStore.edit { prefs ->
+            val set = prefs[KEY_BLOCKED_CVS]?.toMutableSet() ?: mutableSetOf()
+            set.remove(cv.trim())
+            prefs[KEY_BLOCKED_CVS] = set
+        }
+    }
+
+    suspend fun addBlockedCircle(circle: String) {
+        if (circle.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val set = prefs[KEY_BLOCKED_CIRCLES]?.toMutableSet() ?: mutableSetOf()
+            set.add(circle.trim())
+            prefs[KEY_BLOCKED_CIRCLES] = set
+        }
+    }
+
+    suspend fun removeBlockedCircle(circle: String) {
+        context.dataStore.edit { prefs ->
+            val set = prefs[KEY_BLOCKED_CIRCLES]?.toMutableSet() ?: mutableSetOf()
+            set.remove(circle.trim())
+            prefs[KEY_BLOCKED_CIRCLES] = set
+        }
+    }
+
+    // UI Settings: Work Card Display Preferences
+    val cardShowRatingFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_CARD_SHOW_RATING] ?: false }
+    val cardShowPriceFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_CARD_SHOW_PRICE] ?: false }
+    val cardShowDurationFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_CARD_SHOW_DURATION] ?: true }
+    val cardShowSalesFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_CARD_SHOW_SALES] ?: false }
+    val cardShowReleaseDateFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_CARD_SHOW_RELEASE_DATE] ?: true }
+    val cardShowCircleFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_CARD_SHOW_CIRCLE] ?: true }
+    val cardShowSubtitleTagFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_CARD_SHOW_SUBTITLE_TAG] ?: true }
+    val cardShowAgeRatingFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_CARD_SHOW_AGE_RATING] ?: true }
+
+    suspend fun setCardShowRating(show: Boolean) = context.dataStore.edit { it[KEY_CARD_SHOW_RATING] = show }
+    suspend fun setCardShowPrice(show: Boolean) = context.dataStore.edit { it[KEY_CARD_SHOW_PRICE] = show }
+    suspend fun setCardShowDuration(show: Boolean) = context.dataStore.edit { it[KEY_CARD_SHOW_DURATION] = show }
+    suspend fun setCardShowSales(show: Boolean) = context.dataStore.edit { it[KEY_CARD_SHOW_SALES] = show }
+    suspend fun setCardShowReleaseDate(show: Boolean) = context.dataStore.edit { it[KEY_CARD_SHOW_RELEASE_DATE] = show }
+    suspend fun setCardShowCircle(show: Boolean) = context.dataStore.edit { it[KEY_CARD_SHOW_CIRCLE] = show }
+    suspend fun setCardShowSubtitleTag(show: Boolean) = context.dataStore.edit { it[KEY_CARD_SHOW_SUBTITLE_TAG] = show }
+    suspend fun setCardShowAgeRating(show: Boolean) = context.dataStore.edit { it[KEY_CARD_SHOW_AGE_RATING] = show }
+
+    // UI Settings: Work Detail Display Preferences
+    val detailShowRatingFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_RATING] ?: false }
+    val detailShowPriceFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_PRICE] ?: false }
+    val detailShowDurationFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_DURATION] ?: true }
+    val detailShowSalesFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_SALES] ?: false }
+    val detailShowExternalLinksFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_EXTERNAL_LINKS] ?: true }
+    val detailShowReleaseDateFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_RELEASE_DATE] ?: true }
+    val detailShowTranslateButtonFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_TRANSLATE_BUTTON] ?: true }
+    val detailShowSubtitleTagFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_SUBTITLE_TAG] ?: true }
+    val detailShowAgeRatingFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_AGE_RATING] ?: true }
+    val detailShowRecommendationsFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_DETAIL_SHOW_RECOMMENDATIONS] ?: true }
+
+    suspend fun setDetailShowRating(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_RATING] = show }
+    suspend fun setDetailShowPrice(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_PRICE] = show }
+    suspend fun setDetailShowDuration(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_DURATION] = show }
+    suspend fun setDetailShowSales(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_SALES] = show }
+    suspend fun setDetailShowExternalLinks(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_EXTERNAL_LINKS] = show }
+    suspend fun setDetailShowReleaseDate(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_RELEASE_DATE] = show }
+    suspend fun setDetailShowTranslateButton(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_TRANSLATE_BUTTON] = show }
+    suspend fun setDetailShowSubtitleTag(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_SUBTITLE_TAG] = show }
+    suspend fun setDetailShowAgeRating(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_AGE_RATING] = show }
+    suspend fun setDetailShowRecommendations(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_RECOMMENDATIONS] = show }
+
+    // UI Settings: Player Buttons Order
+    val playerButtonOrderFlow: Flow<String> = context.dataStore.data.map {
+        it[KEY_PLAYER_BUTTON_ORDER] ?: "repeat,speed,sleep_timer,bookmark,volume,seek_backward,seek_forward,detail,subtitle,specs"
+    }
+
+    suspend fun setPlayerButtonOrder(order: String) = context.dataStore.edit { it[KEY_PLAYER_BUTTON_ORDER] = order }
+
+    // LLM Settings
+    val llmApiUrlFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_API_URL] ?: "" }
+    val llmApiKeyFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_API_KEY] ?: "" }
+    val llmModelFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_MODEL] ?: "gpt-4o-mini" }
+    val llmPromptFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_PROMPT] ?: "" }
+
+    suspend fun setLlmConfig(url: String, key: String, model: String, prompt: String) {
+        context.dataStore.edit {
+            it[KEY_LLM_API_URL] = url
+            it[KEY_LLM_API_KEY] = key
+            it[KEY_LLM_MODEL] = model
+            it[KEY_LLM_PROMPT] = prompt
+        }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
@@ -305,6 +618,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     suspend fun setTranslationLanguage(lang: String) {
+        fastSp.edit().putString("cached_trans_language", lang).apply()
         context.dataStore.edit { preferences ->
             preferences[KEY_TRANSLATION_LANGUAGE] = lang
         }

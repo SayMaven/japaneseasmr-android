@@ -5,6 +5,9 @@ import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
 import com.saymaven.downloader.japaneseasmr.data.local.dao.TranslationCacheDao
 import com.saymaven.downloader.japaneseasmr.data.local.entity.TranslationCacheEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -45,9 +48,14 @@ object TranslationService {
     }
 
     /**
-     * Resolves target translation language based on active UI app language or system locale.
+     * Resolves target translation language based on configured preference or active UI app language.
      */
     fun getActiveTargetLanguage(context: Context): String {
+        val configured = com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager.getFastCachedTranslationLanguage(context).lowercase()
+        if (configured != "auto" && configured.isNotBlank()) {
+            return configured
+        }
+
         val lang = com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager.getFastCachedLanguage(context).lowercase()
         val effectiveLang = if (lang == "system") {
             java.util.Locale.getDefault().language.lowercase()
@@ -59,6 +67,60 @@ object TranslationService {
             effectiveLang.startsWith("ja") -> "ja"
             else -> "en"
         }
+    }
+
+    /**
+     * Translates multiple texts in parallel chunks, checking local memory & DB cache first.
+     */
+    suspend fun translateBatch(
+        texts: List<String>,
+        targetLang: String = "id"
+    ): Map<String, String> = kotlinx.coroutines.coroutineScope {
+        val unique = texts.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        val result = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+        val missingAfterMem = mutableListOf<String>()
+        for (t in unique) {
+            val memVal = memoryCache["$targetLang:$t"]
+            if (!memVal.isNullOrBlank()) {
+                result[t] = memVal
+            } else {
+                missingAfterMem.add(t)
+            }
+        }
+
+        val missingAfterDb = mutableListOf<String>()
+        if (missingAfterMem.isNotEmpty()) {
+            val dbItems = cacheDao?.getTranslations(missingAfterMem, targetLang) ?: emptyList()
+            val dbMap = dbItems.associate { it.sourceText to it.translatedText }
+            for (t in missingAfterMem) {
+                val dbVal = dbMap[t]
+                if (!dbVal.isNullOrBlank()) {
+                    memoryCache["$targetLang:$t"] = dbVal
+                    result[t] = dbVal
+                } else {
+                    missingAfterDb.add(t)
+                }
+            }
+        }
+
+        if (missingAfterDb.isNotEmpty()) {
+            val chunks = missingAfterDb.chunked(12)
+            coroutineScope {
+                chunks.map { chunk ->
+                    async(Dispatchers.IO) {
+                        for (t in chunk) {
+                            val tr = translateText(t, targetLang)
+                            if (tr.isNotBlank()) {
+                                result[t] = tr
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+        }
+
+        result
     }
 
     private val client = OkHttpClient.Builder()

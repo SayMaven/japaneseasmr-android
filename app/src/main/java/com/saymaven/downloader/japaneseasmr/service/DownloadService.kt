@@ -323,7 +323,8 @@ class DownloadService : Service() {
                 continue
             }
 
-            val tracks = TrackDiscoveryService.discoverAllTracks(itemRjid, "auto")
+            val preferredFormat = prefs.getInitialAudioFormatPriority().firstOrNull() ?: "auto"
+            val tracks = TrackDiscoveryService.discoverAllTracks(itemRjid, preferredFormat)
             log(DownloadLogHelper.tracksFound(tracks.size, tracks.joinToString { it.name }))
 
             updateItem(itemRjid) {

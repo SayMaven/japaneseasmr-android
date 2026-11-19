@@ -21,6 +21,8 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
+import com.saymaven.downloader.japaneseasmr.data.local.entity.UserPlaylistEntity
+import com.saymaven.downloader.japaneseasmr.data.local.entity.PlaylistItemEntity
 import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
 import com.saymaven.downloader.japaneseasmr.data.model.SourceType
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneTrack
@@ -38,6 +40,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,6 +75,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val sp = application.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
     private val prefs = PreferencesManager(application)
     private val historyDao = AsmrDatabase.getDatabase(application).historyDao()
+    private val playlistDao = AsmrDatabase.getDatabase(application).playlistDao()
     private val CURRENT_TRANSLATION_ENGINE_VERSION = 2
 
     // Fast downloadDir StateFlow initialized from SP cache (instant 0ms)
@@ -301,6 +305,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _currentTitle = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_title", "Belum ada lagu yang diputar") ?: "Belum ada lagu yang diputar" else "Belum ada lagu yang diputar")
     val currentTitle = _currentTitle.asStateFlow()
 
+    private val _currentStreamTrackTitle = MutableStateFlow<String?>(null)
+    val currentStreamTrackTitle = _currentStreamTrackTitle.asStateFlow()
+
+    // Room Playlists State
+    val userPlaylists = playlistDao.getAllPlaylists().stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    val allSavedRjids = playlistDao.getAllSavedRjids().map { it.toSet() }.stateIn(viewModelScope, SharingStarted.Lazily, emptySet())
+
+    val homeViewMode = prefs.homeViewModeFlow.stateIn(
+        viewModelScope,
+        SharingStarted.Lazily,
+        prefs.getInitialHomeViewMode()
+    )
+
+    fun setHomeViewMode(mode: String) {
+        viewModelScope.launch {
+            prefs.setHomeViewMode(mode)
+        }
+    }
+
+    // Privacy Mode (Anti-Malu) Flows
+    val privacyEnabled = prefs.privacyEnabledFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialPrivacyEnabled())
+    val privacyBlurNotif = prefs.privacyBlurNotifFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialPrivacyBlurNotif())
+    val privacyBlurInApp = prefs.privacyBlurInAppFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialPrivacyBlurInApp())
+    val privacyMaskTitle = prefs.privacyMaskTitleFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialPrivacyMaskTitle())
+    val privacyCustomMask = prefs.privacyCustomMaskFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialPrivacyCustomMask())
+
+    // Audio Gain Flow
+    val audioGainDb = prefs.audioGainDbFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialAudioGainDb())
+
     private val _currentArtist = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_artist", "-") ?: "-" else "-")
     val currentArtist = _currentArtist.asStateFlow()
 
@@ -490,9 +523,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), customDirStr) ?: customDirStr
         val downloadDir = if (!resolvedPath.isNullOrBlank()) File(resolvedPath) else DownloadService.getDefaultDownloadDirectory()
 
-        // Pindai subfolder fisik yang ada di direktori unduhan
+        // Pindai subfolder fisik yang ada di direktori unduhan dan folder impor
         val subfolders = AudioStorageHelper.getExistingSubfolders(downloadDir)
-        val allFolders = (listOf("Semua", "Utama") + subfolders).distinct()
+        val imported = prefs.importedDirsFlow.first()
+        val importedNames = imported.map { File(it).name }.filter { it.isNotBlank() }
+        val allFolders = (listOf("Semua", "Utama") + subfolders + importedNames).distinct()
         _availableFolders.value = allFolders
 
         // Filter HANYA audio yang file fisiknya benar-benar ada di HP (termasuk di subfolder dan folder multi-track)
@@ -956,13 +991,32 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                 _translatedChapters.value = emptyList()
                             }
                         }
-                        mediaItem.mediaMetadata.let { meta ->
-                            _currentTitle.value = meta.title?.toString() ?: ""
-                            _currentArtist.value = meta.artist?.toString() ?: "-"
-                            val cover = meta.artworkUri?.toString()
-                            if (!cover.isNullOrBlank()) {
-                                _currentCoverUrl.value = cover
-                                preloadCoverArtInMemory(cover)
+                        if (_isOnlineStreaming.value) {
+                            val curIdx = p.currentMediaItemIndex
+                            val curChapter = _currentChapters.value.getOrNull(curIdx)
+                            val trackTitle = curChapter?.title ?: mediaItem.mediaMetadata.title?.toString() ?: ""
+                            _currentStreamTrackTitle.value = trackTitle
+                            val albumTitle = mediaItem.mediaMetadata.albumTitle?.toString() ?: ""
+                            if (albumTitle.isNotBlank()) {
+                                val rj = _currentRjId.value ?: ""
+                                _currentTitle.value = if (rj.isNotBlank()) "[$rj] $albumTitle" else albumTitle
+                            }
+                            val baseMs = curChapter?.startMs ?: 0L
+                            _currentPosition.value = (baseMs + p.currentPosition).coerceAtLeast(0L)
+                            val totalDur = _currentChapters.value.lastOrNull()?.endMs ?: 0L
+                            if (totalDur > 0L) {
+                                _duration.value = totalDur
+                            }
+                            saveCurrentState()
+                        } else {
+                            mediaItem.mediaMetadata.let { meta ->
+                                _currentTitle.value = meta.title?.toString() ?: ""
+                                _currentArtist.value = meta.artist?.toString() ?: "-"
+                                val cover = meta.artworkUri?.toString()
+                                if (!cover.isNullOrBlank()) {
+                                    _currentCoverUrl.value = cover
+                                    preloadCoverArtInMemory(cover)
+                                }
                             }
                         }
                         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
@@ -983,13 +1037,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 updatePlayingState(p)
                 if (playbackState == Player.STATE_ENDED) {
                     if (_repeatMode.value == Player.REPEAT_MODE_ONE) {
-                        p.seekTo(0, 0L)
+                        p.seekTo(p.currentMediaItemIndex, 0L)
                         p.play()
+                    } else if (_isOnlineStreaming.value) {
+                        if (_repeatMode.value == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
+                            p.seekTo(0, 0L)
+                            p.play()
+                        }
                     } else {
                         playAdjacentWork(forward = true)
                     }
                 } else if (playbackState == Player.STATE_READY) {
-                    if (isCurrentVirtualAlbum) {
+                    if (isCurrentVirtualAlbum || _isOnlineStreaming.value) {
                         val totalDur = _currentChapters.value.lastOrNull()?.endMs ?: 0L
                         if (totalDur > 0L) _duration.value = totalDur
                         val curIdx = p.currentMediaItemIndex
@@ -1321,31 +1380,36 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             val targetIndex = startIndex.coerceIn(0, tracks.size - 1)
             val currentTrack = tracks[targetIndex]
-            val initialTitle = "[$rjid] ${currentTrack.title}"
+            val initialTitle = "[$rjid] $workTitle"
 
             _currentRjId.value = rjid
             _currentTitle.value = initialTitle
+            _currentStreamTrackTitle.value = currentTrack.title
             _currentArtist.value = cv
             _currentCoverUrl.value = coverUrl
             preloadCoverArtInMemory(coverUrl)
 
-            // Populate chapter drawer with all tracks of the online work
-            val chapters = tracks.mapIndexed { idx, tr ->
+            // Populate chapter drawer with all tracks of the online work accumulating real durations
+            var accumulatedMs = 0L
+            val chapters = tracks.map { tr ->
+                val durMs = if (tr.duration > 0L) tr.duration * 1000L else 180_000L
+                val start = accumulatedMs
+                accumulatedMs += durMs
                 ChapterItem(
-                    startMs = idx * 1000L,
-                    endMs = (idx + 1) * 1000L,
+                    startMs = start,
+                    endMs = accumulatedMs,
                     title = tr.title
                 )
             }
             _currentChapters.value = chapters
+            _duration.value = accumulatedMs
             _translatedTitle.value = null
             _translatedChapters.value = emptyList()
             _audioSpecs.value = "44.1kHz | 16bits | STREAM"
 
             val mediaItems = tracks.mapIndexed { idx, tr ->
-                val metaTitle = "[$rjid] ${tr.title}"
                 val metaBuilder = MediaMetadata.Builder()
-                    .setTitle(metaTitle)
+                    .setTitle(tr.title)
                     .setArtist(cv)
                     .setAlbumTitle(workTitle)
                     .setArtworkUri(Uri.parse(coverUrl))
@@ -1499,7 +1563,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun seekTo(positionMs: Long) {
         val p = player ?: return
-        if (isCurrentVirtualAlbum && _currentChapters.value.isNotEmpty()) {
+        if ((isCurrentVirtualAlbum || _isOnlineStreaming.value) && _currentChapters.value.isNotEmpty()) {
             val chapters = _currentChapters.value
             val trackIdx = chapters.indexOfLast { positionMs >= it.startMs }.coerceIn(0, (chapters.size - 1).coerceAtLeast(0))
             val offset = (positionMs - chapters[trackIdx].startMs).coerceAtLeast(0L)
@@ -1532,6 +1596,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun toggleShuffleMode() {
         val p = player ?: return
+        if (_isOnlineStreaming.value) return // shuffle is disabled during online streaming
         val nextState = !p.shuffleModeEnabled
         p.shuffleModeEnabled = nextState
         _shuffleMode.value = nextState
@@ -1540,7 +1605,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun seekToChapter(chapter: ChapterItem) {
         val p = player ?: return
-        if ((isCurrentVirtualAlbum || p.mediaItemCount > 1) && _currentChapters.value.isNotEmpty()) {
+        if ((isCurrentVirtualAlbum || _isOnlineStreaming.value || p.mediaItemCount > 1) && _currentChapters.value.isNotEmpty()) {
             val idx = _currentChapters.value.indexOf(chapter)
             if (idx != -1 && idx < p.mediaItemCount) {
                 p.seekToDefaultPosition(idx)
@@ -1805,10 +1870,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     ): List<ChapterItem> = withContext(Dispatchers.IO) {
         if (chapters.isEmpty()) return@withContext emptyList()
         val titles = chapters.map { it.title }
-        val translatedBatch = TranslationService.translateBatch(titles, targetLang)
-        chapters.mapIndexed { idx, orig ->
-            val trans = if (idx < translatedBatch.size) translatedBatch[idx] else orig.title
-            orig.copy(title = trans)
+        val translatedMap = TranslationService.translateBatch(titles, targetLang)
+        chapters.map { orig ->
+            orig.copy(title = translatedMap[orig.title] ?: orig.title)
         }
     }
 
@@ -1879,7 +1943,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         progressJob = viewModelScope.launch {
             while (true) {
                 player?.let { p ->
-                    if (isCurrentVirtualAlbum && _currentChapters.value.isNotEmpty()) {
+                    if ((isCurrentVirtualAlbum || _isOnlineStreaming.value) && _currentChapters.value.isNotEmpty()) {
                         val curIdx = p.currentMediaItemIndex
                         val curChapter = _currentChapters.value.getOrNull(curIdx)
                         val baseMs = curChapter?.startMs ?: 0L
@@ -2064,6 +2128,117 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         }
+    }
+
+    // --- Playlist Management (Room v6) ---
+
+    fun createPlaylist(name: String, onCreated: (Long) -> Unit = {}) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val entity = UserPlaylistEntity(name = name.trim())
+            val id = playlistDao.insertPlaylist(entity)
+            withContext(Dispatchers.Main) { onCreated(id) }
+        }
+    }
+
+    fun renamePlaylist(id: Long, newName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            playlistDao.updatePlaylistName(id, newName.trim())
+        }
+    }
+
+    fun deletePlaylist(playlist: UserPlaylistEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            playlistDao.deletePlaylist(playlist)
+        }
+    }
+
+    fun addWorkToPlaylist(
+        playlistId: Long,
+        rjid: String,
+        title: String,
+        coverUrl: String? = null,
+        circle: String? = null,
+        cv: String? = null
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val item = PlaylistItemEntity(
+                playlistId = playlistId,
+                rjid = rjid,
+                title = title,
+                coverUrl = coverUrl ?: "",
+                circle = circle ?: "-",
+                cv = cv ?: "-"
+            )
+            playlistDao.insertItem(item)
+        }
+    }
+
+    fun removeWorkFromPlaylist(playlistId: Long, rjid: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            playlistDao.removeItem(playlistId, rjid)
+        }
+    }
+
+    suspend fun getPlaylistIdsForWork(rjid: String): List<Long> = withContext(Dispatchers.IO) {
+        playlistDao.getPlaylistIdsForItem(rjid)
+    }
+
+    fun getItemsForPlaylist(playlistId: Long): kotlinx.coroutines.flow.Flow<List<PlaylistItemEntity>> {
+        return playlistDao.getItemsForPlaylist(playlistId)
+    }
+
+    fun playPlaylistItem(item: PlaylistItemEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val local = historyDao.findByRjOrLinkedRj(item.rjid)
+            if (local != null) {
+                withContext(Dispatchers.Main) {
+                    playLocalTrack(local)
+                }
+            } else {
+                val workId = item.rjid.filter { it.isDigit() }.toIntOrNull() ?: 0
+                val tracksRes = com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService.getWorkTracks(workId)
+                val tracks = tracksRes.getOrNull() ?: emptyList()
+                if (tracks.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        playOnlineWork(
+                            rjid = item.rjid,
+                            workTitle = item.title,
+                            cv = item.cv,
+                            coverUrl = item.coverUrl,
+                            tracks = tracks
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Audio Gain & Privacy Mode ---
+
+    fun setAudioGainDb(gainDb: Float) {
+        viewModelScope.launch {
+            prefs.setAudioGainDb(gainDb)
+        }
+    }
+
+    fun setPrivacyEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setPrivacyEnabled(enabled) }
+    }
+
+    fun setPrivacyBlurNotif(blur: Boolean) {
+        viewModelScope.launch { prefs.setPrivacyBlurNotif(blur) }
+    }
+
+    fun setPrivacyBlurInApp(blur: Boolean) {
+        viewModelScope.launch { prefs.setPrivacyBlurInApp(blur) }
+    }
+
+    fun setPrivacyMaskTitle(mask: Boolean) {
+        viewModelScope.launch { prefs.setPrivacyMaskTitle(mask) }
+    }
+
+    fun setPrivacyCustomMask(text: String) {
+        viewModelScope.launch { prefs.setPrivacyCustomMask(text) }
     }
 
     override fun onCleared() {

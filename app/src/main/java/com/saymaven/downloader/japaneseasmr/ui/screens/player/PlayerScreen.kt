@@ -1,9 +1,13 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.player
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.net.Uri
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.compose.ui.draw.blur
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -24,11 +28,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeMute
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
+import com.saymaven.downloader.japaneseasmr.ui.components.PlaylistSelectionSheet
+import com.saymaven.downloader.japaneseasmr.ui.components.AudioGainDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -104,7 +111,13 @@ fun PlayerScreen(
     val translatedTitle by viewModel.translatedTitle.collectAsState()
     val translatedChapters by viewModel.translatedChapters.collectAsState()
     val isOnlineStreaming by viewModel.isOnlineStreaming.collectAsState()
+    val currentStreamTrackTitle by viewModel.currentStreamTrackTitle.collectAsState()
     val currentDisplayBadge by viewModel.currentDisplayBadge.collectAsState()
+    val privacyEnabled by viewModel.privacyEnabled.collectAsState()
+    val privacyBlurInApp by viewModel.privacyBlurInApp.collectAsState()
+    val privacyMaskTitle by viewModel.privacyMaskTitle.collectAsState()
+    val privacyCustomMask by viewModel.privacyCustomMask.collectAsState()
+    var temporaryUnblur by remember { mutableStateOf(false) }
 
     val activity = context as? Activity
     DisposableEffect(keepScreenOn) {
@@ -124,6 +137,9 @@ fun PlayerScreen(
     var showOverflowMenu by remember { mutableStateOf(false) }
     var showLinkRjDialog by remember { mutableStateOf(false) }
     var showCoverPickerSheet by remember { mutableStateOf(false) }
+    var showPlaylistPickerSheet by remember { mutableStateOf(false) }
+    var showAudioGainDialog by remember { mutableStateOf(false) }
+    val audioGainDb by viewModel.audioGainDb.collectAsState()
 
     val sheetNestedScroll = remember {
         object : NestedScrollConnection {
@@ -176,9 +192,17 @@ fun PlayerScreen(
                         )
                     }
 
-                    // RJID / Local Pill Badge
+                    // RJID / Local Pill Badge (Clickable to copy RJ ID)
                     if (currentDisplayBadge.isNotBlank()) {
                         Surface(
+                            onClick = {
+                                val match = Regex("(?:RJ|VJ|BJ)\\d+", RegexOption.IGNORE_CASE).find(currentDisplayBadge)?.value
+                                val rjToCopy = match ?: currentDisplayBadge
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                val clip = ClipData.newPlainText("ASMR ID", rjToCopy)
+                                clipboard?.setPrimaryClip(clip)
+                                Toast.makeText(context, context.getString(R.string.toast_id_copied, rjToCopy), Toast.LENGTH_SHORT).show()
+                            },
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
                         ) {
@@ -198,9 +222,14 @@ fun PlayerScreen(
                 }
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Clean Title (Clean from [RJxxxx] prefix for cleaner presentation)
-            val cleanOriginalTitle = currentTitle.replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+\\]\\s*"), "").trim()
-            val cleanTranslatedTitle = translatedTitle?.replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+\\]\\s*"), "")?.trim()
+            // Clean Title (Clean from [RJxxxx] prefix for cleaner presentation, masked in Privacy Mode)
+            val shouldMask = privacyEnabled && privacyMaskTitle
+            val cleanOriginalTitle = if (shouldMask) {
+                privacyCustomMask.ifBlank { stringResource(R.string.settings_privacy_custom_mask_default) }
+            } else {
+                currentTitle.replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+\\]\\s*"), "").trim()
+            }
+            val cleanTranslatedTitle = if (shouldMask) null else translatedTitle?.replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+\\]\\s*"), "")?.trim()
 
             val displayTitle = if (isTranslationActive && !cleanTranslatedTitle.isNullOrBlank()) {
                 cleanTranslatedTitle
@@ -226,6 +255,20 @@ fun PlayerScreen(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    // Track Title Subtext during online stream
+                    if (isOnlineStreaming && !currentStreamTrackTitle.isNullOrBlank() && !shouldMask) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = currentStreamTrackTitle!!,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
                     // Original Title Subtext (when translation is active and differs)
                     if (isTranslationActive && !cleanTranslatedTitle.isNullOrBlank() && cleanOriginalTitle.isNotBlank() && cleanTranslatedTitle != cleanOriginalTitle) {
@@ -270,8 +313,9 @@ fun PlayerScreen(
             // Geser sedikit thumbnail agak ke bawah dengan spacer 18.dp
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Big Center Cover Art (Adaptive responsive sizing dengan pencegahan flicker abu-abu)
+            // Big Center Cover Art (Adaptive responsive sizing dengan pencegahan flicker abu-abu & privacy blur)
             var lastValidPainter by remember { mutableStateOf<Painter?>(null) }
+            val isCoverBlurred = privacyEnabled && privacyBlurInApp && !temporaryUnblur
             Card(
                 shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
@@ -279,6 +323,11 @@ fun PlayerScreen(
                     .fillMaxWidth(0.68f)
                     .aspectRatio(1f)
                     .heightIn(max = 260.dp)
+                    .clickable {
+                        if (privacyEnabled && privacyBlurInApp) {
+                            temporaryUnblur = !temporaryUnblur
+                        }
+                    }
             ) {
                 val cover = currentCoverUrl
                 if (!cover.isNullOrBlank()) {
@@ -289,6 +338,9 @@ fun PlayerScreen(
                             .crossfade(false)
                             .build()
                     }
+                    val imageModifier = Modifier.fillMaxSize().then(
+                        if (isCoverBlurred) Modifier.blur(25.dp) else Modifier
+                    )
                     AsyncImage(
                         model = imageRequest,
                         contentDescription = "Cover Art",
@@ -298,7 +350,7 @@ fun PlayerScreen(
                         onSuccess = { success ->
                             lastValidPainter = success.painter
                         },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = imageModifier
                     )
                 } else {
                     Box(
@@ -488,6 +540,22 @@ fun PlayerScreen(
                                 onClick = {
                                     showOverflowMenu = false
                                     showCoverPickerSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.browse_action_add_to_playlist)) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showPlaylistPickerSheet = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.settings_audio_gain)) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null) },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    showAudioGainDialog = true
                                 }
                             )
                         }
@@ -1402,6 +1470,28 @@ fun PlayerScreen(
                 }
             }
         }
+    }
+
+    if (showPlaylistPickerSheet) {
+        val currentRj = currentRjId ?: ""
+        if (currentRj.isNotBlank()) {
+            PlaylistSelectionSheet(
+                workRjid = currentRj,
+                workTitle = currentTitle,
+                coverUrl = currentCoverUrl ?: "",
+                cv = currentArtist,
+                playerViewModel = viewModel,
+                onDismiss = { showPlaylistPickerSheet = false }
+            )
+        }
+    }
+
+    if (showAudioGainDialog) {
+        AudioGainDialog(
+            currentGainDb = audioGainDb,
+            onGainChanged = { viewModel.setAudioGainDb(it) },
+            onDismiss = { showAudioGainDialog = false }
+        )
     }
 }
 

@@ -346,6 +346,111 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun dismissUpdateDialog() {
         _updateUiState.value = UpdateUiState.Idle
     }
+
+    // ================= KikoFlu UI Settings =================
+    val pageSize = preferencesManager.pageSizeFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        preferencesManager.getInitialPageSize()
+    )
+    fun setPageSize(size: Int) {
+        viewModelScope.launch { preferencesManager.setPageSize(size) }
+    }
+
+    val playerButtonOrder = preferencesManager.playerButtonOrderFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        "repeat,speed,sleep_timer,bookmark,volume,seek_backward,seek_forward,detail,subtitle,specs"
+    )
+    fun setPlayerButtonOrder(order: String) {
+        viewModelScope.launch { preferencesManager.setPlayerButtonOrder(order) }
+    }
+
+    // Work Card Display Toggles
+    val cardShowRating = preferencesManager.cardShowRatingFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val cardShowPrice = preferencesManager.cardShowPriceFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val cardShowDuration = preferencesManager.cardShowDurationFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val cardShowSales = preferencesManager.cardShowSalesFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val cardShowReleaseDate = preferencesManager.cardShowReleaseDateFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val cardShowCircle = preferencesManager.cardShowCircleFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val cardShowSubtitleTag = preferencesManager.cardShowSubtitleTagFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val cardShowAgeRating = preferencesManager.cardShowAgeRatingFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setCardShowRating(show: Boolean) = viewModelScope.launch { preferencesManager.setCardShowRating(show) }
+    fun setCardShowPrice(show: Boolean) = viewModelScope.launch { preferencesManager.setCardShowPrice(show) }
+    fun setCardShowDuration(show: Boolean) = viewModelScope.launch { preferencesManager.setCardShowDuration(show) }
+    fun setCardShowSales(show: Boolean) = viewModelScope.launch { preferencesManager.setCardShowSales(show) }
+    fun setCardShowReleaseDate(show: Boolean) = viewModelScope.launch { preferencesManager.setCardShowReleaseDate(show) }
+    fun setCardShowCircle(show: Boolean) = viewModelScope.launch { preferencesManager.setCardShowCircle(show) }
+    fun setCardShowSubtitleTag(show: Boolean) = viewModelScope.launch { preferencesManager.setCardShowSubtitleTag(show) }
+    fun setCardShowAgeRating(show: Boolean) = viewModelScope.launch { preferencesManager.setCardShowAgeRating(show) }
+
+    // Work Detail Display Toggles
+    val detailShowRating = preferencesManager.detailShowRatingFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val detailShowPrice = preferencesManager.detailShowPriceFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val detailShowDuration = preferencesManager.detailShowDurationFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val detailShowSales = preferencesManager.detailShowSalesFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val detailShowExternalLinks = preferencesManager.detailShowExternalLinksFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val detailShowReleaseDate = preferencesManager.detailShowReleaseDateFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val detailShowTranslateBtn = preferencesManager.detailShowTranslateButtonFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val detailShowSubtitle = preferencesManager.detailShowSubtitleTagFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val detailShowAgeRating = preferencesManager.detailShowAgeRatingFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val detailShowRecommendations = preferencesManager.detailShowRecommendationsFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setDetailShowRating(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowRating(show) }
+    fun setDetailShowPrice(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowPrice(show) }
+    fun setDetailShowDuration(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowDuration(show) }
+    fun setDetailShowSales(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowSales(show) }
+    fun setDetailShowExternalLinks(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowExternalLinks(show) }
+    fun setDetailShowReleaseDate(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowReleaseDate(show) }
+    fun setDetailShowTranslateBtn(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowTranslateButton(show) }
+    fun setDetailShowSubtitle(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowSubtitleTag(show) }
+    fun setDetailShowAgeRating(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowAgeRating(show) }
+    fun setDetailShowRecommendations(show: Boolean) = viewModelScope.launch { preferencesManager.setDetailShowRecommendations(show) }
+
+    // Privacy Mode (Anti-Malu)
+    val privacyEnabled = preferencesManager.privacyEnabledFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialPrivacyEnabled())
+    val privacyBlurNotif = preferencesManager.privacyBlurNotifFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialPrivacyBlurNotif())
+    val privacyBlurInApp = preferencesManager.privacyBlurInAppFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialPrivacyBlurInApp())
+    val privacyMaskTitle = preferencesManager.privacyMaskTitleFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialPrivacyMaskTitle())
+    val privacyCustomMask = preferencesManager.privacyCustomMaskFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialPrivacyCustomMask())
+
+    fun setPrivacyEnabled(enabled: Boolean) = viewModelScope.launch { preferencesManager.setPrivacyEnabled(enabled) }
+    fun setPrivacyBlurNotif(blur: Boolean) = viewModelScope.launch { preferencesManager.setPrivacyBlurNotif(blur) }
+    fun setPrivacyBlurInApp(blur: Boolean) = viewModelScope.launch { preferencesManager.setPrivacyBlurInApp(blur) }
+    fun setPrivacyMaskTitle(mask: Boolean) = viewModelScope.launch { preferencesManager.setPrivacyMaskTitle(mask) }
+    fun setPrivacyCustomMask(text: String) = viewModelScope.launch { preferencesManager.setPrivacyCustomMask(text) }
+
+    // Audio Format Priority & Preload
+    val audioFormatPriority = preferencesManager.audioFormatPriorityFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "mp3,flac,wav,opus,m4a,aac")
+    val audioPreloadSeconds = preferencesManager.audioPreloadSecondsFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 15)
+    val audioGainDb = preferencesManager.audioGainDbFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialAudioGainDb())
+
+    fun setAudioFormatPriority(priority: String) = viewModelScope.launch { preferencesManager.setAudioFormatPriority(priority) }
+    fun setAudioPreloadSeconds(seconds: Int) = viewModelScope.launch { preferencesManager.setAudioPreloadSeconds(seconds) }
+    fun setAudioGainDb(gainDb: Float) = viewModelScope.launch { preferencesManager.setAudioGainDb(gainDb) }
+
+    // Blocked Items (Blacklist)
+    val blockedTags = preferencesManager.blockedTagsFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+    val blockedCvs = preferencesManager.blockedCvsFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+    val blockedCircles = preferencesManager.blockedCirclesFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    fun addBlockedTag(tag: String) = viewModelScope.launch { preferencesManager.addBlockedTag(tag) }
+    fun removeBlockedTag(tag: String) = viewModelScope.launch { preferencesManager.removeBlockedTag(tag) }
+    fun addBlockedCv(cv: String) = viewModelScope.launch { preferencesManager.addBlockedCv(cv) }
+    fun removeBlockedCv(cv: String) = viewModelScope.launch { preferencesManager.removeBlockedCv(cv) }
+    fun addBlockedCircle(circle: String) = viewModelScope.launch { preferencesManager.addBlockedCircle(circle) }
+    fun removeBlockedCircle(circle: String) = viewModelScope.launch { preferencesManager.removeBlockedCircle(circle) }
+
+    // LLM Config
+    val llmApiUrl = preferencesManager.llmApiUrlFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+    val llmApiKey = preferencesManager.llmApiKeyFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+    val llmModel = preferencesManager.llmModelFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gpt-4o-mini")
+    val llmPrompt = preferencesManager.llmPromptFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    fun setLlmConfig(url: String, key: String, model: String, prompt: String) = viewModelScope.launch {
+        preferencesManager.setLlmConfig(url, key, model, prompt)
+    }
 }
 
 sealed interface UpdateUiState {
