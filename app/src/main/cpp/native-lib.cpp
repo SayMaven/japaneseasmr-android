@@ -186,6 +186,15 @@ Java_com_saymaven_downloader_japaneseasmr_service_NativeAudioPlayer_setVolume(
     if (gEngine) gEngine->setVolume(volume);
 }
 
+JNIEXPORT void JNICALL
+Java_com_saymaven_downloader_japaneseasmr_service_NativeAudioPlayer_setAudioGainDb(
+    JNIEnv *env,
+    jobject thiz,
+    jfloat gain_db
+) {
+    if (gEngine) gEngine->setAudioGainDb(gain_db);
+}
+
 JNIEXPORT jint JNICALL
 Java_com_saymaven_downloader_japaneseasmr_service_NativeAudioPlayer_getSampleRate(
     JNIEnv *env,

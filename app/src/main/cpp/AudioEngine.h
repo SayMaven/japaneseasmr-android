@@ -28,6 +28,7 @@ public:
     void setExclusiveMode(bool exclusive);
     void setPreferredDeviceId(int32_t deviceId);
     void setVolume(float volume);
+    void setAudioGainDb(float gainDb);
 
     bool setUsbDevice(int fd, int acIface, int asIface, int epOut, int clockSourceId);
     void releaseUsbDevice();
@@ -85,6 +86,7 @@ private:
     std::atomic<bool> mExclusiveMode{true};
     std::atomic<int32_t> mPreferredDeviceId{oboe::kUnspecified};
     std::atomic<float> mVolume{0.25f};
+    std::atomic<float> mGainMultiplier{1.0f};
 
     int32_t mSampleRate = 44100;
     int32_t mChannelCount = 2;

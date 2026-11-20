@@ -39,6 +39,7 @@ object NativeAudioPlayer {
     external fun setExclusiveMode(exclusive: Boolean)
     external fun setPreferredDeviceId(deviceId: Int)
     external fun setVolume(volume: Float)
+    external fun setAudioGainDb(gainDb: Float)
     external fun getSampleRate(): Int
     external fun releaseEngine()
     external fun testUsbClaim(fd: Int, iface: Int): Int

@@ -33,6 +33,7 @@ class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private lateinit var player: ExoPlayer
+    private lateinit var gainAudioProcessor: GainAudioProcessor
     private val serviceScope = CoroutineScope(Dispatchers.Main)
     private var isExclusiveFocusActive: Boolean = true
 
@@ -42,9 +43,15 @@ class PlaybackService : MediaSessionService() {
 
         val prefs = PreferencesManager(this)
 
-        // Restore initial volume immediately
+        // Restore initial volume and audio gain immediately
         val initialVol = PreferencesManager.getFastCachedUsbVolume(this)
+        val initialGainDb = prefs.getInitialAudioGainDb()
         NativeAudioPlayer.setVolume(initialVol)
+        NativeAudioPlayer.setAudioGainDb(initialGainDb)
+
+        gainAudioProcessor = GainAudioProcessor().apply {
+            setGainDb(initialGainDb)
+        }
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -60,6 +67,7 @@ class PlaybackService : MediaSessionService() {
                 val defaultSink = DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(gainAudioProcessor))
                     .build()
                 return UsbAudioSink(defaultSink)
             }
@@ -109,6 +117,14 @@ class PlaybackService : MediaSessionService() {
                     player.volume = vol
                     NativeAudioPlayer.setVolume(vol)
                 }
+            }
+        }
+
+        // Audio Gain synchronization (real-time dB boost/attenuation for both ExoPlayer and Native DAC)
+        serviceScope.launch {
+            prefs.audioGainDbFlow.collect { gainDb ->
+                gainAudioProcessor.setGainDb(gainDb)
+                NativeAudioPlayer.setAudioGainDb(gainDb)
             }
         }
 

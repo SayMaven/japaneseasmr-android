@@ -257,13 +257,14 @@ bool AudioEngine::startUsbPlayback() {
         // Read pre-decoded frames directly from Lock-Free Ring Buffer (0 disk I/O, 0 mutex)
         uint64_t framesRead = mRingBuffer.read(buffer, frames);
 
-        // Apply volume scaling with smooth quadratic acoustic curve and symmetric rounding (eliminates deadband)
+        // Apply volume scaling with smooth quadratic acoustic curve and audio gain multiplier
         float vol = mVolume.load();
-        if (vol < 0.999f) {
-            float gain = vol * vol;
+        float volGain = (vol < 0.999f) ? (vol * vol) : 1.0f;
+        float totalGain = volGain * mGainMultiplier.load();
+        if (std::abs(totalGain - 1.0f) > 0.001f) {
             size_t totalSamples = framesRead * mChannelCount;
             for (size_t i = 0; i < totalSamples; ++i) {
-                float sample = buffer[i] * gain;
+                float sample = buffer[i] * totalGain;
                 long rounded = std::lround(sample);
                 if (rounded > 32767) rounded = 32767;
                 else if (rounded < -32768) rounded = -32768;
@@ -413,6 +414,12 @@ void AudioEngine::setVolume(float volume) {
     mVolume.store(std::max(0.0f, std::min(1.0f, volume)));
 }
 
+void AudioEngine::setAudioGainDb(float gainDb) {
+    float clamped = std::max(-12.0f, std::min(12.0f, gainDb));
+    float multiplier = (std::abs(clamped) < 0.01f) ? 1.0f : std::pow(10.0f, clamped / 20.0f);
+    mGainMultiplier.store(multiplier);
+}
+
 void AudioEngine::closeStream() {
     if (mStream) {
         mStream->stop();
@@ -442,10 +449,12 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
     uint64_t framesRead = mRingBuffer.read(tempInt16, framesToRead);
 
     float vol = mVolume.load();
-    float gain = (vol < 0.999f) ? (vol * vol) : 1.0f;
+    float volGain = (vol < 0.999f) ? (vol * vol) : 1.0f;
+    float totalGain = volGain * mGainMultiplier.load();
 
     for (size_t i = 0; i < framesRead * mChannelCount; ++i) {
-        floatBuffer[i] = (tempInt16[i] / 32768.0f) * gain;
+        float sample = (tempInt16[i] / 32768.0f) * totalGain;
+        floatBuffer[i] = std::max(-1.0f, std::min(1.0f, sample));
     }
 
     if (framesRead < static_cast<uint64_t>(numFrames)) {
