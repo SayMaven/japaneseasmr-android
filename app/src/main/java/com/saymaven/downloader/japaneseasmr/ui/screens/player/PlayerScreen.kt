@@ -140,6 +140,14 @@ fun PlayerScreen(
     var showPlaylistPickerSheet by remember { mutableStateOf(false) }
     var showAudioGainDialog by remember { mutableStateOf(false) }
     val audioGainDb by viewModel.audioGainDb.collectAsState()
+    var showLyricsView by remember { mutableStateOf(false) }
+    var showSubtitlePickerSheet by remember { mutableStateOf(false) }
+    val lyrics by viewModel.currentLyrics.collectAsState()
+    val activeLyricIndex by viewModel.activeLyricIndex.collectAsState()
+    val availableSubtitles by viewModel.availableSubtitles.collectAsState()
+    val selectedSubtitleSource by viewModel.selectedSubtitleSource.collectAsState()
+    val isLyricsTranslated by viewModel.isLyricsTranslated.collectAsState()
+    val isTranslatingLyrics by viewModel.isTranslatingLyrics.collectAsState()
 
     val sheetNestedScroll = remember {
         object : NestedScrollConnection {
@@ -313,58 +321,234 @@ fun PlayerScreen(
             // Geser sedikit thumbnail agak ke bawah dengan spacer 18.dp
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Big Center Cover Art (Adaptive responsive sizing dengan pencegahan flicker abu-abu & privacy blur)
+            // Big Center Cover Art / Synchronized Lyrics Toggle (Opsi A)
             var lastValidPainter by remember { mutableStateOf<Painter?>(null) }
             val isCoverBlurred = privacyEnabled && privacyBlurInApp && !temporaryUnblur
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                modifier = Modifier
-                    .fillMaxWidth(0.68f)
-                    .aspectRatio(1f)
-                    .heightIn(max = 260.dp)
-                    .clickable {
-                        if (privacyEnabled && privacyBlurInApp) {
-                            temporaryUnblur = !temporaryUnblur
+            val hasSubtitles = lyrics.isNotEmpty() || availableSubtitles.isNotEmpty()
+
+            if (showLyricsView && hasSubtitles) {
+                val lyricsListState = rememberLazyListState()
+                LaunchedEffect(activeLyricIndex) {
+                    if (activeLyricIndex in lyrics.indices) {
+                        lyricsListState.animateScrollToItem((activeLyricIndex - 1).coerceAtLeast(0))
+                    }
+                }
+
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth(0.94f)
+                        .height(260.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Top bar inside Lyrics panel
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                onClick = { if (availableSubtitles.size > 1) showSubtitlePickerSheet = true },
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Subtitles,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = selectedSubtitleSource?.title ?: stringResource(R.string.player_lyrics_title),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { viewModel.toggleLyricsTranslation() },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    if (isTranslatingLyrics) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Translate,
+                                            contentDescription = stringResource(R.string.player_lyrics_translate),
+                                            tint = if (isLyricsTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = { showLyricsView = false },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Album,
+                                        contentDescription = stringResource(R.string.player_lyrics_show_cover),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                        if (lyrics.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.player_lyrics_empty),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                state = lyricsListState,
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                itemsIndexed(lyrics) { idx, line ->
+                                    val isActive = idx == activeLyricIndex
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable { viewModel.seekToLyricLine(line) }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = line.text,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                                            textAlign = TextAlign.Center
+                                        )
+                                        if (isLyricsTranslated && !line.translatedText.isNullOrBlank()) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = line.translatedText,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-            ) {
-                val cover = currentCoverUrl
-                if (!cover.isNullOrBlank()) {
-                    val imageRequest = remember(cover) {
-                        ImageRequest.Builder(context)
-                            .data(cover)
-                            .memoryCacheKey(cover)
-                            .crossfade(false)
-                            .build()
-                    }
-                    val imageModifier = Modifier.fillMaxSize().then(
-                        if (isCoverBlurred) Modifier.blur(25.dp) else Modifier
-                    )
-                    AsyncImage(
-                        model = imageRequest,
-                        contentDescription = "Cover Art",
-                        contentScale = ContentScale.Crop,
-                        placeholder = lastValidPainter,
-                        error = lastValidPainter,
-                        onSuccess = { success ->
-                            lastValidPainter = success.painter
-                        },
-                        modifier = imageModifier
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(96.dp)
-                        )
+                }
+            } else {
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(0.68f)
+                        .aspectRatio(1f)
+                        .heightIn(max = 260.dp)
+                        .clickable {
+                            if (privacyEnabled && privacyBlurInApp && !temporaryUnblur) {
+                                temporaryUnblur = true
+                            } else if (hasSubtitles) {
+                                showLyricsView = true
+                            } else if (privacyEnabled && privacyBlurInApp) {
+                                temporaryUnblur = !temporaryUnblur
+                            }
+                        }
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        val cover = currentCoverUrl
+                        if (!cover.isNullOrBlank()) {
+                            val imageRequest = remember(cover) {
+                                ImageRequest.Builder(context)
+                                    .data(cover)
+                                    .memoryCacheKey(cover)
+                                    .crossfade(false)
+                                    .build()
+                            }
+                            val imageModifier = Modifier.fillMaxSize().then(
+                                if (isCoverBlurred) Modifier.blur(25.dp) else Modifier
+                            )
+                            AsyncImage(
+                                model = imageRequest,
+                                contentDescription = "Cover Art",
+                                contentScale = ContentScale.Crop,
+                                placeholder = lastValidPainter,
+                                error = lastValidPainter,
+                                onSuccess = { success ->
+                                    lastValidPainter = success.painter
+                                },
+                                modifier = imageModifier
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(96.dp)
+                                )
+                            }
+                        }
+
+                        if (hasSubtitles) {
+                            Surface(
+                                onClick = { showLyricsView = true },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Subtitles,
+                                        contentDescription = stringResource(R.string.player_lyrics_title),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = stringResource(R.string.player_lyrics_title),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1492,6 +1676,42 @@ fun PlayerScreen(
             onGainChanged = { viewModel.setAudioGainDb(it) },
             onDismiss = { showAudioGainDialog = false }
         )
+    }
+
+    if (showSubtitlePickerSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSubtitlePickerSheet = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.player_lyrics_select_file),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                availableSubtitles.forEach { src ->
+                    val isSelected = selectedSubtitleSource?.pathOrUrl == src.pathOrUrl
+                    ListItem(
+                        headlineContent = { Text(src.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        supportingContent = { Text(src.format.uppercase(), style = MaterialTheme.typography.labelSmall) },
+                        trailingContent = {
+                            if (isSelected) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        },
+                        modifier = Modifier.clickable {
+                            viewModel.selectSubtitleSource(src)
+                            showSubtitlePickerSheet = false
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
     }
 }
 

@@ -108,6 +108,16 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
     val showCardSubtitle = prefs.cardShowSubtitleTagFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
     val showCardAgeRating = prefs.cardShowAgeRatingFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
 
+    // Work Detail Display Toggles from UI Settings
+    val showDetailRating = prefs.detailShowRatingFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val showDetailPrice = prefs.detailShowPriceFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val showDetailDuration = prefs.detailShowDurationFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showDetailSales = prefs.detailShowSalesFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val showDetailReleaseDate = prefs.detailShowReleaseDateFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showDetailTranslateBtn = prefs.detailShowTranslateButtonFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showDetailSubtitle = prefs.detailShowSubtitleTagFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showDetailAgeRating = prefs.detailShowAgeRatingFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+
     // Pagination
     private val _currentPage = MutableStateFlow(1)
     val currentPage = _currentPage.asStateFlow()

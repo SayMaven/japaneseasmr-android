@@ -35,6 +35,7 @@ import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import com.saymaven.downloader.japaneseasmr.ui.components.BottomNavBar
 import com.saymaven.downloader.japaneseasmr.ui.components.FloatingVolumeHud
+import com.saymaven.downloader.japaneseasmr.ui.components.FloatingLyricsBar
 import com.saymaven.downloader.japaneseasmr.ui.components.MiniPlayer
 import com.saymaven.downloader.japaneseasmr.ui.components.NavTab
 import com.saymaven.downloader.japaneseasmr.ui.screens.history.HistoryScreen
@@ -315,8 +316,9 @@ class MainActivity : ComponentActivity() {
                                     .fillMaxWidth()
                                     .navigationBarsPadding()
                             ) {
-                                // Floating Mini Player (Docked across all tabs unless full player is expanded)
+                                // Floating Lyrics & Mini Player (Docked across all tabs unless full player is expanded)
                                 if (!isPlayerExpanded) {
+                                    FloatingLyricsBar(viewModel = playerViewModel)
                                     MiniPlayer(
                                         viewModel = playerViewModel,
                                         onExpand = { isPlayerExpanded = true }

@@ -3,10 +3,14 @@ package com.saymaven.downloader.japaneseasmr.ui.screens.player
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import java.io.ByteArrayOutputStream
+import java.net.URL
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -25,9 +29,14 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.UserPlaylistEntity
 import com.saymaven.downloader.japaneseasmr.data.local.entity.PlaylistItemEntity
 import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
 import com.saymaven.downloader.japaneseasmr.data.model.SourceType
+import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService
+import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneFileNode
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneTrack
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
 import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
+import com.saymaven.downloader.japaneseasmr.service.lyrics.LyricLine
+import com.saymaven.downloader.japaneseasmr.service.lyrics.LyricsParser
+import com.saymaven.downloader.japaneseasmr.service.lyrics.SubtitleSource
 import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import com.saymaven.downloader.japaneseasmr.service.ChapterDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
@@ -283,6 +292,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _currentRjId = MutableStateFlow<String?>(if (isAutoResumeActive) sp.getString("cached_rjid", null) else null)
     val currentRjId = _currentRjId.asStateFlow()
 
+    enum class PlaybackMode { OFFLINE_SINGLE, OFFLINE_ALBUM, ONLINE_STREAM }
+
+    private val _playbackMode = MutableStateFlow(PlaybackMode.OFFLINE_SINGLE)
+    val playbackMode = _playbackMode.asStateFlow()
+
     private val _isOnlineStreaming = MutableStateFlow(false)
     val isOnlineStreaming = _isOnlineStreaming.asStateFlow()
 
@@ -333,6 +347,36 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     // Audio Gain Flow
     val audioGainDb = prefs.audioGainDbFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialAudioGainDb())
+
+    // Lyrics & Floating Lyrics State
+    private val _currentLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
+    val currentLyrics = _currentLyrics.asStateFlow()
+
+    private val _activeLyricIndex = MutableStateFlow(-1)
+    val activeLyricIndex = _activeLyricIndex.asStateFlow()
+
+    private val _availableSubtitles = MutableStateFlow<List<SubtitleSource>>(emptyList())
+    val availableSubtitles = _availableSubtitles.asStateFlow()
+
+    private val _selectedSubtitleSource = MutableStateFlow<SubtitleSource?>(null)
+    val selectedSubtitleSource = _selectedSubtitleSource.asStateFlow()
+
+    private val _isLyricsTranslated = MutableStateFlow(false)
+    val isLyricsTranslated = _isLyricsTranslated.asStateFlow()
+
+    private val _isTranslatingLyrics = MutableStateFlow(false)
+    val isTranslatingLyrics = _isTranslatingLyrics.asStateFlow()
+
+    val floatingLyricsEnabled = prefs.floatingLyricsEnabledFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val floatingLyricsFontSize = prefs.floatingLyricsFontSizeFlow.stateIn(viewModelScope, SharingStarted.Lazily, 14f)
+    val floatingLyricsOpacity = prefs.floatingLyricsOpacityFlow.stateIn(viewModelScope, SharingStarted.Lazily, 0.90f)
+    val floatingLyricsCornerRadius = prefs.floatingLyricsCornerRadiusFlow.stateIn(viewModelScope, SharingStarted.Lazily, 16f)
+    val floatingLyricsShowTranslation = prefs.floatingLyricsShowTranslationFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val floatingLyricsLocked = prefs.floatingLyricsLockedFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+
+    private var lyricsJob: Job? = null
+    private var translationJob: Job? = null
+    private val workTreeCache = mutableMapOf<String, List<AsmrOneFileNode>>()
 
     private val _currentArtist = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_artist", "-") ?: "-" else "-")
     val currentArtist = _currentArtist.asStateFlow()
@@ -445,9 +489,50 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             restorePlaybackState()
             observeAudioSettings()
             observeTranslationPreference()
+            observePrivacyNotificationSync()
             checkAndMigrateTranslationEngine()
             if (!_currentRjId.value.isNullOrBlank()) {
                 loadChaptersForCurrentTrack(_currentRjId.value)
+            }
+        }
+    }
+
+    private fun observePrivacyNotificationSync() {
+        viewModelScope.launch {
+            var isFirst = true
+            combine(
+                prefs.privacyEnabledFlow,
+                prefs.privacyBlurNotifFlow,
+                prefs.privacyMaskTitleFlow,
+                prefs.privacyCustomMaskFlow
+            ) { enabled, blurNotif, maskTitle, customMask ->
+                listOf(enabled, blurNotif, maskTitle, customMask)
+            }.collect { values ->
+                if (isFirst) {
+                    isFirst = false
+                    return@collect
+                }
+                val p = player ?: return@collect
+                val curIdx = p.currentMediaItemIndex
+                val curItem = p.currentMediaItem ?: return@collect
+                val enabled = values[0] as Boolean
+                val blurNotif = enabled && (values[1] as Boolean)
+                val maskTitle = enabled && (values[2] as Boolean)
+                val customMask = values[3] as String
+
+                val coverBytes = loadArtworkBytes(null, _currentCoverUrl.value, shouldBlur = blurNotif)
+                val updatedMeta = buildMediaMetadataWithPrivacy(
+                    title = if (_isOnlineStreaming.value) (_currentStreamTrackTitle.value ?: _currentTitle.value) else _currentTitle.value,
+                    artist = _currentArtist.value,
+                    albumTitle = _currentTitle.value,
+                    coverUrl = _currentCoverUrl.value,
+                    coverBytes = coverBytes,
+                    blurNotif = blurNotif,
+                    maskTitle = maskTitle,
+                    customMask = customMask
+                )
+                val updatedItem = curItem.buildUpon().setMediaMetadata(updatedMeta).build()
+                p.replaceMediaItem(curIdx, updatedItem)
             }
         }
     }
@@ -526,7 +611,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Pindai subfolder fisik yang ada di direktori unduhan dan folder impor
         val subfolders = AudioStorageHelper.getExistingSubfolders(downloadDir)
         val imported = prefs.importedDirsFlow.first()
-        val importedNames = imported.map { File(it).name }.filter { it.isNotBlank() }
+        val importedNames = imported.mapNotNull { dirUri ->
+            val phys = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), dirUri)
+            val decoded = if (!phys.isNullOrBlank()) {
+                File(phys).name
+            } else {
+                val rawDecoded = Uri.decode(dirUri)
+                rawDecoded.substringAfterLast(':').substringAfterLast('/').trim()
+            }
+            decoded.takeIf { it.isNotBlank() }
+        }
         val allFolders = (listOf("Semua", "Utama") + subfolders + importedNames).distinct()
         _availableFolders.value = allFolders
 
@@ -577,7 +671,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val created = AudioStorageHelper.createSubfolder(downloadDir, folderName)
             if (created != null) {
                 val subfolders = AudioStorageHelper.getExistingSubfolders(downloadDir)
-                _availableFolders.value = (listOf("Semua", "Utama") + subfolders).distinct()
+                val imported = prefs.importedDirsFlow.first()
+                val importedNames = imported.mapNotNull { dirUri ->
+                    val phys = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), dirUri)
+                    val decoded = if (!phys.isNullOrBlank()) {
+                        File(phys).name
+                    } else {
+                        Uri.decode(dirUri).substringAfterLast(':').substringAfterLast('/').trim()
+                    }
+                    decoded.takeIf { it.isNotBlank() }
+                }
+                _availableFolders.value = (listOf("Semua", "Utama") + subfolders + importedNames).distinct()
                 _selectedFolder.value = folderName.trim()
                 refreshPlaylist()
             }
@@ -837,9 +941,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             val targetPair = validItemsWithFiles.firstOrNull { it.first.rjid == history.rjid } ?: validItemsWithFiles.first()
 
-            val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, targetPair.first.coverUrl)
+            val isPriv = privacyEnabled.value
+            val blurNotif = isPriv && privacyBlurNotif.value
+            val maskNotifTitle = isPriv && privacyMaskTitle.value
+            val customMask = privacyCustomMask.value
+            val coverBytes = loadArtworkBytes(targetPair.second.absolutePath, targetPair.first.coverUrl, shouldBlur = blurNotif)
 
             if (targetPair.first.sourceType == SourceType.LOCAL_FOLDER.name || targetPair.second.isDirectory) {
+                _playbackMode.value = PlaybackMode.OFFLINE_ALBUM
                 isCurrentVirtualAlbum = true
                 currentAlbumHistory = targetPair.first
                 val folder = targetPair.second
@@ -875,19 +984,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 val mediaItems = tracks.mapIndexed { idx, tr ->
                     val trackTitle = chapters.getOrNull(idx)?.title ?: tr.nameWithoutExtension
-                    val metaBuilder = MediaMetadata.Builder()
-                        .setTitle(trackTitle)
-                        .setArtist(targetPair.first.cv)
-                        .setAlbumTitle(targetPair.first.title)
-                        .setArtworkUri(Uri.parse(targetPair.first.coverUrl ?: ""))
-                    if (coverBytes != null) {
-                        metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                    }
+                    val meta = buildMediaMetadataWithPrivacy(
+                        title = trackTitle,
+                        artist = targetPair.first.cv,
+                        albumTitle = targetPair.first.title,
+                        coverUrl = targetPair.first.coverUrl,
+                        coverBytes = coverBytes,
+                        blurNotif = blurNotif,
+                        maskTitle = maskNotifTitle,
+                        customMask = customMask
+                    )
                     MediaItem.Builder()
                         .setUri(Uri.fromFile(tr))
                         .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(tr)).build())
                         .setMediaId(tr.absolutePath)
-                        .setMediaMetadata(metaBuilder.build())
+                        .setMediaMetadata(meta)
                         .build()
                 }
 
@@ -906,27 +1017,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 p.prepare()
                 _currentPosition.value = startPositionMs
             } else {
+                _playbackMode.value = PlaybackMode.OFFLINE_SINGLE
                 isCurrentVirtualAlbum = false
                 currentAlbumHistory = null
                 val targetIndex = validItemsWithFiles.indexOf(targetPair).coerceAtLeast(0)
                 calculateAudioSpecs(targetPair.second)
 
                 val mediaItems = validItemsWithFiles.map { (item, file) ->
-                    val metaBuilder = MediaMetadata.Builder()
-                        .setTitle("[${item.rjid}] ${item.title}")
-                        .setArtist(item.cv)
-                        .setAlbumTitle(item.circle)
-                        .setArtworkUri(Uri.parse(item.coverUrl ?: ""))
-
-                    if (coverBytes != null && item.rjid == targetPair.first.rjid) {
-                        metaBuilder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                    }
+                    val itemBytes = if (item.rjid == targetPair.first.rjid) coverBytes else null
+                    val meta = buildMediaMetadataWithPrivacy(
+                        title = "[${item.rjid}] ${item.title}",
+                        artist = item.cv,
+                        albumTitle = item.circle,
+                        coverUrl = item.coverUrl,
+                        coverBytes = itemBytes,
+                        blurNotif = blurNotif,
+                        maskTitle = maskNotifTitle,
+                        customMask = customMask
+                    )
 
                     MediaItem.Builder()
                         .setUri(Uri.fromFile(file))
                         .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(file)).build())
                         .setMediaId(item.rjid)
-                        .setMediaMetadata(metaBuilder.build())
+                        .setMediaMetadata(meta)
                         .build()
                 }
 
@@ -954,44 +1068,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (mediaItem != null) {
-                    if (isCurrentVirtualAlbum) {
-                        val album = currentAlbumHistory
-                        val curIdx = p.currentMediaItemIndex
-                        val curChapter = _currentChapters.value.getOrNull(curIdx)
-                        val trackTitle = curChapter?.title ?: mediaItem.mediaMetadata.title?.toString() ?: ""
-                        val isLocalAlbum = album?.sourceType != SourceType.DL_SITE.name || album?.rjid?.startsWith("LOCAL_") == true
-                        val albumTag = when {
-                            isLocalAlbum && !album?.linkedRjId.isNullOrBlank() -> "IMPORT • ${album?.linkedRjId}"
-                            isLocalAlbum -> "IMPORT"
-                            else -> album?.rjid ?: ""
-                        }
-                        _currentTitle.value = if (album != null) "[$albumTag] ${album.title} - $trackTitle" else trackTitle
-                        val baseMs = curChapter?.startMs ?: 0L
-                        _currentPosition.value = (baseMs + p.currentPosition).coerceAtLeast(0L)
-                        val totalDur = _currentChapters.value.lastOrNull()?.endMs ?: 0L
-                        if (totalDur > 0L) {
-                            _duration.value = totalDur
-                        }
-                        saveCurrentState()
-                    } else {
-                        val rawId = mediaItem.mediaId
-                        val cleanId = when {
-                            rawId.contains('_') -> rawId.substringBefore('_')
-                            rawId.startsWith("http") || rawId.contains('/') -> _currentRjId.value ?: ""
-                            else -> rawId
-                        }
-                        val prevRj = _currentRjId.value
-                        _currentRjId.value = cleanId
-                        if (prevRj != cleanId && !cleanId.startsWith("http") && !cleanId.contains('/')) {
-                            loadChaptersForCurrentTrack(cleanId)
-                            if (_isTranslationActive.value) {
-                                loadOrFetchTranslations(cleanId)
-                            } else {
-                                _translatedTitle.value = null
-                                _translatedChapters.value = emptyList()
+                    when (_playbackMode.value) {
+                        PlaybackMode.OFFLINE_ALBUM -> {
+                            val album = currentAlbumHistory
+                            val curIdx = p.currentMediaItemIndex
+                            val curChapter = _currentChapters.value.getOrNull(curIdx)
+                            val trackTitle = curChapter?.title ?: mediaItem.mediaMetadata.title?.toString() ?: ""
+                            val isLocalAlbum = album?.sourceType != SourceType.DL_SITE.name || album?.rjid?.startsWith("LOCAL_") == true
+                            val albumTag = when {
+                                isLocalAlbum && !album?.linkedRjId.isNullOrBlank() -> "IMPORT • ${album?.linkedRjId}"
+                                isLocalAlbum -> "IMPORT"
+                                else -> album?.rjid ?: ""
                             }
+                            _currentTitle.value = if (album != null) "[$albumTag] ${album.title} - $trackTitle" else trackTitle
+                            val baseMs = curChapter?.startMs ?: 0L
+                            _currentPosition.value = (baseMs + p.currentPosition).coerceAtLeast(0L)
+                            val totalDur = _currentChapters.value.lastOrNull()?.endMs ?: 0L
+                            if (totalDur > 0L) {
+                                _duration.value = totalDur
+                            }
+                            saveCurrentState()
                         }
-                        if (_isOnlineStreaming.value) {
+                        PlaybackMode.ONLINE_STREAM -> {
                             val curIdx = p.currentMediaItemIndex
                             val curChapter = _currentChapters.value.getOrNull(curIdx)
                             val trackTitle = curChapter?.title ?: mediaItem.mediaMetadata.title?.toString() ?: ""
@@ -1008,7 +1106,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                 _duration.value = totalDur
                             }
                             saveCurrentState()
-                        } else {
+                        }
+                        PlaybackMode.OFFLINE_SINGLE -> {
+                            val rawId = mediaItem.mediaId
+                            val cleanId = when {
+                                rawId.contains('_') -> rawId.substringBefore('_')
+                                rawId.startsWith("http") || rawId.contains('/') -> _currentRjId.value ?: ""
+                                else -> rawId
+                            }
+                            val prevRj = _currentRjId.value
+                            _currentRjId.value = cleanId
+                            if (prevRj != cleanId && !cleanId.startsWith("http") && !cleanId.contains('/')) {
+                                loadChaptersForCurrentTrack(cleanId)
+                                if (_isTranslationActive.value) {
+                                    loadOrFetchTranslations(cleanId)
+                                } else {
+                                    _translatedTitle.value = null
+                                    _translatedChapters.value = emptyList()
+                                }
+                            }
                             mediaItem.mediaMetadata.let { meta ->
                                 _currentTitle.value = meta.title?.toString() ?: ""
                                 _currentArtist.value = meta.artist?.toString() ?: "-"
@@ -1018,17 +1134,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                     preloadCoverArtInMemory(cover)
                                 }
                             }
+                            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
+                                _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                            } else if (p.isPlaying) {
+                                _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
+                            }
+                            if (p.duration > 0L) {
+                                _duration.value = p.duration.coerceAtLeast(0L)
+                            }
+                            saveCurrentState()
                         }
-                        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
-                            _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
-                        } else if (p.isPlaying) {
-                            _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
-                        }
-                        if (p.duration > 0L) {
-                            _duration.value = p.duration.coerceAtLeast(0L)
-                        }
-                        saveCurrentState()
                     }
+                    loadLyricsForCurrentTrack()
                 }
                 updatePlayingState(p)
             }
@@ -1299,6 +1416,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
             } else {
+                _playbackMode.value = PlaybackMode.OFFLINE_SINGLE
                 isCurrentVirtualAlbum = false
                 currentAlbumHistory = null
                 calculateAudioSpecs(targetFile)
@@ -1374,6 +1492,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (tracks.isEmpty()) return
 
         viewModelScope.launch {
+            _playbackMode.value = PlaybackMode.ONLINE_STREAM
             _isOnlineStreaming.value = true
             isCurrentVirtualAlbum = false
             currentAlbumHistory = null
@@ -1405,26 +1524,41 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _duration.value = accumulatedMs
             _translatedTitle.value = null
             _translatedChapters.value = emptyList()
+            if (_isTranslationActive.value) {
+                loadOrFetchTranslations(rjid, forceOnline = true)
+            }
             _audioSpecs.value = "44.1kHz | 16bits | STREAM"
 
+            val isPriv = privacyEnabled.value
+            val blurNotif = isPriv && privacyBlurNotif.value
+            val maskNotifTitle = isPriv && privacyMaskTitle.value
+            val customMask = privacyCustomMask.value
+            val coverBytes = loadArtworkBytes(null, coverUrl, shouldBlur = blurNotif)
+
             val mediaItems = tracks.mapIndexed { idx, tr ->
-                val metaBuilder = MediaMetadata.Builder()
-                    .setTitle(tr.title)
-                    .setArtist(cv)
-                    .setAlbumTitle(workTitle)
-                    .setArtworkUri(Uri.parse(coverUrl))
+                val meta = buildMediaMetadataWithPrivacy(
+                    title = tr.title,
+                    artist = cv,
+                    albumTitle = workTitle,
+                    coverUrl = coverUrl,
+                    coverBytes = coverBytes,
+                    blurNotif = blurNotif,
+                    maskTitle = maskNotifTitle,
+                    customMask = customMask
+                )
 
                 MediaItem.Builder()
                     .setUri(Uri.parse(tr.streamUrl))
                     .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.parse(tr.streamUrl)).build())
                     .setMediaId("${rjid}_$idx")
-                    .setMediaMetadata(metaBuilder.build())
+                    .setMediaMetadata(meta)
                     .build()
             }
 
             p.setMediaItems(mediaItems, targetIndex, 0L)
             p.prepare()
             p.play()
+            loadLyricsForCurrentTrack()
         }
     }
 
@@ -1443,7 +1577,47 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playOnlineWork(rjid, workTitle, cv, coverUrl, listOf(singleTrack), 0)
     }
 
-    private suspend fun loadArtworkBytes(localFilePath: String?, coverUrl: String?): ByteArray? = withContext(Dispatchers.IO) {
+    private fun buildMediaMetadataWithPrivacy(
+        title: String,
+        artist: String,
+        albumTitle: String,
+        coverUrl: String?,
+        coverBytes: ByteArray?,
+        blurNotif: Boolean,
+        maskTitle: Boolean,
+        customMask: String
+    ): MediaMetadata {
+        val builder = MediaMetadata.Builder()
+        if (maskTitle) {
+            builder.setTitle(customMask.ifBlank { "Audio Book" })
+                .setArtist("-")
+                .setAlbumTitle("")
+        } else {
+            builder.setTitle(title)
+                .setArtist(artist)
+                .setAlbumTitle(albumTitle)
+        }
+        if (blurNotif) {
+            if (coverBytes != null) {
+                builder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+            }
+        } else {
+            if (!coverUrl.isNullOrBlank()) {
+                builder.setArtworkUri(Uri.parse(coverUrl))
+            }
+            if (coverBytes != null) {
+                builder.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+            }
+        }
+        return builder.build()
+    }
+
+    private suspend fun loadArtworkBytes(
+        localFilePath: String?,
+        coverUrl: String?,
+        shouldBlur: Boolean = false
+    ): ByteArray? = withContext(Dispatchers.IO) {
+        var rawBytes: ByteArray? = null
         try {
             if (!localFilePath.isNullOrBlank()) {
                 val f = File(localFilePath)
@@ -1452,16 +1626,50 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     try {
                         retriever.setDataSource(f.absolutePath)
                         val pic = retriever.embeddedPicture
-                        if (pic != null && pic.isNotEmpty() && pic.size <= 256 * 1024) return@withContext pic
-                    } catch (e: Exception) {
+                        if (pic != null && pic.isNotEmpty() && pic.size <= 512 * 1024) {
+                            rawBytes = pic
+                        }
+                    } catch (_: Exception) {
                     } finally {
-                        try { retriever.release() } catch (e: Exception) {}
+                        try { retriever.release() } catch (_: Exception) {}
                     }
                 }
             }
-        } catch (e: Exception) {
+            if (rawBytes == null && !coverUrl.isNullOrBlank()) {
+                if (coverUrl.startsWith("http://") || coverUrl.startsWith("https://")) {
+                    if (shouldBlur) {
+                        rawBytes = URL(coverUrl).openStream().use { it.readBytes() }
+                    }
+                } else {
+                    val coverFile = File(coverUrl)
+                    if (coverFile.exists() && coverFile.isFile) {
+                        rawBytes = coverFile.readBytes()
+                    }
+                }
+            }
+            if (shouldBlur && rawBytes != null) {
+                return@withContext blurArtworkBytes(rawBytes) ?: rawBytes
+            }
+        } catch (_: Exception) {
         }
-        return@withContext null
+        return@withContext if (rawBytes != null && rawBytes.size <= 256 * 1024) rawBytes else null
+    }
+
+    private fun blurArtworkBytes(rawBytes: ByteArray): ByteArray? {
+        return try {
+            val orig = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size) ?: return null
+            // Strong privacy blur via downscale to 18x18 then upscale to 256x256 with bilinear filter
+            val tiny = Bitmap.createScaledBitmap(orig, 18, 18, true)
+            val blurred = Bitmap.createScaledBitmap(tiny, 256, 256, true)
+            if (orig != tiny) orig.recycle()
+            if (tiny != blurred) tiny.recycle()
+            val out = ByteArrayOutputStream()
+            blurred.compress(Bitmap.CompressFormat.JPEG, 80, out)
+            blurred.recycle()
+            out.toByteArray()
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun togglePlayPause() {
@@ -1772,10 +1980,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             prefs.setTranslationActive(next)
             if (next) {
-                val targetLang = context?.let { TranslationService.getActiveTargetLanguage(it) } ?: "en"
+                val targetLang = TranslationService.getActiveTargetLanguage(context ?: getApplication())
                 translatePlaylistTitles(targetLang)
                 if (!_currentRjId.value.isNullOrBlank()) {
-                    loadOrFetchTranslations(_currentRjId.value)
+                    loadOrFetchTranslations(_currentRjId.value, forceOnline = _isOnlineStreaming.value)
                 }
             } else {
                 _translatedTitle.value = null
@@ -1814,12 +2022,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
-        viewModelScope.launch {
+        translationJob?.cancel()
+        translationJob = viewModelScope.launch {
             try {
-                val targetLang = prefs.translationLanguageFlow.first()
-                val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
+                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+                val history = if (_isOnlineStreaming.value) null else withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
 
-                // 1. Cek cache DB jika tidak forceOnline
+                // 1. Cek cache DB jika tidak forceOnline dan bukan stream online
                 if (!forceOnline && history != null && !history.translatedTitle.isNullOrBlank()) {
                     _translatedTitle.value = history.translatedTitle
                     if (!history.translatedChaptersJson.isNullOrBlank()) {
@@ -1956,9 +2165,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
                         _duration.value = p.duration.coerceAtLeast(0L)
                     }
+                    val lyrics = _currentLyrics.value
+                    if (lyrics.isNotEmpty()) {
+                        val trackPosMs = p.currentPosition.coerceAtLeast(0L)
+                        val idx = LyricsParser.findActiveIndex(lyrics, trackPosMs)
+                        if (_activeLyricIndex.value != idx) {
+                            _activeLyricIndex.value = idx
+                        }
+                    }
                     saveCacheSynchronously()
                 }
-                delay(1000)
+                delay(350)
             }
         }
     }
@@ -2239,6 +2456,178 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setPrivacyCustomMask(text: String) {
         viewModelScope.launch { prefs.setPrivacyCustomMask(text) }
+    }
+
+    // --- Lyrics & Floating Lyrics ---
+
+    fun setFloatingLyricsEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setFloatingLyricsEnabled(enabled) }
+    }
+
+    fun setFloatingLyricsLocked(locked: Boolean) {
+        viewModelScope.launch { prefs.setFloatingLyricsLocked(locked) }
+    }
+
+    fun seekToLyricLine(line: LyricLine) {
+        val p = player ?: return
+        p.seekTo(line.startMs.coerceAtLeast(0L))
+    }
+
+    fun selectSubtitleSource(source: SubtitleSource) {
+        _selectedSubtitleSource.value = source
+        _isLyricsTranslated.value = false
+        lyricsJob?.cancel()
+        lyricsJob = viewModelScope.launch(Dispatchers.IO) {
+            val content = fetchSubtitleContent(source)
+            val parsed = if (!content.isNullOrBlank()) LyricsParser.parse(content, source.format) else emptyList()
+            _currentLyrics.value = parsed
+            _activeLyricIndex.value = -1
+        }
+    }
+
+    fun toggleLyricsTranslation() {
+        val current = _currentLyrics.value
+        if (current.isEmpty()) return
+
+        if (_isLyricsTranslated.value) {
+            _isLyricsTranslated.value = false
+            return
+        }
+
+        if (current.any { !it.translatedText.isNullOrBlank() }) {
+            _isLyricsTranslated.value = true
+            return
+        }
+
+        viewModelScope.launch {
+            _isTranslatingLyrics.value = true
+            val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+            val llmUrl = prefs.llmApiUrlFlow.first()
+            val llmKey = prefs.llmApiKeyFlow.first()
+            val llmModel = prefs.llmModelFlow.first()
+            val llmPrompt = prefs.llmPromptFlow.first()
+
+            val texts = current.map { it.text }
+            val translatedMap = TranslationService.translateLyricsNaturally(
+                lines = texts,
+                targetLang = targetLang,
+                llmUrl = llmUrl,
+                llmKey = llmKey,
+                llmModel = llmModel,
+                llmPrompt = llmPrompt
+            )
+
+            _currentLyrics.value = current.map { line ->
+                line.copy(translatedText = translatedMap[line.text.trim()] ?: translatedMap[line.text])
+            }
+            _isLyricsTranslated.value = true
+            _isTranslatingLyrics.value = false
+        }
+    }
+
+    fun loadLyricsForCurrentTrack() {
+        lyricsJob?.cancel()
+        lyricsJob = viewModelScope.launch(Dispatchers.IO) {
+            val trackName = if (_isOnlineStreaming.value) {
+                _currentStreamTrackTitle.value ?: _currentTitle.value
+            } else {
+                val p = withContext(Dispatchers.Main) { player?.currentMediaItem?.mediaMetadata?.title?.toString() }
+                p ?: _currentTitle.value
+            }
+
+            val sources = mutableListOf<SubtitleSource>()
+            if (_isOnlineStreaming.value) {
+                val rj = _currentRjId.value ?: ""
+                val workId = rj.filter { it.isDigit() }.toIntOrNull()
+                if (workId != null && workId > 0) {
+                    val tree = workTreeCache[rj] ?: AsmrOneApiService.getWorkFileTree(workId).getOrNull()?.also {
+                        workTreeCache[rj] = it
+                    } ?: emptyList()
+                    collectRemoteSubtitles(tree, sources)
+                }
+            } else {
+                val mediaPath = withContext(Dispatchers.Main) { player?.currentMediaItem?.mediaId }
+                val localFile = if (!mediaPath.isNullOrBlank() && File(mediaPath).exists()) File(mediaPath) else null
+                val searchDir = localFile?.parentFile ?: currentAlbumHistory?.localFilePath?.let { File(it) }?.let {
+                    if (it.isDirectory) it else it.parentFile
+                }
+                if (searchDir != null && searchDir.exists()) {
+                    collectLocalSubtitles(searchDir, sources)
+                }
+            }
+
+            _availableSubtitles.value = sources
+            if (sources.isEmpty()) {
+                _selectedSubtitleSource.value = null
+                _currentLyrics.value = emptyList()
+                return@launch
+            }
+
+            val best = pickBestSubtitleForTrack(sources, trackName)
+            if (best.pathOrUrl == _selectedSubtitleSource.value?.pathOrUrl && _currentLyrics.value.isNotEmpty()) {
+                return@launch
+            }
+            _selectedSubtitleSource.value = best
+            val content = fetchSubtitleContent(best)
+            val parsed = if (!content.isNullOrBlank()) LyricsParser.parse(content, best.format) else emptyList()
+            _currentLyrics.value = parsed
+            _isLyricsTranslated.value = false
+            _activeLyricIndex.value = -1
+        }
+    }
+
+    private fun collectRemoteSubtitles(nodes: List<AsmrOneFileNode>, out: MutableList<SubtitleSource>) {
+        val exts = setOf("vtt", "lrc", "srt")
+        for (node in nodes) {
+            if (node.type == "folder") {
+                collectRemoteSubtitles(node.children, out)
+            } else {
+                val ext = node.title.substringAfterLast('.', "").lowercase()
+                if (ext in exts && node.streamUrl.isNotBlank()) {
+                    out.add(SubtitleSource(title = node.title, pathOrUrl = node.streamUrl, format = ext, isRemote = true))
+                }
+            }
+        }
+    }
+
+    private fun collectLocalSubtitles(dir: File, out: MutableList<SubtitleSource>) {
+        val exts = setOf("vtt", "lrc", "srt")
+        dir.walkTopDown().maxDepth(3).forEach { file ->
+            if (file.isFile) {
+                val ext = file.extension.lowercase()
+                if (ext in exts) {
+                    out.add(SubtitleSource(title = file.name, pathOrUrl = file.absolutePath, format = ext, isRemote = false))
+                }
+            }
+        }
+    }
+
+    private fun pickBestSubtitleForTrack(sources: List<SubtitleSource>, trackTitle: String): SubtitleSource {
+        fun cleanName(s: String): String = s.lowercase()
+            .replace(Regex("\\.(mp3|wav|flac|m4a|opus|aac|vtt|lrc|srt)$"), "")
+            .replace(Regex("\\s+"), "")
+        val target = cleanName(trackTitle)
+        return sources.maxByOrNull { src ->
+            val cand = cleanName(src.title)
+            var score = 0
+            if (cand == target) score += 100
+            else if (target.isNotEmpty() && (cand.contains(target) || target.contains(cand))) score += 60
+            if (src.format == "vtt") score += 10
+            else if (src.format == "lrc") score += 5
+            score
+        } ?: sources.first()
+    }
+
+    private suspend fun fetchSubtitleContent(source: SubtitleSource): String? {
+        return try {
+            if (!source.isRemote) {
+                File(source.pathOrUrl).readText(Charsets.UTF_8)
+            } else {
+                AsmrOneApiService.fetchRawText(source.pathOrUrl)
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     override fun onCleared() {

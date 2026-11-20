@@ -55,7 +55,8 @@ enum class SettingsSubScreen {
     PRIVACY_MODE,
     BLOCKED_ITEMS,
     AUDIO_FORMAT,
-    LLM_SETTINGS
+    LLM_SETTINGS,
+    FLOATING_LYRICS
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,6 +97,13 @@ fun SettingsScreen(
             WorkDetailDisplaySettingsScreen(
                 viewModel = viewModel,
                 onBack = { subScreen = SettingsSubScreen.UI_SETTINGS }
+            )
+            return
+        }
+        SettingsSubScreen.FLOATING_LYRICS -> {
+            FloatingLyricsSettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.MAIN }
             )
             return
         }
@@ -734,6 +742,29 @@ fun SettingsScreen(
                 headlineContent = { Text(stringResource(R.string.settings_cat_ui), fontWeight = FontWeight.SemiBold) },
                 supportingContent = { Text(stringResource(R.string.settings_ui_desc), style = MaterialTheme.typography.bodySmall) },
                 leadingContent = { Icon(Icons.Default.DashboardCustomize, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            onClick = { subScreen = SettingsSubScreen.FLOATING_LYRICS },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+        ) {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_floating_lyrics), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_floating_lyrics_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.Subtitles, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 trailingContent = {
                     Icon(
                         imageVector = Icons.Default.ChevronRight,

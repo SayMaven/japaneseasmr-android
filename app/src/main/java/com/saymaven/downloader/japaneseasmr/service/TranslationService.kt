@@ -9,8 +9,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
@@ -70,14 +73,26 @@ object TranslationService {
     }
 
     /**
-     * Translates multiple texts in parallel chunks, checking local memory & DB cache first.
+     * Translates multiple texts using fast multi-line HTTP batching (up to 25 items per request),
+     * checking local memory & DB cache first.
      */
     suspend fun translateBatch(
         texts: List<String>,
         targetLang: String = "id"
-    ): Map<String, String> = kotlinx.coroutines.coroutineScope {
+    ): Map<String, String> = withContext(Dispatchers.IO) {
         val unique = texts.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-        val result = java.util.concurrent.ConcurrentHashMap<String, String>()
+        if (unique.isEmpty()) return@withContext emptyMap()
+
+        val result = ConcurrentHashMap<String, String>()
+        val isEn = targetLang.equals("en", ignoreCase = true)
+        val isId = targetLang.equals("id", ignoreCase = true) || targetLang.equals("in", ignoreCase = true)
+        val normalizedTl = when {
+            isId -> "id"
+            targetLang.startsWith("zh", ignoreCase = true) -> "zh-CN"
+            targetLang.startsWith("ja", ignoreCase = true) -> "ja"
+            isEn -> "en"
+            else -> targetLang
+        }
 
         val missingAfterMem = mutableListOf<String>()
         for (t in unique) {
@@ -91,7 +106,11 @@ object TranslationService {
 
         val missingAfterDb = mutableListOf<String>()
         if (missingAfterMem.isNotEmpty()) {
-            val dbItems = cacheDao?.getTranslations(missingAfterMem, targetLang) ?: emptyList()
+            val dbItems = try {
+                cacheDao?.getTranslations(missingAfterMem, targetLang) ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
             val dbMap = dbItems.associate { it.sourceText to it.translatedText }
             for (t in missingAfterMem) {
                 val dbVal = dbMap[t]
@@ -105,22 +124,181 @@ object TranslationService {
         }
 
         if (missingAfterDb.isNotEmpty()) {
-            val chunks = missingAfterDb.chunked(12)
+            val newEntities = java.util.Collections.synchronizedList(mutableListOf<TranslationCacheEntity>())
+            val chunks = missingAfterDb.chunked(25)
             coroutineScope {
                 chunks.map { chunk ->
                     async(Dispatchers.IO) {
-                        for (t in chunk) {
-                            val tr = translateText(t, targetLang)
-                            if (tr.isNotBlank()) {
-                                result[t] = tr
+                        val prepared = chunk.map { item ->
+                            val pre = if (isEn || isId) preProcessJapaneseText(item, isEn) else item
+                            pre.replace('\n', ' ').replace('\r', ' ').trim().ifEmpty { item }
+                        }
+                        val joined = prepared.joinToString("\n")
+                        val batchOut = translateViaGoogleWeb(joined, normalizedTl)
+                        val splitLines = batchOut?.split("\n")
+
+                        if (splitLines != null && splitLines.size == chunk.size) {
+                            for (i in chunk.indices) {
+                                val src = chunk[i]
+                                val rawTr = splitLines[i].trim()
+                                val finalTr = if (isEn || isId) postProcessTranslation(rawTr, isEn) else rawTr
+                                if (finalTr.isNotBlank()) {
+                                    result[src] = finalTr
+                                    memoryCache["$targetLang:$src"] = finalTr
+                                    newEntities.add(
+                                        TranslationCacheEntity(
+                                            sourceText = src,
+                                            targetLang = targetLang,
+                                            translatedText = finalTr
+                                        )
+                                    )
+                                }
+                            }
+                        } else {
+                            // Parallel individual fallback if line count mismatches
+                            coroutineScope {
+                                chunk.map { src ->
+                                    async(Dispatchers.IO) {
+                                        val tr = translateText(src, targetLang)
+                                        if (tr.isNotBlank()) {
+                                            result[src] = tr
+                                        }
+                                    }
+                                }.awaitAll()
                             }
                         }
                     }
                 }.awaitAll()
             }
+            if (newEntities.isNotEmpty()) {
+                try {
+                    cacheDao?.insertTranslations(newEntities.toList())
+                } catch (_: Exception) {
+                }
+            }
         }
 
         result
+    }
+
+    /**
+     * Translates subtitle/lyric lines naturally. Uses configured OpenAI-compatible LLM if API key is provided,
+     * falling back to fast multi-line Google Translate + ASMR dialogue post-processing.
+     */
+    suspend fun translateLyricsNaturally(
+        lines: List<String>,
+        targetLang: String,
+        llmUrl: String,
+        llmKey: String,
+        llmModel: String,
+        llmPrompt: String
+    ): Map<String, String> = withContext(Dispatchers.IO) {
+        val unique = lines.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (unique.isEmpty()) return@withContext emptyMap()
+
+        if (llmKey.isNotBlank() && llmUrl.isNotBlank()) {
+            val llmResult = ConcurrentHashMap<String, String>()
+            val langName = when {
+                targetLang.equals("id", ignoreCase = true) || targetLang.equals("in", ignoreCase = true) -> "Indonesian (natural, conversational, intimate ASMR dialogue tone)"
+                targetLang.startsWith("zh", ignoreCase = true) -> "Simplified Chinese"
+                targetLang.startsWith("ja", ignoreCase = true) -> "Japanese"
+                else -> "English"
+            }
+            val systemInstruction = buildString {
+                if (llmPrompt.isNotBlank()) {
+                    append(llmPrompt.trim()).append("\n")
+                }
+                append("Translate each numbered ASMR voice-drama subtitle line into ")
+                append(langName)
+                append(". Keep the exact same numbering [0], [1], ... one line per item, natural spoken phrasing, no extra commentary.")
+            }
+
+            val chunks = unique.chunked(30)
+            var allSucceeded = true
+            for (chunk in chunks) {
+                val userPrompt = chunk.mapIndexed { idx, s -> "[$idx] $s" }.joinToString("\n")
+                val response = callOpenAiCompatibleLlm(llmUrl, llmKey, llmModel.ifBlank { "gpt-4o-mini" }, systemInstruction, userPrompt)
+                if (response.isNullOrBlank()) {
+                    allSucceeded = false
+                    break
+                }
+                val parsed = mutableMapOf<Int, String>()
+                val lineRegex = Regex("^\\[(\\d+)]\\s*(.+)$")
+                for (rawLine in response.lines()) {
+                    val m = lineRegex.find(rawLine.trim())
+                    if (m != null) {
+                        val idx = m.groupValues[1].toIntOrNull()
+                        val text = m.groupValues[2].trim()
+                        if (idx != null && text.isNotEmpty()) {
+                            parsed[idx] = text
+                        }
+                    }
+                }
+                if (parsed.size < chunk.size / 2) {
+                    allSucceeded = false
+                    break
+                }
+                for (i in chunk.indices) {
+                    val tr = parsed[i]
+                    if (!tr.isNullOrBlank()) {
+                        llmResult[chunk[i]] = tr
+                    }
+                }
+            }
+            if (allSucceeded && llmResult.isNotEmpty()) {
+                val missing = unique.filter { !llmResult.containsKey(it) }
+                if (missing.isNotEmpty()) {
+                    llmResult.putAll(translateBatch(missing, targetLang))
+                }
+                return@withContext llmResult
+            }
+        }
+
+        translateBatch(unique, targetLang)
+    }
+
+    private fun callOpenAiCompatibleLlm(
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        systemPrompt: String,
+        userPrompt: String
+    ): String? {
+        return try {
+            val endpoint = baseUrl.trimEnd('/') + if (baseUrl.trimEnd('/').endsWith("/chat/completions")) "" else "/chat/completions"
+            val messages = JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                })
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", userPrompt)
+                })
+            }
+            val payload = JSONObject().apply {
+                put("model", model)
+                put("messages", messages)
+                put("temperature", 0.4)
+            }
+            val req = Request.Builder()
+                .url(endpoint)
+                .header("Authorization", "Bearer $apiKey")
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                val json = JSONObject(body)
+                val choices = json.optJSONArray("choices") ?: return null
+                if (choices.length() == 0) return null
+                choices.getJSONObject(0).optJSONObject("message")?.optString("content")?.trim()
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private val client = OkHttpClient.Builder()
@@ -585,21 +763,29 @@ object TranslationService {
         }
 
         // 2. Pre-processing: bersihkan sensor fuseji (○, ●, ×), normalisasi hiragana & konteks ASMR
-        val preProcessed = preProcessJapaneseText(trimmed, isEn)
+        val isId = targetLang.equals("id", ignoreCase = true) || targetLang.equals("in", ignoreCase = true)
+        val normalizedTl = when {
+            isId -> "id"
+            targetLang.startsWith("zh", ignoreCase = true) -> "zh-CN"
+            targetLang.startsWith("ja", ignoreCase = true) -> "ja"
+            isEn -> "en"
+            else -> targetLang
+        }
+        val preProcessed = if (isEn || isId) preProcessJapaneseText(trimmed, isEn) else trimmed
 
         // 3. Panggil Mesin Terjemahan Google Web (Utama & Cepat & Kontekstual)
-        var onlineTranslated = translateViaGoogleWeb(preProcessed, if (isEn) "en" else "id")
+        var onlineTranslated = translateViaGoogleWeb(preProcessed, normalizedTl)
 
         // 4. Failover jika Google Web tidak merespon
         if (onlineTranslated.isNullOrBlank()) {
-            val langPair = if (isEn) "ja|en" else "ja|id"
+            val langPair = "ja|$normalizedTl"
             onlineTranslated = translateViaMyMemory(preProcessed, langPair)
         }
 
         val result = onlineTranslated ?: preProcessed
 
         // 5. Post-process: koreksi terjemahan kaku/salah konteks khas ASMR
-        val finalResult = postProcessTranslation(result, isEn)
+        val finalResult = if (isEn || isId) postProcessTranslation(result, isEn) else result
 
         // 6. Simpan hasil ke Memory Cache dan SQLite Room Database
         if (finalResult.isNotBlank()) {
@@ -1310,7 +1496,7 @@ object TranslationService {
     private fun translateViaGoogleWeb(text: String, tl: String): String? {
         return try {
             val encoded = URLEncoder.encode(text, "UTF-8")
-            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=ja&tl=$tl&dt=t&q=$encoded"
+            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t&q=$encoded"
             val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", USER_AGENT)

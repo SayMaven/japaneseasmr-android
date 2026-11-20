@@ -108,6 +108,14 @@ class PreferencesManager(private val context: Context) {
         val KEY_LLM_MODEL = stringPreferencesKey("llm_model")
         val KEY_LLM_PROMPT = stringPreferencesKey("llm_prompt")
 
+        // Floating Lyrics (In-App above MiniPlayer)
+        val KEY_FLOATING_LYRICS_ENABLED = booleanPreferencesKey("floating_lyrics_enabled")
+        val KEY_FLOATING_LYRICS_FONT_SIZE = floatPreferencesKey("floating_lyrics_font_size")
+        val KEY_FLOATING_LYRICS_OPACITY = floatPreferencesKey("floating_lyrics_opacity")
+        val KEY_FLOATING_LYRICS_CORNER_RADIUS = floatPreferencesKey("floating_lyrics_corner_radius")
+        val KEY_FLOATING_LYRICS_SHOW_TRANSLATION = booleanPreferencesKey("floating_lyrics_show_translation")
+        val KEY_FLOATING_LYRICS_LOCKED = booleanPreferencesKey("floating_lyrics_locked")
+
         fun getFastCachedUsbVolume(context: Context): Float {
             return try {
                 val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
@@ -537,6 +545,21 @@ class PreferencesManager(private val context: Context) {
             it[KEY_LLM_PROMPT] = prompt
         }
     }
+
+    // Floating Lyrics Settings
+    val floatingLyricsEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_ENABLED] ?: false }
+    val floatingLyricsFontSizeFlow: Flow<Float> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_FONT_SIZE] ?: 14f }
+    val floatingLyricsOpacityFlow: Flow<Float> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_OPACITY] ?: 0.90f }
+    val floatingLyricsCornerRadiusFlow: Flow<Float> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_CORNER_RADIUS] ?: 16f }
+    val floatingLyricsShowTranslationFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] ?: true }
+    val floatingLyricsLockedFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_LOCKED] ?: false }
+
+    suspend fun setFloatingLyricsEnabled(enabled: Boolean) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_ENABLED] = enabled }
+    suspend fun setFloatingLyricsFontSize(size: Float) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_FONT_SIZE] = size.coerceIn(10f, 24f) }
+    suspend fun setFloatingLyricsOpacity(opacity: Float) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_OPACITY] = opacity.coerceIn(0.25f, 1.0f) }
+    suspend fun setFloatingLyricsCornerRadius(radius: Float) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_CORNER_RADIUS] = radius.coerceIn(0f, 24f) }
+    suspend fun setFloatingLyricsShowTranslation(show: Boolean) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] = show }
+    suspend fun setFloatingLyricsLocked(locked: Boolean) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_LOCKED] = locked }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         fastSp.edit().putString("cached_theme_mode", mode.name).apply()

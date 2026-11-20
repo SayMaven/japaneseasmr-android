@@ -48,6 +48,14 @@ fun AsmrOneWorkDetailScreen(
     audioTracks: List<AsmrOneTrack>,
     isLoadingFiles: Boolean,
     playerViewModel: PlayerViewModel,
+    showRating: Boolean = false,
+    showPrice: Boolean = false,
+    showDuration: Boolean = true,
+    showSales: Boolean = false,
+    showReleaseDate: Boolean = true,
+    showTranslateBtn: Boolean = true,
+    showSubtitle: Boolean = true,
+    showAgeRating: Boolean = true,
     onBack: () -> Unit,
     onOpenPlayer: () -> Unit = {},
     onDownload: () -> Unit,
@@ -225,14 +233,74 @@ fun AsmrOneWorkDetailScreen(
                 }
             }
 
-            // 3. Metadata Row (Sold, Release date)
+            // 3. Metadata Row (Rating, Price, Duration, Sold, Release date, Subtitle, Age Rating)
             item {
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    if (work.dlCount != null) {
+                    if (showAgeRating) {
+                        val isR18 = work.nsfw || work.ageRating.contains("18", ignoreCase = true)
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isR18) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = if (isR18) "R-18" else "ALL",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isR18) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    if (showSubtitle && work.hasSubtitle) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer
+                        ) {
+                            Text(
+                                text = stringResource(R.string.browse_filter_subtitled),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    if (showRating && work.rating != null && work.rating > 0.0) {
+                        Text(
+                            text = String.format(java.util.Locale.US, "%.1f (%d)", work.rating, work.reviewCount ?: 0),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    if (showPrice && work.price != null && work.price > 0) {
+                        Text(
+                            text = "${work.price} JPY",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    if (showDuration && audioTracks.isNotEmpty()) {
+                        val totalSec = audioTracks.sumOf { it.duration }
+                        if (totalSec > 0) {
+                            val mins = totalSec / 60
+                            Text(
+                                text = "${mins} min",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (showSales && work.dlCount != null) {
                         Text(
                             text = stringResource(R.string.browse_detail_sold, work.dlCount.toString()),
                             style = MaterialTheme.typography.bodySmall,
@@ -240,7 +308,7 @@ fun AsmrOneWorkDetailScreen(
                         )
                     }
 
-                    if (!work.releaseDate.isNullOrBlank()) {
+                    if (showReleaseDate && !work.releaseDate.isNullOrBlank()) {
                         Text(
                             text = work.releaseDate,
                             style = MaterialTheme.typography.bodySmall,
@@ -356,61 +424,63 @@ fun AsmrOneWorkDetailScreen(
                         color = MaterialTheme.colorScheme.primary
                     )
 
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isFileTreeTranslated) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable {
-                                if (!isFileTreeTranslated && translatedNodeTitles.isEmpty()) {
-                                    coroutineScope.launch {
-                                        isTranslatingFileTree = true
-                                        val targetLang = TranslationService.getActiveTargetLanguage(context)
-                                        val titlesToTranslate = mutableSetOf<String>()
-                                        fun collectTitles(nodes: List<AsmrOneFileNode>) {
-                                            for (node in nodes) {
-                                                titlesToTranslate.add(node.title)
-                                                collectTitles(node.children)
+                    if (showTranslateBtn) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isFileTreeTranslated) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    if (!isFileTreeTranslated && translatedNodeTitles.isEmpty()) {
+                                        coroutineScope.launch {
+                                            isTranslatingFileTree = true
+                                            val targetLang = TranslationService.getActiveTargetLanguage(context)
+                                            val titlesToTranslate = mutableSetOf<String>()
+                                            fun collectTitles(nodes: List<AsmrOneFileNode>) {
+                                                for (node in nodes) {
+                                                    titlesToTranslate.add(node.title)
+                                                    collectTitles(node.children)
+                                                }
                                             }
-                                        }
-                                        collectTitles(fileTree)
-                                        if (audioTracks.isNotEmpty()) {
-                                            for (tr in audioTracks) {
-                                                titlesToTranslate.add(tr.title)
+                                            collectTitles(fileTree)
+                                            if (audioTracks.isNotEmpty()) {
+                                                for (tr in audioTracks) {
+                                                    titlesToTranslate.add(tr.title)
+                                                }
                                             }
-                                        }
 
-                                        val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLang)
-                                        translatedNodeTitles = map
-                                        isFileTreeTranslated = true
-                                        isTranslatingFileTree = false
+                                            val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLang)
+                                            translatedNodeTitles = map
+                                            isFileTreeTranslated = true
+                                            isTranslatingFileTree = false
+                                        }
+                                    } else {
+                                        isFileTreeTranslated = !isFileTreeTranslated
                                     }
-                                } else {
-                                    isFileTreeTranslated = !isFileTreeTranslated
                                 }
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isTranslatingFileTree) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Translate,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = if (isFileTreeTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (isTranslatingFileTree) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Translate,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = if (isFileTreeTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.browse_detail_trans),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isFileTreeTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = stringResource(R.string.browse_detail_trans),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isFileTreeTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }

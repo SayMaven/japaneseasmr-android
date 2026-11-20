@@ -99,6 +99,16 @@ fun AsmrOneBrowseScreen(
     val showCardSubtitle by viewModel.showCardSubtitle.collectAsState()
     val showCardAgeRating by viewModel.showCardAgeRating.collectAsState()
 
+    // Work Detail Display Toggles from UI settings
+    val showDetailRating by viewModel.showDetailRating.collectAsState()
+    val showDetailPrice by viewModel.showDetailPrice.collectAsState()
+    val showDetailDuration by viewModel.showDetailDuration.collectAsState()
+    val showDetailSales by viewModel.showDetailSales.collectAsState()
+    val showDetailReleaseDate by viewModel.showDetailReleaseDate.collectAsState()
+    val showDetailTranslateBtn by viewModel.showDetailTranslateBtn.collectAsState()
+    val showDetailSubtitle by viewModel.showDetailSubtitle.collectAsState()
+    val showDetailAgeRating by viewModel.showDetailAgeRating.collectAsState()
+
     var isSearchExpanded by remember { mutableStateOf(false) }
     var showSortSheet by remember { mutableStateOf(false) }
     var showTagFilterSheet by remember { mutableStateOf(false) }
@@ -143,6 +153,14 @@ fun AsmrOneBrowseScreen(
             audioTracks = workTracks,
             isLoadingFiles = isLoadingTracks,
             playerViewModel = playerViewModel,
+            showRating = showDetailRating,
+            showPrice = showDetailPrice,
+            showDuration = showDetailDuration,
+            showSales = showDetailSales,
+            showReleaseDate = showDetailReleaseDate,
+            showTranslateBtn = showDetailTranslateBtn,
+            showSubtitle = showDetailSubtitle,
+            showAgeRating = showDetailAgeRating,
             onBack = { viewModel.selectWork(null) },
             onOpenPlayer = onOpenPlayer,
             onDownload = {

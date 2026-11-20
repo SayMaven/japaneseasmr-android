@@ -28,7 +28,6 @@ fun WorkDetailDisplaySettingsScreen(
     val showPrice by viewModel.detailShowPrice.collectAsState()
     val showDuration by viewModel.detailShowDuration.collectAsState()
     val showSales by viewModel.detailShowSales.collectAsState()
-    val showExternalLinks by viewModel.detailShowExternalLinks.collectAsState()
     val showReleaseDate by viewModel.detailShowReleaseDate.collectAsState()
     val showTranslateBtn by viewModel.detailShowTranslateBtn.collectAsState()
     val showSubtitle by viewModel.detailShowSubtitle.collectAsState()
@@ -36,8 +35,10 @@ fun WorkDetailDisplaySettingsScreen(
     val showRecommendations by viewModel.detailShowRecommendations.collectAsState()
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {
                     Text(
                         text = stringResource(R.string.settings_work_detail_display),
@@ -58,7 +59,6 @@ fun WorkDetailDisplaySettingsScreen(
                         viewModel.setDetailShowPrice(false)
                         viewModel.setDetailShowDuration(true)
                         viewModel.setDetailShowSales(false)
-                        viewModel.setDetailShowExternalLinks(true)
                         viewModel.setDetailShowReleaseDate(true)
                         viewModel.setDetailShowTranslateBtn(true)
                         viewModel.setDetailShowSubtitle(true)
@@ -101,8 +101,8 @@ fun WorkDetailDisplaySettingsScreen(
             ) {
                 Column {
                     ListItem(
-                        headlineContent = { Text("Rating & Reviews", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display review rating section", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_rating), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_rating_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showRating, onCheckedChange = { viewModel.setDetailShowRating(it) })
                         }
@@ -110,8 +110,8 @@ fun WorkDetailDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Price", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display JPY pricing details", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_price), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_price_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showPrice, onCheckedChange = { viewModel.setDetailShowPrice(it) })
                         }
@@ -119,8 +119,8 @@ fun WorkDetailDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Duration", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display audio total duration", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_duration), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_duration_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showDuration, onCheckedChange = { viewModel.setDetailShowDuration(it) })
                         }
@@ -128,8 +128,8 @@ fun WorkDetailDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Sales / DL Count", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display total DL count", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_sales), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_sales_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showSales, onCheckedChange = { viewModel.setDetailShowSales(it) })
                         }
@@ -137,17 +137,8 @@ fun WorkDetailDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("External Links (DLsite / dlsite.com)", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display button to open original DLsite store page", style = MaterialTheme.typography.bodySmall) },
-                        trailingContent = {
-                            Switch(checked = showExternalLinks, onCheckedChange = { viewModel.setDetailShowExternalLinks(it) })
-                        }
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    ListItem(
-                        headlineContent = { Text("Release Date", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display release date information", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_release_date), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_release_date_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showReleaseDate, onCheckedChange = { viewModel.setDetailShowReleaseDate(it) })
                         }
@@ -155,8 +146,8 @@ fun WorkDetailDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Translate Button", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display fast batch translation trigger in tree header", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_translate_btn), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_translate_btn_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showTranslateBtn, onCheckedChange = { viewModel.setDetailShowTranslateBtn(it) })
                         }
@@ -164,8 +155,8 @@ fun WorkDetailDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Subtitle Badge", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display subtitle indicator", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_subtitle), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_subtitle_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showSubtitle, onCheckedChange = { viewModel.setDetailShowSubtitle(it) })
                         }
@@ -173,8 +164,8 @@ fun WorkDetailDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Age Rating (ALL / R-18)", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display age classification badge", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_age_rating), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_age_rating_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showAgeRating, onCheckedChange = { viewModel.setDetailShowAgeRating(it) })
                         }
@@ -182,8 +173,8 @@ fun WorkDetailDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Recommended Works", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display related recommendations section", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_recommendations), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_recommendations_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showRecommendations, onCheckedChange = { viewModel.setDetailShowRecommendations(it) })
                         }

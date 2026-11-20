@@ -42,8 +42,10 @@ fun LLMSettingsScreen(
     var prompt by remember(initialPrompt) { mutableStateOf(initialPrompt) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {
                     Text(
                         text = stringResource(R.string.settings_llm_config),

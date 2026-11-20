@@ -34,8 +34,10 @@ fun WorkCardDisplaySettingsScreen(
     val showAgeRating by viewModel.cardShowAgeRating.collectAsState()
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = {
                     Text(
                         text = stringResource(R.string.settings_work_card_display),
@@ -97,8 +99,8 @@ fun WorkCardDisplaySettingsScreen(
             ) {
                 Column {
                     ListItem(
-                        headlineContent = { Text("Rating & Reviews", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display average score and review count", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_rating), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_rating_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showRating, onCheckedChange = { viewModel.setCardShowRating(it) })
                         }
@@ -106,8 +108,8 @@ fun WorkCardDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Price", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display original JPY price", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_price), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_price_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showPrice, onCheckedChange = { viewModel.setCardShowPrice(it) })
                         }
@@ -115,8 +117,8 @@ fun WorkCardDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Duration / File Size", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display duration and size badge", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_duration), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_duration_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showDuration, onCheckedChange = { viewModel.setCardShowDuration(it) })
                         }
@@ -124,8 +126,8 @@ fun WorkCardDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Sales / DL Count", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display total sales count", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_sales), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_sales_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showSales, onCheckedChange = { viewModel.setCardShowSales(it) })
                         }
@@ -133,8 +135,8 @@ fun WorkCardDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Release Date", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display original release date", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_release_date), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_release_date_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showReleaseDate, onCheckedChange = { viewModel.setCardShowReleaseDate(it) })
                         }
@@ -142,8 +144,8 @@ fun WorkCardDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Circle / Maker Name", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display circle or production group name", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_circle), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_circle_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showCircle, onCheckedChange = { viewModel.setCardShowCircle(it) })
                         }
@@ -151,8 +153,8 @@ fun WorkCardDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Subtitle Badge", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display SUB indicator badge", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_subtitle), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_subtitle_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showSubtitle, onCheckedChange = { viewModel.setCardShowSubtitleTag(it) })
                         }
@@ -160,8 +162,8 @@ fun WorkCardDisplaySettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
-                        headlineContent = { Text("Age Rating (ALL / R-18)", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Display age classification badge", style = MaterialTheme.typography.bodySmall) },
+                        headlineContent = { Text(stringResource(R.string.settings_display_age_rating), fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text(stringResource(R.string.settings_display_age_rating_desc), style = MaterialTheme.typography.bodySmall) },
                         trailingContent = {
                             Switch(checked = showAgeRating, onCheckedChange = { viewModel.setCardShowAgeRating(it) })
                         }

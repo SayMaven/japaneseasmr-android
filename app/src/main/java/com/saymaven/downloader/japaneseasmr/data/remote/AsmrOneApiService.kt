@@ -347,6 +347,7 @@ object AsmrOneApiService {
             }
             val hash = obj.optString("hash", "").ifBlank { null }
             var streamUrl = obj.optString("mediaStreamUrl", "")
+                .ifBlank { obj.optString("mediaDownloadUrl", "") }
             if (streamUrl.isBlank() && hash != null) {
                 streamUrl = "$host/api/media/stream/$hash"
             }
@@ -389,6 +390,20 @@ object AsmrOneApiService {
             }
         }
         return list
+    }
+
+    /**
+     * Fetches raw text content (such as .vtt / .lrc / .srt subtitles) using proper asmr.one headers.
+     */
+    suspend fun fetchRawText(url: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val req = buildRequest(url)
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) resp.body?.string() else null
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /**
