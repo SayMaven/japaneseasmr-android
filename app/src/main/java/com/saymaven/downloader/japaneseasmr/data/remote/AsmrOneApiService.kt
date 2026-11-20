@@ -407,7 +407,9 @@ object AsmrOneApiService {
     }
 
     /**
-     * Get track list for a work for streaming or offline playback.
+     * Get primary track list for a work for streaming or offline playback.
+     * Selects the best single folder/group (e.g. MP3 SEあり or root audio tracks) instead of
+     * flattening duplicate format folders (WAV + MP3 + SEあり + SEなし) together.
      */
     suspend fun getWorkTracks(workId: Int): Result<List<AsmrOneTrack>> = withContext(Dispatchers.IO) {
         try {
@@ -415,12 +417,72 @@ object AsmrOneApiService {
             val responseBody = executeRequest(endpoint)
                 ?: return@withContext Result.failure(Exception("Failed to fetch tracks for work $workId"))
 
-            val tracks = mutableListOf<AsmrOneTrack>()
             val array = JSONArray(responseBody)
+            val tree = parseFileNodes(array, DEFAULT_HOST)
+            val primaryTracks = selectPrimaryAudioTracks(tree)
+            if (primaryTracks.isNotEmpty()) {
+                return@withContext Result.success(primaryTracks)
+            }
+
+            val tracks = mutableListOf<AsmrOneTrack>()
             extractAudioTracks(array, DEFAULT_HOST, tracks)
             Result.success(tracks)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    private fun selectPrimaryAudioTracks(tree: List<AsmrOneFileNode>): List<AsmrOneTrack> {
+        data class GroupCandidate(val path: String, val audios: List<AsmrOneFileNode>)
+        val candidates = mutableListOf<GroupCandidate>()
+
+        val rootAudios = tree.filter { it.type == "audio" && it.streamUrl.isNotBlank() }
+        if (rootAudios.isNotEmpty()) {
+            candidates.add(GroupCandidate("root", rootAudios))
+        }
+
+        fun collectFolders(nodes: List<AsmrOneFileNode>, parentPath: String) {
+            for (n in nodes) {
+                if (n.type == "folder") {
+                    val curPath = if (parentPath.isEmpty()) n.title else "$parentPath/${n.title}"
+                    val directAudios = n.children.filter { it.type == "audio" && it.streamUrl.isNotBlank() }
+                    if (directAudios.isNotEmpty()) {
+                        candidates.add(GroupCandidate(curPath, directAudios))
+                    }
+                    collectFolders(n.children, curPath)
+                }
+            }
+        }
+        collectFolders(tree, "")
+
+        if (candidates.isEmpty()) return emptyList()
+
+        fun scoreCandidate(c: GroupCandidate): Int {
+            val lowerPath = c.path.lowercase()
+            val sampleExt = c.audios.firstOrNull()?.title?.substringAfterLast('.', "")?.lowercase() ?: ""
+            var score = 0
+            if (lowerPath.contains("mp3") || sampleExt == "mp3") score += 100
+            else if (sampleExt in listOf("m4a", "aac", "ogg", "opus")) score += 60
+            else if (lowerPath.contains("wav") || lowerPath.contains("flac") || sampleExt in listOf("wav", "flac")) score -= 40
+
+            if (lowerPath.contains("seあり") || lowerPath.contains("se有り") || lowerPath.contains("se_ari") || lowerPath.contains("se ari") || lowerPath.contains("効果音あり")) score += 80
+            if (lowerPath.contains("本編") || lowerPath.contains("main")) score += 50
+            if (lowerPath.contains("seなし") || lowerPath.contains("se無し") || lowerPath.contains("se_nashi") || lowerPath.contains("se nashi") || lowerPath.contains("効果音なし") || lowerPath.contains("効果音無") || lowerPath.contains("nose")) score -= 120
+            if (lowerPath.contains("おまけ") || lowerPath.contains("特典") || lowerPath.contains("bonus") || lowerPath.contains("free talk") || lowerPath.contains("フリートーク")) score -= 70
+
+            return score
+        }
+
+        val best = candidates.maxByOrNull { scoreCandidate(it) } ?: candidates.first()
+        return best.audios.map {
+            AsmrOneTrack(
+                title = it.title,
+                hash = it.hash,
+                streamUrl = it.streamUrl,
+                duration = it.duration,
+                size = it.size,
+                type = "audio"
+            )
         }
     }
 

@@ -49,9 +49,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -224,6 +226,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    val folderItemsMap: StateFlow<Map<String, List<HistoryEntity>>> = combine(_playlist, _downloadDir) { list, rawDirStr ->
+        val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), rawDirStr) ?: rawDirStr
+        val downloadDir = if (!resolvedPath.isNullOrBlank()) File(resolvedPath) else DownloadService.getDefaultDownloadDirectory()
+        list.groupBy { item ->
+            AudioStorageHelper.getRelativeFolderName(downloadDir, File(item.localFilePath))
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     val filteredPlaylist = combine(_playlist, _selectedFolder, _downloadDir, _sortState) { list, folder, rawDirStr, sort ->
         val folderFiltered = if (folder == "Semua") {
             list
@@ -376,7 +386,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private var lyricsJob: Job? = null
     private var translationJob: Job? = null
+    private var lastTranslatedKey: String? = null
     private val workTreeCache = mutableMapOf<String, List<AsmrOneFileNode>>()
+    private val subtitleTextCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     private val _currentArtist = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_artist", "-") ?: "-" else "-")
     val currentArtist = _currentArtist.asStateFlow()
@@ -473,7 +485,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         viewModelScope.launch {
-            prefs.downloadDirFlow.collect { dir ->
+            prefs.downloadDirFlow.distinctUntilChanged().collect { dir ->
                 _downloadDir.value = dir
                 sp.edit().putString("cached_download_dir", dir).apply()
             }
@@ -507,7 +519,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 prefs.privacyCustomMaskFlow
             ) { enabled, blurNotif, maskTitle, customMask ->
                 listOf(enabled, blurNotif, maskTitle, customMask)
-            }.collect { values ->
+            }.distinctUntilChanged().collect { values ->
                 if (isFirst) {
                     isFirst = false
                     return@collect
@@ -737,7 +749,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun observeAudioSettings() {
         viewModelScope.launch {
-            prefs.defaultSpeedFlow.collect { speed ->
+            prefs.defaultSpeedFlow.distinctUntilChanged().collect { speed ->
                 player?.setPlaybackSpeed(speed)
             }
         }
@@ -745,7 +757,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun observeTranslationPreference() {
         viewModelScope.launch {
-            prefs.isTranslationActiveFlow.collect { active ->
+            prefs.isTranslationActiveFlow.distinctUntilChanged().collect { active ->
                 _isTranslationActive.value = active
                 if (active && !_currentRjId.value.isNullOrBlank()) {
                     loadOrFetchTranslations(_currentRjId.value)
@@ -753,7 +765,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         viewModelScope.launch {
-            prefs.translationLanguageFlow.collect { _ ->
+            var isFirstLang = true
+            prefs.translationLanguageFlow.distinctUntilChanged().collect { _ ->
+                if (isFirstLang) {
+                    isFirstLang = false
+                    return@collect
+                }
                 if (_isTranslationActive.value && !_currentRjId.value.isNullOrBlank()) {
                     loadOrFetchTranslations(_currentRjId.value, forceOnline = true)
                 }
@@ -1483,7 +1500,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         cv: String,
         coverUrl: String,
         tracks: List<AsmrOneTrack>,
-        startIndex: Int = 0
+        startIndex: Int = 0,
+        startPositionMs: Long = 0L
     ) {
         val p = player ?: run {
             initMediaController()
@@ -1555,7 +1573,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     .build()
             }
 
-            p.setMediaItems(mediaItems, targetIndex, 0L)
+            val resolvedIndex = if (startIndex == 0 && startPositionMs > 0L && chapters.isNotEmpty()) {
+                chapters.indexOfLast { startPositionMs >= it.startMs }.coerceIn(0, tracks.size - 1)
+            } else targetIndex
+            val resolvedOffsetMs = if (startIndex == 0 && startPositionMs > 0L && chapters.isNotEmpty()) {
+                (startPositionMs - chapters[resolvedIndex].startMs).coerceAtLeast(0L)
+            } else 0L
+
+            p.setMediaItems(mediaItems, resolvedIndex, resolvedOffsetMs)
             p.prepare()
             p.play()
             loadLyricsForCurrentTrack()
@@ -1684,10 +1709,32 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val rj = _currentRjId.value
                 if (!rj.isNullOrBlank()) {
                     viewModelScope.launch {
-                        val history = historyDao.getHistoryById(rj)
+                        val savedPos = _currentPosition.value
+                        val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(rj) }
                         if (history != null) {
-                            val savedPos = _currentPosition.value
                             playLocalTrack(history, _playlist.value, startPositionMs = savedPos)
+                        } else {
+                            // Resume online stream from asmr.one when no local history exists
+                            val workId = rj.filter { it.isDigit() }.toIntOrNull() ?: 0
+                            if (workId > 0) {
+                                val tracks = withContext(Dispatchers.IO) {
+                                    AsmrOneApiService.getWorkTracks(workId).getOrNull() ?: emptyList()
+                                }
+                                if (tracks.isNotEmpty()) {
+                                    val cleanTitle = _currentTitle.value
+                                        .replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+]\\s*"), "")
+                                        .trim()
+                                        .ifBlank { rj }
+                                    playOnlineWork(
+                                        rjid = rj,
+                                        workTitle = cleanTitle,
+                                        cv = _currentArtist.value,
+                                        coverUrl = _currentCoverUrl.value ?: "",
+                                        tracks = tracks,
+                                        startPositionMs = savedPos
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1832,6 +1879,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         viewModelScope.launch {
+            if (_isOnlineStreaming.value || _playbackMode.value == PlaybackMode.ONLINE_STREAM) {
+                if (_currentChapters.value.isNotEmpty()) {
+                    checkTranslateChaptersIfNeeded(targetRjid, _currentChapters.value, forceOnline = forceOnline)
+                }
+                return@launch
+            }
             _isLoadingChapters.value = true
             try {
                 fun isBogus(chapters: List<ChapterItem>): Boolean {
@@ -2026,6 +2079,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         translationJob = viewModelScope.launch {
             try {
                 val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+                val currentKey = "$targetRjid:$targetLang:${_currentChapters.value.size}"
+
+                if (!forceOnline &&
+                    lastTranslatedKey == currentKey &&
+                    !_translatedTitle.value.isNullOrBlank() &&
+                    (_currentChapters.value.isEmpty() || _translatedChapters.value.size == _currentChapters.value.size)
+                ) {
+                    return@launch
+                }
+
                 val history = if (_isOnlineStreaming.value) null else withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
 
                 // 1. Cek cache DB jika tidak forceOnline dan bukan stream online
@@ -2035,6 +2098,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
                         _translatedChapters.value = parsed
                     }
+                    lastTranslatedKey = currentKey
                     return@launch
                 }
 
@@ -2057,6 +2121,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         _translatedChapters.value = it
                     }
                 } else emptyList()
+
+                lastTranslatedKey = currentKey
 
                 val chapsJson = if (translatedChapsList.isNotEmpty()) {
                     ChapterItem.toJsonArray(translatedChapsList)
@@ -2085,21 +2151,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun checkTranslateChaptersIfNeeded(targetRjid: String, chapters: List<ChapterItem>) {
+    private fun checkTranslateChaptersIfNeeded(
+        targetRjid: String,
+        chapters: List<ChapterItem>,
+        forceOnline: Boolean = false
+    ) {
         if (!_isTranslationActive.value || chapters.isEmpty()) return
         viewModelScope.launch {
+            _isTranslating.value = true
             try {
-                val history = withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
-                if (!history?.translatedChaptersJson.isNullOrBlank()) {
-                    val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
+                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+                val history = if (_isOnlineStreaming.value || forceOnline) null else withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
+                if (!forceOnline && !history?.translatedChaptersJson.isNullOrBlank()) {
+                    val parsed = ChapterItem.fromJsonArray(history!!.translatedChaptersJson)
                     if (parsed.size == chapters.size) {
                         _translatedChapters.value = parsed
+                        lastTranslatedKey = "$targetRjid:$targetLang:${chapters.size}"
                         return@launch
                     }
                 }
-                val targetLang = prefs.translationLanguageFlow.first()
                 val translatedChapsList = translateChaptersBatch(chapters, targetLang)
                 _translatedChapters.value = translatedChapsList
+                lastTranslatedKey = "$targetRjid:$targetLang:${chapters.size}"
                 withContext(Dispatchers.IO) {
                     historyDao.updateTranslations(
                         targetRjid,
@@ -2109,6 +2182,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                _isTranslating.value = false
             }
         }
     }
@@ -2528,17 +2603,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun loadLyricsForCurrentTrack() {
         lyricsJob?.cancel()
         lyricsJob = viewModelScope.launch(Dispatchers.IO) {
+            val curIdx = withContext(Dispatchers.Main) { player?.currentMediaItemIndex ?: 0 }
             val trackName = if (_isOnlineStreaming.value) {
-                _currentStreamTrackTitle.value ?: _currentTitle.value
+                val chapTitle = _currentChapters.value.getOrNull(curIdx)?.title
+                if (!chapTitle.isNullOrBlank()) {
+                    _currentStreamTrackTitle.value = chapTitle
+                    chapTitle
+                } else {
+                    _currentStreamTrackTitle.value ?: _currentTitle.value
+                }
             } else {
                 val p = withContext(Dispatchers.Main) { player?.currentMediaItem?.mediaMetadata?.title?.toString() }
                 p ?: _currentTitle.value
             }
 
             val sources = mutableListOf<SubtitleSource>()
+            var resolvedLocalAudioFile: File? = null
+            var resolvedHistory: HistoryEntity? = null
+
             if (_isOnlineStreaming.value) {
                 val rj = _currentRjId.value ?: ""
-                val workId = rj.filter { it.isDigit() }.toIntOrNull()
+                val rawDigits = rj.filter { it.isDigit() }
+                val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull()
                 if (workId != null && workId > 0) {
                     val tree = workTreeCache[rj] ?: AsmrOneApiService.getWorkFileTree(workId).getOrNull()?.also {
                         workTreeCache[rj] = it
@@ -2547,12 +2633,80 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             } else {
                 val mediaPath = withContext(Dispatchers.Main) { player?.currentMediaItem?.mediaId }
-                val localFile = if (!mediaPath.isNullOrBlank() && File(mediaPath).exists()) File(mediaPath) else null
-                val searchDir = localFile?.parentFile ?: currentAlbumHistory?.localFilePath?.let { File(it) }?.let {
+                val rj = _currentRjId.value
+                resolvedHistory = if (!rj.isNullOrBlank()) historyDao.getHistoryById(rj) else null
+                resolvedLocalAudioFile = when {
+                    !mediaPath.isNullOrBlank() && File(mediaPath).exists() -> File(mediaPath)
+                    !resolvedHistory?.localFilePath.isNullOrBlank() && File(resolvedHistory!!.localFilePath).exists() -> File(resolvedHistory.localFilePath)
+                    else -> null
+                }
+
+                val searchDir = resolvedLocalAudioFile?.parentFile ?: currentAlbumHistory?.localFilePath?.let { File(it) }?.let {
                     if (it.isDirectory) it else it.parentFile
                 }
                 if (searchDir != null && searchDir.exists()) {
-                    collectLocalSubtitles(searchDir, sources)
+                    val allLocal = mutableListOf<SubtitleSource>()
+                    collectLocalSubtitles(searchDir, allLocal)
+                    if (!isCurrentVirtualAlbum && resolvedLocalAudioFile != null && resolvedLocalAudioFile.isFile) {
+                        val baseName = resolvedLocalAudioFile.nameWithoutExtension.lowercase()
+                        val rjLow = (rj ?: "").lowercase()
+                        sources.addAll(
+                            allLocal.filter { src ->
+                                val fName = File(src.pathOrUrl).nameWithoutExtension.lowercase()
+                                fName == baseName || (rjLow.isNotBlank() && fName.contains(rjLow))
+                            }
+                        )
+                    } else {
+                        sources.addAll(allLocal)
+                    }
+                }
+
+                // Auto-backfill from asmr.one for already-downloaded works that don't have local .vtt yet
+                if (sources.isEmpty()) {
+                    val lookupRj = (resolvedHistory?.linkedRjId?.takeIf { it.isNotBlank() } ?: rj).orEmpty()
+                    val rawDigits = lookupRj.filter { it.isDigit() }
+                    val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull()
+                    if (workId != null && workId > 0) {
+                        val tree = workTreeCache[lookupRj] ?: AsmrOneApiService.getWorkFileTree(workId).getOrNull()?.also {
+                            workTreeCache[lookupRj] = it
+                        } ?: emptyList()
+                        val remoteSubs = mutableListOf<SubtitleSource>()
+                        collectRemoteSubtitles(tree, remoteSubs)
+                        if (remoteSubs.isNotEmpty()) {
+                            if (isCurrentVirtualAlbum) {
+                                sources.addAll(remoteSubs)
+                            } else {
+                                val chaps = _currentChapters.value.ifEmpty {
+                                    ChapterItem.fromJsonArray(resolvedHistory?.chaptersJson)
+                                }
+                                val mergedLyrics = LyricsParser.buildMergedWorkLyrics(
+                                    rjid = lookupRj,
+                                    chapters = chaps,
+                                    remoteSources = remoteSubs
+                                ) { src -> fetchSubtitleContent(src) }
+                                if (mergedLyrics.isNotEmpty()) {
+                                    val savedVtt = resolvedLocalAudioFile?.takeIf { it.isFile }?.let { audioFile ->
+                                        runCatching {
+                                            val vttFile = File(audioFile.parentFile, "${audioFile.nameWithoutExtension}.vtt")
+                                            vttFile.writeText(LyricsParser.toWebVtt(mergedLyrics), Charsets.UTF_8)
+                                            vttFile
+                                        }.getOrNull()
+                                    }
+                                    val subSrc = if (savedVtt != null) {
+                                        SubtitleSource(savedVtt.name, savedVtt.absolutePath, "vtt", isRemote = false)
+                                    } else {
+                                        remoteSubs.first()
+                                    }
+                                    _availableSubtitles.value = listOf(subSrc)
+                                    _selectedSubtitleSource.value = subSrc
+                                    _currentLyrics.value = mergedLyrics
+                                    _isLyricsTranslated.value = false
+                                    _activeLyricIndex.value = -1
+                                    return@launch
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2560,10 +2714,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (sources.isEmpty()) {
                 _selectedSubtitleSource.value = null
                 _currentLyrics.value = emptyList()
+                _activeLyricIndex.value = -1
                 return@launch
             }
 
-            val best = pickBestSubtitleForTrack(sources, trackName)
+            val best = LyricsParser.matchBestSubtitle(sources, trackName, curIdx)
+            if (best == null) {
+                _selectedSubtitleSource.value = null
+                _currentLyrics.value = emptyList()
+                _activeLyricIndex.value = -1
+                return@launch
+            }
             if (best.pathOrUrl == _selectedSubtitleSource.value?.pathOrUrl && _currentLyrics.value.isNotEmpty()) {
                 return@launch
             }
@@ -2619,12 +2780,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun fetchSubtitleContent(source: SubtitleSource): String? {
+        subtitleTextCache[source.pathOrUrl]?.let { return it }
         return try {
-            if (!source.isRemote) {
+            val content = if (!source.isRemote) {
                 File(source.pathOrUrl).readText(Charsets.UTF_8)
             } else {
                 AsmrOneApiService.fetchRawText(source.pathOrUrl)
             }
+            if (!content.isNullOrBlank()) {
+                subtitleTextCache[source.pathOrUrl] = content
+            }
+            content
         } catch (_: Exception) {
             null
         }

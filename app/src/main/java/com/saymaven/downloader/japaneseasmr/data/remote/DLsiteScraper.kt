@@ -56,12 +56,15 @@ object DLsiteScraper {
             return dlsiteCover
         }
 
-        // Fallback ke asmr.one
-        val numId = cleanId.replace(Regex("^[A-Za-z]+"), "")
+        // Fallback ke asmr.one / asmr-200.com
+        val rawDigits = cleanId.replace(Regex("^[A-Za-z]+"), "")
+        val numId = rawDigits.trimStart('0').ifBlank { rawDigits }
         if (numId.isNotBlank()) {
-            val asmrOneCover = "https://api.asmr.one/api/cover/${numId}.jpg?type=main"
-            if (checkUrlAccessible(asmrOneCover, referer = REFERER_ASMRONE)) {
-                return asmrOneCover
+            for (host in listOf("https://api.asmr-200.com", "https://api.asmr.one")) {
+                val asmrOneCover = "$host/api/cover/${numId}.jpg?type=main"
+                if (checkUrlAccessible(asmrOneCover, referer = REFERER_ASMRONE)) {
+                    return asmrOneCover
+                }
             }
         }
 
@@ -86,11 +89,13 @@ object DLsiteScraper {
         var curGenre = genre
         var curAgeRating = ageRating
 
-        val numId = cleanId.replace(Regex("^[A-Za-z]+"), "")
+        val rawDigits = cleanId.replace(Regex("^[A-Za-z]+"), "")
+        val numId = rawDigits.trimStart('0').ifBlank { rawDigits }
         if (numId.isBlank()) return arrayOf(curTitle, curCv, curCircle, curGenre, curAgeRating)
 
-        val url = "https://api.asmr.one/api/work/$numId"
-        try {
+        for (host in listOf("https://api.asmr-200.com", "https://api.asmr.one")) {
+            val url = "$host/api/work/$numId"
+            try {
             val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", USER_AGENT)
@@ -168,10 +173,12 @@ object DLsiteScraper {
                             curAgeRating = age
                         }
                     }
+                    return arrayOf(curTitle, curCv, curCircle, curGenre, curAgeRating)
                 }
             }
         } catch (e: Exception) {
             // Abaikan kesalahan request fallback asmr.one
+        }
         }
 
         return arrayOf(curTitle, curCv, curCircle, curGenre, curAgeRating)

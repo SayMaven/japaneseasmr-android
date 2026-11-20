@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
@@ -210,7 +211,7 @@ class PreferencesManager(private val context: Context) {
 
     val downloadDirFlow: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[KEY_DOWNLOAD_DIR]
-    }
+    }.distinctUntilChanged()
 
     val importedDirsFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[KEY_IMPORTED_DIRS] ?: emptySet()
@@ -238,11 +239,11 @@ class PreferencesManager(private val context: Context) {
 
     val translationLanguageFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[KEY_TRANSLATION_LANGUAGE] ?: "auto"
-    }
+    }.distinctUntilChanged()
 
     val isTranslationActiveFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_IS_TRANSLATION_ACTIVE] ?: false
-    }
+    }.distinctUntilChanged()
 
     // Audio Player Settings Flows
     val exclusiveUsbDacFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -277,7 +278,7 @@ class PreferencesManager(private val context: Context) {
 
     val defaultSpeedFlow: Flow<Float> = context.dataStore.data.map { preferences ->
         preferences[KEY_DEFAULT_SPEED] ?: 1.0f
-    }
+    }.distinctUntilChanged()
 
     val lastPlayedRjidFlow: Flow<String?> = context.dataStore.data.map { preferences ->
         preferences[KEY_LAST_PLAYED_RJID]
@@ -357,11 +358,11 @@ class PreferencesManager(private val context: Context) {
     }
 
     // Privacy Mode (Anti-Malu) Flows & Setters
-    val privacyEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_ENABLED] ?: false }
-    val privacyBlurNotifFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_BLUR_NOTIF] ?: true }
-    val privacyBlurInAppFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_BLUR_INAPP] ?: false }
-    val privacyMaskTitleFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_MASK_TITLE] ?: true }
-    val privacyCustomMaskFlow: Flow<String> = context.dataStore.data.map { it[KEY_PRIVACY_CUSTOM_MASK] ?: "Audio Relaksasi" }
+    val privacyEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_ENABLED] ?: false }.distinctUntilChanged()
+    val privacyBlurNotifFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_BLUR_NOTIF] ?: true }.distinctUntilChanged()
+    val privacyBlurInAppFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_BLUR_INAPP] ?: false }.distinctUntilChanged()
+    val privacyMaskTitleFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_MASK_TITLE] ?: true }.distinctUntilChanged()
+    val privacyCustomMaskFlow: Flow<String> = context.dataStore.data.map { it[KEY_PRIVACY_CUSTOM_MASK] ?: "Audio Relaksasi" }.distinctUntilChanged()
 
     fun getInitialPrivacyEnabled(): Boolean = fastSp.getBoolean("cached_privacy_enabled", false)
     fun getInitialPrivacyMaskTitle(): Boolean = fastSp.getBoolean("cached_privacy_mask_title", true)

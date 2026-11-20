@@ -22,19 +22,20 @@ object AudioDownloader {
     private const val REFERER = "https://japaneseasmr.com"
 
     private fun applyHeaders(builder: Request.Builder, url: String, customReferer: String? = null): Request.Builder {
+        val isAsmrHost = url.contains("asmr.one", ignoreCase = true) ||
+                url.contains("asmr-200.com", ignoreCase = true) ||
+                url.contains("kiko-play", ignoreCase = true) ||
+                (customReferer?.contains("asmr.one", ignoreCase = true) == true)
         val effectiveReferer = when {
             !customReferer.isNullOrBlank() -> customReferer
-            url.contains("asmr.one", ignoreCase = true) || url.contains("kiko-play", ignoreCase = true) -> "https://asmr.one/"
+            isAsmrHost -> "https://www.asmr.one/"
             else -> REFERER
         }
-        val isAsmrOne = effectiveReferer.contains("asmr.one", ignoreCase = true) ||
-                url.contains("asmr.one", ignoreCase = true) ||
-                url.contains("kiko-play", ignoreCase = true)
 
         builder.header("User-Agent", USER_AGENT)
         builder.header("Referer", effectiveReferer)
-        if (isAsmrOne) {
-            builder.header("Origin", "https://asmr.one")
+        if (isAsmrHost) {
+            builder.header("Origin", "https://www.asmr.one")
             builder.header("Accept-Language", "zh-CN,zh;q=0.9,ja;q=0.8,en;q=0.7")
         } else {
             builder.header("Origin", effectiveReferer)
@@ -399,9 +400,12 @@ object AudioDownloader {
             applyHeaders(headReqBuilder, url, referer)
             val headReq = headReqBuilder.build()
 
-            val headResp = client.newCall(headReq).execute()
-            val totalBytes = headResp.headers["Content-Length"]?.toLongOrNull() ?: 0L
-            val acceptRanges = headResp.headers["Accept-Ranges"]?.contains("bytes", ignoreCase = true) == true
+            var totalBytes = 0L
+            var acceptRanges = false
+            client.newCall(headReq).execute().use { headResp ->
+                totalBytes = headResp.headers["Content-Length"]?.toLongOrNull() ?: 0L
+                acceptRanges = headResp.headers["Accept-Ranges"]?.contains("bytes", ignoreCase = true) == true
+            }
 
             destFile.parentFile?.mkdirs()
 
@@ -442,47 +446,54 @@ object AudioDownloader {
                                 applyHeaders(rangeReqBuilder, url, referer)
                                 val rangeReq = rangeReqBuilder.build()
 
-                                val rangeResp = client.newCall(rangeReq).execute()
-                                val body = rangeResp.body ?: throw Exception("Empty body")
+                                client.newCall(rangeReq).execute().use { rangeResp ->
+                                    if (rangeResp.code !in 200..206) {
+                                        throw IOException("HTTP ${rangeResp.code}")
+                                    }
+                                    val body = rangeResp.body ?: throw IOException("Empty body")
 
-                                val inputStream = body.byteStream()
-                                val partRaf = RandomAccessFile(destFile, "rw")
-                                partRaf.seek(startByte)
+                                    val inputStream = body.byteStream()
+                                    val partRaf = RandomAccessFile(destFile, "rw")
+                                    partRaf.seek(startByte)
 
-                                val buffer = ByteArray(32 * 1024)
-                                var bytesRead: Int
+                                    val buffer = ByteArray(32 * 1024)
+                                    var bytesRead: Int
 
-                                inputStream.use { input ->
-                                    partRaf.use { pRaf ->
-                                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                                            pRaf.write(buffer, 0, bytesRead)
-                                            totalRead.addAndGet(bytesRead.toLong())
-                                            bytesSinceLast.addAndGet(bytesRead.toLong())
+                                    inputStream.use { input ->
+                                        partRaf.use { pRaf ->
+                                            while (input.read(buffer).also { bytesRead = it } != -1) {
+                                                pRaf.write(buffer, 0, bytesRead)
+                                                totalRead.addAndGet(bytesRead.toLong())
+                                                bytesSinceLast.addAndGet(bytesRead.toLong())
 
-                                            val now = System.currentTimeMillis()
-                                            val diff = now - lastTime
-                                            if (diff >= 500) {
-                                                val currentRead = totalRead.get()
-                                                val speedBps = if (diff > 0) (bytesSinceLast.get() * 1000) / diff else 0L
-                                                val speedStr = "${formatFileSize(speedBps)}/s"
+                                                val now = System.currentTimeMillis()
+                                                val diff = now - lastTime
+                                                if (diff >= 500) {
+                                                    val currentRead = totalRead.get()
+                                                    val speedBps = if (diff > 0) (bytesSinceLast.get() * 1000) / diff else 0L
+                                                    val speedStr = "${formatFileSize(speedBps)}/s"
 
-                                                val timeElapsed = (now - startTime) / 1000
-                                                val etaSec = if (currentRead > 0) ((totalBytes - currentRead) * timeElapsed) / currentRead else 0L
-                                                val etaStr = formatTimeSeconds(etaSec)
+                                                    val timeElapsed = (now - startTime) / 1000
+                                                    val etaSec = if (currentRead > 0) ((totalBytes - currentRead) * timeElapsed) / currentRead else 0L
+                                                    val etaStr = formatTimeSeconds(etaSec)
 
-                                                val pct = currentRead.toFloat() / totalBytes.toFloat()
-                                                onProgress(pct, speedStr, etaStr, formatFileSize(currentRead), totalStr)
+                                                    val pct = currentRead.toFloat() / totalBytes.toFloat()
+                                                    onProgress(pct, speedStr, etaStr, formatFileSize(currentRead), totalStr)
 
-                                                lastTime = now
-                                                bytesSinceLast.set(0)
+                                                    lastTime = now
+                                                    bytesSinceLast.set(0)
+                                                }
                                             }
                                         }
                                     }
+                                    success = true
                                 }
-                                success = true
                             } catch (e: Exception) {
                                 delay(500)
                             }
+                        }
+                        if (!success) {
+                            throw IOException("Part $partIndex failed after 4 attempts")
                         }
                     }
                 }.awaitAll()

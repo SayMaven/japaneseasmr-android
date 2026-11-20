@@ -507,6 +507,16 @@ fun AsmrOneWorkDetailScreen(
                 }
             } else {
                 if (fileTree.isNotEmpty()) {
+                    val rootDirectTracks = fileTree.filter { it.type == "audio" }.map {
+                        AsmrOneTrack(
+                            title = it.title,
+                            hash = it.hash,
+                            streamUrl = it.streamUrl,
+                            duration = it.duration,
+                            size = it.size,
+                            type = "audio"
+                        )
+                    }
                     items(fileTree) { node ->
                         FileTreeNodeItem(
                             node = node,
@@ -516,7 +526,8 @@ fun AsmrOneWorkDetailScreen(
                             autoExpandedFolders = autoExpandedFolders,
                             translatedTitles = translatedNodeTitles,
                             isTranslationActive = isFileTreeTranslated,
-                            onOpenPlayer = onOpenPlayer
+                            onOpenPlayer = onOpenPlayer,
+                            parentFolderTracks = rootDirectTracks.takeIf { it.isNotEmpty() }
                         )
                     }
                 } else {
@@ -604,42 +615,20 @@ private fun findAutoExpandedFolders(tree: List<AsmrOneFileNode>): Set<String> {
 }
 
 /**
- * Extracts audio tracks within the given folder node only, isolating its stream and bab count.
+ * Extracts only the direct audio tracks inside the given folder node,
+ * preventing recursive mixing of multiple format/SE subfolders (e.g. WAV + MP3 + SEあり + SEなし).
  */
 private fun extractFolderAudioTracks(folderNode: AsmrOneFileNode): List<AsmrOneTrack> {
-    val directAudios = folderNode.children.filter { it.type == "audio" }
-    if (directAudios.isNotEmpty()) {
-        return directAudios.map {
-            AsmrOneTrack(
-                title = it.title,
-                hash = it.hash,
-                streamUrl = it.streamUrl,
-                duration = it.duration,
-                size = it.size,
-                type = "audio"
-            )
-        }
+    return folderNode.children.filter { it.type == "audio" }.map {
+        AsmrOneTrack(
+            title = it.title,
+            hash = it.hash,
+            streamUrl = it.streamUrl,
+            duration = it.duration,
+            size = it.size,
+            type = "audio"
+        )
     }
-
-    val recursive = mutableListOf<AsmrOneTrack>()
-    fun walk(n: AsmrOneFileNode) {
-        if (n.type == "audio") {
-            recursive.add(
-                AsmrOneTrack(
-                    title = n.title,
-                    hash = n.hash,
-                    streamUrl = n.streamUrl,
-                    duration = n.duration,
-                    size = n.size,
-                    type = "audio"
-                )
-            )
-        } else if (n.type == "folder") {
-            n.children.forEach { walk(it) }
-        }
-    }
-    walk(folderNode)
-    return recursive
 }
 
 @Composable

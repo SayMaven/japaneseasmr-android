@@ -6,13 +6,13 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -78,6 +78,7 @@ fun PlaylistScreen(
     val playlist by viewModel.playlist.collectAsState()
     val filteredPlaylist by viewModel.filteredPlaylist.collectAsState()
     val availableFolders by viewModel.availableFolders.collectAsState()
+    val folderItemsMap by viewModel.folderItemsMap.collectAsState()
     val selectedFolder by viewModel.selectedFolder.collectAsState()
     val currentRjId by viewModel.currentRjId.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
@@ -89,7 +90,15 @@ fun PlaylistScreen(
     val userPlaylists by viewModel.userPlaylists.collectAsState()
 
     var selectedCategoryTab by rememberSaveable { mutableStateOf(0) } // 0: All, 1: Folder, 2: Playlist
+    var openedFolderInTab by rememberSaveable { mutableStateOf<String?>(null) }
     var showSortSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectedCategoryTab, openedFolderInTab) {
+        when (selectedCategoryTab) {
+            0 -> viewModel.selectFolder("Semua")
+            1 -> viewModel.selectFolder(openedFolderInTab ?: "Semua")
+        }
+    }
 
     // Tag Filter State
     var selectedTagFilter by remember { mutableStateOf<String?>(null) }
@@ -202,8 +211,13 @@ fun PlaylistScreen(
 
             Spacer(modifier = Modifier.width(6.dp))
 
+            val headerCount = when {
+                selectedCategoryTab == 1 && openedFolderInTab == null -> playlist.size
+                selectedCategoryTab == 2 -> playlist.size
+                else -> displayedPlaylist.size
+            }
             Text(
-                text = stringResource(R.string.player_playlist_sheet_header, displayedPlaylist.size),
+                text = stringResource(R.string.player_playlist_sheet_header, headerCount),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -291,7 +305,11 @@ fun PlaylistScreen(
         ) {
             Tab(
                 selected = selectedCategoryTab == 0,
-                onClick = { selectedCategoryTab = 0; viewModel.selectFolder("Semua") },
+                onClick = {
+                    selectedCategoryTab = 0
+                    openedFolderInTab = null
+                    viewModel.selectFolder("Semua")
+                },
                 text = { Text(stringResource(R.string.hiby_tab_all), style = MaterialTheme.typography.labelMedium) }
             )
             Tab(
@@ -306,50 +324,88 @@ fun PlaylistScreen(
             )
         }
 
-        // Subfolder Selector Row (when Folder tab is active)
-        if (selectedCategoryTab == 1) {
-            LazyRow(
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+        // Main Track, Folder, or Playlist Content
+        if (selectedCategoryTab == 1 && openedFolderInTab == null) {
+            val folderList = remember(availableFolders) {
+                availableFolders.filter { it != "Semua" }
+            }
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .weight(1f)
             ) {
-                items(availableFolders) { folder ->
-                    val isSelected = (folder == selectedFolder)
-                    val folderDisplayName = when (folder) {
-                        "Semua" -> stringResource(R.string.player_folder_all)
-                        "Utama" -> stringResource(R.string.player_folder_main)
-                        else -> folder
-                    }
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.selectFolder(folder) },
-                        label = { Text(folderDisplayName, style = MaterialTheme.typography.labelMedium) },
-                        leadingIcon = if (isSelected) {
-                            { Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        } else {
-                            { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                        }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "${stringResource(R.string.hiby_tab_folders)} (${folderList.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
-                }
-                item {
-                    AssistChip(
+                    FilledTonalButton(
                         onClick = {
                             newFolderNameInput = ""
                             showNewFolderDialog = true
-                        },
-                        label = { Text(stringResource(R.string.player_folder_new), style = MaterialTheme.typography.labelMedium) },
-                        leadingIcon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        }
+                    ) {
+                        Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.player_folder_new))
+                    }
+                }
+
+                if (folderList.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.player_folder_all_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    val folderEntries = folderList.map { folder ->
+                        val itemsInFolder = remember(folderItemsMap, folder) {
+                            folderItemsMap.entries
+                                .firstOrNull { it.key.equals(folder, ignoreCase = true) }
+                                ?.value ?: emptyList()
+                        }
+                        val covers = remember(itemsInFolder) {
+                            itemsInFolder.map { it.coverUrl }.filter { it.isNotBlank() }.distinct().take(4)
+                        }
+                        val folderDisplayName = if (folder == "Utama") {
+                            stringResource(R.string.player_folder_main)
+                        } else {
+                            folder
+                        }
+                        ExplorerFolderEntry(
+                            key = folder,
+                            title = folderDisplayName,
+                            subtitle = stringResource(R.string.playlist_item_count, itemsInFolder.size),
+                            coverUrls = covers,
+                            onClick = {
+                                openedFolderInTab = folder
+                                viewModel.selectFolder(folder)
+                            }
+                        )
+                    }
+                    ExplorerFolderCollection(
+                        entries = folderEntries,
+                        isGridMode = isGridMode
                     )
                 }
             }
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-        // Main Track or Playlist Content
-        if (selectedCategoryTab == 2) {
+        } else if (selectedCategoryTab == 2) {
             if (selectedUserPlaylist != null) {
                 BackHandler { selectedUserPlaylist = null }
                 val currentPl = selectedUserPlaylist!!
@@ -414,6 +470,37 @@ fun PlaylistScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    } else if (isGridMode) {
+                        LazyVerticalStaggeredGrid(
+                            columns = StaggeredGridCells.Fixed(2),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalItemSpacing = 8.dp,
+                            contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(playlistItems, key = { it.id }) { item ->
+                                val isCurrentTrack = (item.rjid == currentRjId)
+                                val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
+                                PlaylistItemGridCard(
+                                    item = item,
+                                    displayTitle = displayTitle,
+                                    isCurrentTrack = isCurrentTrack,
+                                    onClick = {
+                                        viewModel.playPlaylistItem(item)
+                                        onOpenPlayer()
+                                    },
+                                    onRemove = {
+                                        viewModel.removeWorkFromPlaylist(currentPl.id, item.rjid)
+                                    },
+                                    onCopyRj = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        clipboard.setPrimaryClip(ClipData.newPlainText("RJ Code", item.rjid))
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        Toast.makeText(context, context.getString(R.string.browse_toast_rj_copied, item.rjid), Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            }
+                        }
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
@@ -421,8 +508,10 @@ fun PlaylistScreen(
                             contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp)
                         ) {
                             items(playlistItems, key = { it.id }) { item ->
+                                val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
                                 PlaylistItemRow(
                                     item = item,
+                                    displayTitle = displayTitle,
                                     onClick = {
                                         viewModel.playPlaylistItem(item)
                                         onOpenPlayer()
@@ -485,16 +574,17 @@ fun PlaylistScreen(
                             )
                         }
                     } else {
-                        LazyVerticalStaggeredGrid(
-                            columns = StaggeredGridCells.Fixed(2),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalItemSpacing = 8.dp,
-                            contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(userPlaylists, key = { it.id }) { pl ->
-                                UserPlaylistCard(
-                                    playlist = pl,
+                        val playlistEntries = userPlaylists.map { pl ->
+                            key(pl.id) {
+                                val plItems by viewModel.getItemsForPlaylist(pl.id).collectAsState(emptyList())
+                                val covers = remember(plItems) {
+                                    plItems.map { it.coverUrl }.filter { it.isNotBlank() }.distinct().take(4)
+                                }
+                                ExplorerFolderEntry(
+                                    key = pl.id,
+                                    title = pl.name,
+                                    subtitle = stringResource(R.string.playlist_item_count, plItems.size),
+                                    coverUrls = covers,
                                     onClick = { selectedUserPlaylist = pl },
                                     onRename = {
                                         playlistToRename = pl
@@ -504,144 +594,206 @@ fun PlaylistScreen(
                                 )
                             }
                         }
+                        ExplorerFolderCollection(
+                            entries = playlistEntries,
+                            isGridMode = isGridMode
+                        )
                     }
                 }
             }
-        } else if (displayedPlaylist.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (selectedFolder == "Semua" || selectedFolder == stringResource(R.string.player_folder_all)) {
-                        stringResource(R.string.player_folder_all_empty)
-                    } else {
-                        val folderDisplay = if (selectedFolder == "Utama") stringResource(R.string.player_folder_main) else selectedFolder
-                        stringResource(R.string.player_folder_empty_format, folderDisplay)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         } else {
-            val onItemClickAction = remember {
-                { clickedItem: HistoryEntity ->
-                    viewModel.playLocalTrack(clickedItem, displayedPlaylist)
-                    onOpenPlayer()
+            if (selectedCategoryTab == 1 && openedFolderInTab != null) {
+                BackHandler {
+                    openedFolderInTab = null
+                    viewModel.selectFolder("Semua")
                 }
-            }
-            val onMoveFolderClick = remember {
-                { item: HistoryEntity ->
-                    itemToMove = item
-                    showMoveDialog = true
+                val currentFolder = openedFolderInTab!!
+                val folderDisplayName = if (currentFolder == "Utama") {
+                    stringResource(R.string.player_folder_main)
+                } else {
+                    currentFolder
                 }
-            }
-            val onCopyRjClick = remember {
-                { item: HistoryEntity ->
-                    val rjToCopy = item.linkedRjId ?: item.rjid
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("RJ Code", rjToCopy))
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    Toast.makeText(
-                        context,
-                        context.getString(R.string.browse_toast_rj_copied, rjToCopy),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-            val onAudioInfoClick = remember {
-                { item: HistoryEntity ->
-                    itemForAudioInfo = item
-                    showAudioInfoDialog = true
-                }
-            }
-            val onDeleteClick = remember {
-                { item: HistoryEntity ->
-                    itemToDelete = item
-                    showDeleteDialog = true
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                Box(modifier = Modifier.weight(1f)) {
-                    if (isGridMode) {
-                        // Pinterest Staggered Grid Layout (2 Columns)
-                        LazyVerticalStaggeredGrid(
-                            columns = StaggeredGridCells.Fixed(2),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalItemSpacing = 8.dp,
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp),
-                            modifier = Modifier.fillMaxSize()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            openedFolderInTab = null
+                            viewModel.selectFolder("Semua")
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = folderDisplayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = stringResource(R.string.playlist_item_count, displayedPlaylist.size),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (displayedPlaylist.isNotEmpty()) {
+                        FilledTonalButton(
+                            onClick = {
+                                viewModel.playLocalTrack(displayedPlaylist.first(), displayedPlaylist)
+                                onOpenPlayer()
+                            }
                         ) {
-                            items(pagedPlaylist, key = { it.rjid }) { item ->
-                                val isCurrentTrack = (item.rjid == currentRjId)
-                                val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
-                                LocalWorkPinterestCard(
-                                    item = item,
-                                    displayTitle = displayTitle,
-                                    isCurrentTrack = isCurrentTrack,
-                                    isPlaying = (isCurrentTrack && isPlaying),
-                                    onClick = { onItemClickAction(item) },
-                                    onMoveFolder = { onMoveFolderClick(item) },
-                                    onCopyRj = { onCopyRjClick(item) },
-                                    onAudioInfo = { onAudioInfoClick(item) },
-                                    onDelete = { onDeleteClick(item) }
-                                )
-                            }
-
-                            item(span = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.FullLine) {
-                                PaginationBar(
-                                    currentPage = currentPage,
-                                    totalPages = totalPages,
-                                    totalCount = displayedPlaylist.size,
-                                    onPageSelected = { currentPage = it },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 10.dp, bottom = 20.dp)
-                                )
-                            }
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.player_action_play))
                         }
-                    } else {
-                        // KikoFlu-style Horizontal List View
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
-                        ) {
-                            items(pagedPlaylist, key = { it.rjid }) { item ->
-                                val isCurrentTrack = (item.rjid == currentRjId)
-                                val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
-                                LocalWorkListViewItem(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    item = item,
-                                    displayTitle = displayTitle,
-                                    isCurrentTrack = isCurrentTrack,
-                                    isPlaying = (isCurrentTrack && isPlaying),
-                                    onClick = onItemClickAction,
-                                    onMoveFolder = { onMoveFolderClick(item) },
-                                    onCopyRj = { onCopyRjClick(item) },
-                                    onAudioInfo = { onAudioInfoClick(item) },
-                                    onDelete = { onDeleteClick(item) }
-                                )
-                            }
+                    }
+                }
+            }
 
-                            item {
-                                PaginationBar(
-                                    currentPage = currentPage,
-                                    totalPages = totalPages,
-                                    totalCount = displayedPlaylist.size,
-                                    onPageSelected = { currentPage = it },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 10.dp, bottom = 20.dp)
-                                )
+            if (displayedPlaylist.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (selectedFolder == "Semua" || selectedFolder == stringResource(R.string.player_folder_all)) {
+                            stringResource(R.string.player_folder_all_empty)
+                        } else {
+                            val folderDisplay = if (selectedFolder == "Utama") stringResource(R.string.player_folder_main) else selectedFolder
+                            stringResource(R.string.player_folder_empty_format, folderDisplay)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                val onItemClickAction = remember(displayedPlaylist) {
+                    { clickedItem: HistoryEntity ->
+                        viewModel.playLocalTrack(clickedItem, displayedPlaylist)
+                        onOpenPlayer()
+                    }
+                }
+                val onMoveFolderClick = remember {
+                    { item: HistoryEntity ->
+                        itemToMove = item
+                        showMoveDialog = true
+                    }
+                }
+                val onCopyRjClick = remember {
+                    { item: HistoryEntity ->
+                        val rjToCopy = item.linkedRjId ?: item.rjid
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("RJ Code", rjToCopy))
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.browse_toast_rj_copied, rjToCopy),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                val onAudioInfoClick = remember {
+                    { item: HistoryEntity ->
+                        itemForAudioInfo = item
+                        showAudioInfoDialog = true
+                    }
+                }
+                val onDeleteClick = remember {
+                    { item: HistoryEntity ->
+                        itemToDelete = item
+                        showDeleteDialog = true
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (isGridMode) {
+                            // Pinterest Staggered Grid Layout (2 Columns)
+                            LazyVerticalStaggeredGrid(
+                                columns = StaggeredGridCells.Fixed(2),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalItemSpacing = 8.dp,
+                                contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(pagedPlaylist, key = { it.rjid }) { item ->
+                                    val isCurrentTrack = (item.rjid == currentRjId)
+                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
+                                    LocalWorkPinterestCard(
+                                        item = item,
+                                        displayTitle = displayTitle,
+                                        isCurrentTrack = isCurrentTrack,
+                                        isPlaying = (isCurrentTrack && isPlaying),
+                                        onClick = { onItemClickAction(item) },
+                                        onMoveFolder = { onMoveFolderClick(item) },
+                                        onCopyRj = { onCopyRjClick(item) },
+                                        onAudioInfo = { onAudioInfoClick(item) },
+                                        onDelete = { onDeleteClick(item) }
+                                    )
+                                }
+
+                                item(span = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan.FullLine) {
+                                    PaginationBar(
+                                        currentPage = currentPage,
+                                        totalPages = totalPages,
+                                        totalCount = displayedPlaylist.size,
+                                        onPageSelected = { currentPage = it },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 10.dp, bottom = 20.dp)
+                                    )
+                                }
+                            }
+                        } else {
+                            // KikoFlu-style Horizontal List View
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
+                            ) {
+                                items(pagedPlaylist, key = { it.rjid }) { item ->
+                                    val isCurrentTrack = (item.rjid == currentRjId)
+                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
+                                    LocalWorkListViewItem(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        item = item,
+                                        displayTitle = displayTitle,
+                                        isCurrentTrack = isCurrentTrack,
+                                        isPlaying = (isCurrentTrack && isPlaying),
+                                        onClick = onItemClickAction,
+                                        onMoveFolder = { onMoveFolderClick(item) },
+                                        onCopyRj = { onCopyRjClick(item) },
+                                        onAudioInfo = { onAudioInfoClick(item) },
+                                        onDelete = { onDeleteClick(item) }
+                                    )
+                                }
+
+                                item {
+                                    PaginationBar(
+                                        currentPage = currentPage,
+                                        totalPages = totalPages,
+                                        totalCount = displayedPlaylist.size,
+                                        onPageSelected = { currentPage = it },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 10.dp, bottom = 20.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -994,93 +1146,583 @@ fun PlaylistScreen(
     }
 }
 
+private data class ExplorerFolderEntry(
+    val key: Any,
+    val title: String,
+    val subtitle: String,
+    val coverUrls: List<String>,
+    val onClick: () -> Unit,
+    val onRename: (() -> Unit)? = null,
+    val onDelete: (() -> Unit)? = null
+)
+
 @Composable
-fun UserPlaylistCard(
-    playlist: UserPlaylistEntity,
-    onClick: () -> Unit,
-    onRename: () -> Unit,
-    onDelete: () -> Unit,
+private fun ExplorerFolderCollection(
+    entries: List<ExplorerFolderEntry>,
+    isGridMode: Boolean,
     modifier: Modifier = Modifier
 ) {
-    var isMenuExpanded by remember { mutableStateOf(false) }
+    if (isGridMode) {
+        LazyVerticalStaggeredGrid(
+            columns = StaggeredGridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalItemSpacing = 8.dp,
+            contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
+            modifier = modifier.fillMaxSize()
+        ) {
+            items(entries, key = { it.key }) { entry ->
+                ExplorerFolderCard(
+                    title = entry.title,
+                    subtitle = entry.subtitle,
+                    coverUrls = entry.coverUrls,
+                    onClick = entry.onClick,
+                    onRename = entry.onRename,
+                    onDelete = entry.onDelete
+                )
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp)
+        ) {
+            items(entries, key = { it.key }) { entry ->
+                ExplorerFolderListRow(
+                    title = entry.title,
+                    subtitle = entry.subtitle,
+                    coverUrls = entry.coverUrls,
+                    onClick = entry.onClick,
+                    onRename = entry.onRename,
+                    onDelete = entry.onDelete
+                )
+            }
+        }
+    }
+}
 
+@Composable
+private fun FolderThumbnailCoverTile(
+    coverUrl: String,
+    cornerRadius: androidx.compose.ui.unit.Dp = 6.dp,
+    modifier: Modifier = Modifier
+) {
+    AsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(coverUrl)
+            .crossfade(true)
+            .build(),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier.clip(RoundedCornerShape(cornerRadius))
+    )
+}
+
+@Composable
+private fun FolderThumbnailPreviewBox(
+    coverUrls: List<String>,
+    compact: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val folderTabColor = Color(0xFFD9A438)
+    val folderBorderColor = Color(0xFFE6B64B).copy(alpha = 0.7f)
+    val spacing = if (compact) 2.dp else 4.dp
+    val tileRadius = if (compact) 3.dp else 6.dp
+    val innerPad = if (compact) 3.dp else 6.dp
+
+    Column(modifier = modifier) {
+        // Top-left Windows File Explorer folder tab lip
+        Box(
+            modifier = Modifier
+                .padding(start = if (compact) 4.dp else 8.dp)
+                .width(if (compact) 26.dp else 56.dp)
+                .height(if (compact) 5.dp else 9.dp)
+                .background(
+                    color = folderTabColor,
+                    shape = RoundedCornerShape(
+                        topStart = if (compact) 4.dp else 7.dp,
+                        topEnd = if (compact) 4.dp else 7.dp
+                    )
+                )
+        )
+
+        Surface(
+            shape = RoundedCornerShape(
+                topStart = if (compact) 2.dp else 3.dp,
+                topEnd = if (compact) 7.dp else 12.dp,
+                bottomStart = if (compact) 7.dp else 12.dp,
+                bottomEnd = if (compact) 7.dp else 12.dp
+            ),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.5.dp, folderBorderColor),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (coverUrls.size) {
+                    0 -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FolderOpen,
+                                contentDescription = null,
+                                tint = folderTabColor.copy(alpha = 0.85f),
+                                modifier = Modifier.size(if (compact) 24.dp else 42.dp)
+                            )
+                        }
+                    }
+                    1 -> {
+                        FolderThumbnailCoverTile(
+                            coverUrl = coverUrls[0],
+                            cornerRadius = tileRadius,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPad)
+                        )
+                    }
+                    2 -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPad),
+                            horizontalArrangement = Arrangement.spacedBy(spacing)
+                        ) {
+                            FolderThumbnailCoverTile(
+                                coverUrl = coverUrls[0],
+                                cornerRadius = tileRadius,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                            )
+                            FolderThumbnailCoverTile(
+                                coverUrl = coverUrls[1],
+                                cornerRadius = tileRadius,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                            )
+                        }
+                    }
+                    else -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPad),
+                            verticalArrangement = Arrangement.spacedBy(spacing)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(spacing)
+                            ) {
+                                FolderThumbnailCoverTile(
+                                    coverUrl = coverUrls[0],
+                                    cornerRadius = tileRadius,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                )
+                                FolderThumbnailCoverTile(
+                                    coverUrl = coverUrls[1],
+                                    cornerRadius = tileRadius,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                )
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(spacing)
+                            ) {
+                                FolderThumbnailCoverTile(
+                                    coverUrl = coverUrls[2],
+                                    cornerRadius = tileRadius,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                )
+                                if (coverUrls.size >= 4) {
+                                    FolderThumbnailCoverTile(
+                                        coverUrl = coverUrls[3],
+                                        cornerRadius = tileRadius,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                    )
+                                } else {
+                                    Surface(
+                                        shape = RoundedCornerShape(tileRadius),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Folder,
+                                                contentDescription = null,
+                                                tint = folderTabColor.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(if (compact) 12.dp else 18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Bottom Explorer folder front sleeve strip
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(if (compact) 5.dp else 8.dp)
+                        .background(folderTabColor.copy(alpha = 0.85f))
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExplorerFolderOptionsMenu(
+    onRename: (() -> Unit)?,
+    onDelete: (() -> Unit)?
+) {
+    if (onRename == null && onDelete == null) return
+    var isMenuExpanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { isMenuExpanded = true },
+            modifier = Modifier.size(28.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "Options",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(
+            expanded = isMenuExpanded,
+            onDismissRequest = { isMenuExpanded = false }
+        ) {
+            if (onRename != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.playlist_dialog_rename)) },
+                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                    onClick = {
+                        isMenuExpanded = false
+                        onRename()
+                    }
+                )
+            }
+            if (onDelete != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.playlist_dialog_delete)) },
+                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                    onClick = {
+                        isMenuExpanded = false
+                        onDelete()
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ExplorerFolderCard(
+    title: String,
+    subtitle: String,
+    coverUrls: List<String>,
+    onClick: () -> Unit,
+    onRename: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
         modifier = modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            FolderThumbnailPreviewBox(
+                coverUrls = coverUrls,
+                compact = false,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.22f)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                ExplorerFolderOptionsMenu(onRename = onRename, onDelete = onDelete)
+            }
+        }
+    }
+}
+
+@Composable
+fun ExplorerFolderListRow(
+    title: String,
+    subtitle: String,
+    coverUrls: List<String>,
+    onClick: () -> Unit,
+    onRename: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FolderThumbnailPreviewBox(
+                coverUrls = coverUrls,
+                compact = true,
+                modifier = Modifier.size(width = 84.dp, height = 66.dp)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            if (onRename != null || onDelete != null) {
+                ExplorerFolderOptionsMenu(onRename = onRename, onDelete = onDelete)
+            } else {
+                Icon(
+                    imageVector = Icons.Default.FolderOpen,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistItemOptionsMenu(
+    onCopyRj: () -> Unit,
+    onRemove: () -> Unit,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier: Modifier = Modifier
+) {
+    var isMenuExpanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        IconButton(
+            onClick = { isMenuExpanded = true },
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "Options",
+                tint = tint
+            )
+        }
+        DropdownMenu(
+            expanded = isMenuExpanded,
+            onDismissRequest = { isMenuExpanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.browse_action_copy_id)) },
+                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                onClick = {
+                    isMenuExpanded = false
+                    onCopyRj()
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.playlist_dialog_delete)) },
+                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                onClick = {
+                    isMenuExpanded = false
+                    onRemove()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun PlaylistItemGridCard(
+    item: PlaylistItemEntity,
+    displayTitle: String = item.title,
+    isCurrentTrack: Boolean = false,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    onCopyRj: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardShape = RoundedCornerShape(10.dp)
+    Card(
+        onClick = onClick,
+        shape = cardShape,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrentTrack) 4.dp else 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCurrentTrack) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            }
+        ),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.3f)
+            ) {
+                if (item.coverUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(item.coverUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = displayTitle,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Folder,
+                            imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(36.dp)
                         )
                     }
                 }
 
-                Box {
-                    IconButton(
-                        onClick = { isMenuExpanded = true },
-                        modifier = Modifier.size(28.dp)
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    modifier = Modifier
+                        .padding(6.dp)
+                        .align(Alignment.TopStart)
+                ) {
+                    Text(
+                        text = item.rjid,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+
+                Surface(
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.55f),
+                    modifier = Modifier
+                        .padding(6.dp)
+                        .align(Alignment.TopEnd)
+                ) {
+                    PlaylistItemOptionsMenu(
+                        onCopyRj = onCopyRj,
+                        onRemove = onRemove,
+                        tint = Color.White
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = displayTitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (isCurrentTrack) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (item.circle.isNotBlank() && item.circle != "-") {
+                    Text(
+                        text = item.circle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (item.cv.isNotBlank() && item.cv != "-") {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Options",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = isMenuExpanded,
-                        onDismissRequest = { isMenuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.playlist_dialog_rename)) },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                            onClick = {
-                                isMenuExpanded = false
-                                onRename()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.playlist_dialog_delete)) },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                            onClick = {
-                                isMenuExpanded = false
-                                onDelete()
-                            }
+                        Text(
+                            text = item.cv,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = playlist.name,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = stringResource(R.string.playlist_tab_title),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -1088,13 +1730,12 @@ fun UserPlaylistCard(
 @Composable
 fun PlaylistItemRow(
     item: PlaylistItemEntity,
+    displayTitle: String = item.title,
     onClick: () -> Unit,
     onRemove: () -> Unit,
     onCopyRj: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isMenuExpanded by remember { mutableStateOf(false) }
-
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
@@ -1136,7 +1777,7 @@ fun PlaylistItemRow(
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = item.title,
+                    text = displayTitle,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -1153,39 +1794,10 @@ fun PlaylistItemRow(
                 }
             }
 
-            Box {
-                IconButton(
-                    onClick = { isMenuExpanded = true },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Options",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                DropdownMenu(
-                    expanded = isMenuExpanded,
-                    onDismissRequest = { isMenuExpanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.browse_action_copy_id)) },
-                        leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-                        onClick = {
-                            isMenuExpanded = false
-                            onCopyRj()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.playlist_dialog_delete)) },
-                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                        onClick = {
-                            isMenuExpanded = false
-                            onRemove()
-                        }
-                    )
-                }
-            }
+            PlaylistItemOptionsMenu(
+                onCopyRj = onCopyRj,
+                onRemove = onRemove
+            )
         }
     }
 }

@@ -372,11 +372,20 @@ object AudioStorageHelper {
         if (downloadDir == null || !downloadDir.exists()) return "Utama"
         return try {
             val parent = audioFile.parentFile ?: return "Utama"
-            if (parent.canonicalPath == downloadDir.canonicalPath) {
-                "Utama"
-            } else {
-                val rel = parent.relativeToOrNull(downloadDir)?.path?.replace('\\', '/') ?: parent.name
-                if (rel.isBlank()) "Utama" else rel
+            val dlCanon = downloadDir.canonicalPath
+            val parentCanon = parent.canonicalPath
+            when {
+                parentCanon.equals(dlCanon, ignoreCase = true) -> "Utama"
+                parentCanon.startsWith(dlCanon + File.separator, ignoreCase = true) -> {
+                    val rel = parentCanon.substring(dlCanon.length + 1)
+                        .replace('\\', '/')
+                        .substringBefore('/')
+                    if (rel.isBlank()) "Utama" else rel
+                }
+                else -> {
+                    val fallback = parent.name
+                    if (fallback.isBlank()) "Utama" else fallback
+                }
             }
         } catch (e: Exception) {
             "Utama"

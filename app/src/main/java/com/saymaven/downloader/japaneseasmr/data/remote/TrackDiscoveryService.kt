@@ -133,9 +133,10 @@ object TrackDiscoveryService {
         // =========================================================================
         // 1. TAHAP 1: SUMBER UTAMA (asmr.one API via Smart Filter)
         // =========================================================================
-        val numericId = cleanId.replace(Regex("^[A-Za-z]+"), "")
+        val rawDigits = cleanId.replace(Regex("^[A-Za-z]+"), "")
+        val numericId = rawDigits.trimStart('0').ifBlank { rawDigits }
         if (numericId.isNotBlank()) {
-            val asmrOneTree = fetchAsmrOneTree(numericId)
+            val asmrOneTree = fetchAsmrOneTree(numericId) ?: if (rawDigits != numericId) fetchAsmrOneTree(rawDigits) else null
             if (asmrOneTree != null && asmrOneTree.length() > 0) {
                 val filteredTracks = filterSmartAsmrOneTracks(asmrOneTree, preferredFormat)
                 if (filteredTracks.isNotEmpty()) {
@@ -318,24 +319,41 @@ object TrackDiscoveryService {
     }
 
     /**
-     * Mengambil pohon berkas audio dari API asmr.one dengan header bypass WAF.
+     * Mengambil pohon berkas audio dari API asmr.one dengan mirror failover (asmr-200.com -> asmr.one).
      */
     suspend fun fetchAsmrOneTree(numericId: String): JSONArray? = withContext(Dispatchers.IO) {
-        val url = "https://api.asmr.one/api/tracks/$numericId"
-        try {
-            val reqBuilder = Request.Builder().url(url)
-            ASMRONE_HEADERS.forEach { (k, v) -> reqBuilder.header(k, v) }
+        val hosts = listOf("https://api.asmr-200.com", "https://api.asmr.one")
+        for (host in hosts) {
+            val url = "$host/api/tracks/$numericId"
+            try {
+                val reqBuilder = Request.Builder().url(url)
+                ASMRONE_HEADERS.forEach { (k, v) -> reqBuilder.header(k, v) }
 
-            client.newCall(reqBuilder.build()).execute().use { resp ->
-                if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: return@withContext null
-                    return@withContext JSONArray(bodyStr)
+                client.newCall(reqBuilder.build()).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val bodyStr = resp.body?.string()
+                        if (!bodyStr.isNullOrBlank()) {
+                            return@withContext JSONArray(bodyStr)
+                        }
+                    }
                 }
+            } catch (_: Exception) {
+                // Coba host mirror berikutnya
             }
-        } catch (e: Exception) {
-            // Gagal request API asmr.one
         }
         null
+    }
+
+    private fun resolveAsmrOneStreamUrl(node: JSONObject): String {
+        val hash = node.optString("hash", "").trim()
+        var url = node.optString("mediaDownloadUrl", "").ifBlank { node.optString("mediaStreamUrl", "") }.trim()
+        if (url.isBlank() && hash.isNotBlank()) {
+            url = "https://api.asmr-200.com/api/media/stream/$hash"
+        }
+        if (url.isNotBlank() && !url.startsWith("http")) {
+            url = if (url.startsWith("/")) "https://api.asmr-200.com$url" else "https://api.asmr-200.com/$url"
+        }
+        return url
     }
 
     /**
@@ -350,7 +368,7 @@ object TrackDiscoveryService {
         for (i in 0 until tree.length()) {
             val item = tree.optJSONObject(i) ?: continue
             if (item.optString("type") == "audio") {
-                val streamUrl = item.optString("mediaDownloadUrl").ifBlank { item.optString("mediaStreamUrl") }
+                val streamUrl = resolveAsmrOneStreamUrl(item)
                 val title = item.optString("title")
                 if (streamUrl.isNotBlank() && isAudioFile(title)) {
                     val cleanName = title.replace(Regex("\\.[a-zA-Z0-9]+$"), "")
@@ -467,16 +485,16 @@ object TrackDiscoveryService {
                         seenBases[rawBase] = tr
                         filtered.add(tr)
                     } else {
-                        val trIsPref = when (pref) {
-                            "flac", "wav" -> tr.url.contains(".flac", ignoreCase = true) || tr.url.contains(".wav", ignoreCase = true)
-                            "m4a" -> tr.url.contains(".m4a", ignoreCase = true)
-                            "mp3" -> tr.url.contains(".mp3", ignoreCase = true)
+                        val trIsPref = when {
+                            pref == "flac" || pref == "wav" -> tr.url.contains(".flac", ignoreCase = true) || tr.url.contains(".wav", ignoreCase = true)
+                            pref == "m4a" || pref == "aac" -> tr.url.contains(".m4a", ignoreCase = true) || tr.url.contains(".aac", ignoreCase = true)
+                            pref.startsWith("mp3") -> tr.url.contains(".mp3", ignoreCase = true)
                             else -> tr.url.contains(".mp3", ignoreCase = true) || tr.url.contains(".m4a", ignoreCase = true)
                         }
-                        val exIsPref = when (pref) {
-                            "flac", "wav" -> existing.url.contains(".flac", ignoreCase = true) || existing.url.contains(".wav", ignoreCase = true)
-                            "m4a" -> existing.url.contains(".m4a", ignoreCase = true)
-                            "mp3" -> existing.url.contains(".mp3", ignoreCase = true)
+                        val exIsPref = when {
+                            pref == "flac" || pref == "wav" -> existing.url.contains(".flac", ignoreCase = true) || existing.url.contains(".wav", ignoreCase = true)
+                            pref == "m4a" || pref == "aac" -> existing.url.contains(".m4a", ignoreCase = true) || existing.url.contains(".aac", ignoreCase = true)
+                            pref.startsWith("mp3") -> existing.url.contains(".mp3", ignoreCase = true)
                             else -> existing.url.contains(".mp3", ignoreCase = true) || existing.url.contains(".m4a", ignoreCase = true)
                         }
                         if (trIsPref && !exIsPref) {
@@ -514,7 +532,7 @@ object TrackDiscoveryService {
     private fun extractAudiosFromNode(node: JSONObject): List<TrackInfo> {
         val audios = mutableListOf<TrackInfo>()
         if (node.optString("type") == "audio") {
-            val streamUrl = node.optString("mediaDownloadUrl").ifBlank { node.optString("mediaStreamUrl") }
+            val streamUrl = resolveAsmrOneStreamUrl(node)
             val title = node.optString("title")
             if (streamUrl.isNotBlank() && isAudioFile(title)) {
                 val cleanName = title.replace(Regex("\\.[a-zA-Z0-9]+$"), "")

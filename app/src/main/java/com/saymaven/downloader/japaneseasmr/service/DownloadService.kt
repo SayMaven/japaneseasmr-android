@@ -15,8 +15,12 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadStatus
+import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService
+import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneFileNode
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
 import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
+import com.saymaven.downloader.japaneseasmr.service.lyrics.LyricsParser
+import com.saymaven.downloader.japaneseasmr.service.lyrics.SubtitleSource
 import com.saymaven.downloader.japaneseasmr.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -517,6 +521,43 @@ class DownloadService : Service() {
                 }
                 ChapterItem.toJsonArray(generatedChapters)
             } else null
+
+            // 6b. Unduh & gabungkan subtitle (.vtt/.lrc/.srt) dari asmr.one jika tersedia
+            try {
+                val rawDigits = itemRjid.filter { it.isDigit() }
+                val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull() ?: 0
+                if (workId > 0) {
+                    val tree = AsmrOneApiService.getWorkFileTree(workId).getOrNull() ?: emptyList()
+                    val remoteSubs = mutableListOf<SubtitleSource>()
+                    fun collectSubs(nodes: List<AsmrOneFileNode>) {
+                        val exts = setOf("vtt", "lrc", "srt")
+                        for (node in nodes) {
+                            if (node.type == "folder") {
+                                collectSubs(node.children)
+                            } else {
+                                val ext = node.title.substringAfterLast('.', "").lowercase()
+                                if (ext in exts && node.streamUrl.isNotBlank()) {
+                                    remoteSubs.add(SubtitleSource(node.title, node.streamUrl, ext, true))
+                                }
+                            }
+                        }
+                    }
+                    collectSubs(tree)
+                    if (remoteSubs.isNotEmpty()) {
+                        val mergedLyrics = LyricsParser.buildMergedWorkLyrics(
+                            rjid = itemRjid,
+                            chapters = generatedChapters,
+                            remoteSources = remoteSubs
+                        ) { src -> AsmrOneApiService.fetchRawText(src.pathOrUrl) }
+                        if (mergedLyrics.isNotEmpty()) {
+                            val vttFile = File(finalAudioFile.parentFile, "${finalAudioFile.nameWithoutExtension}.vtt")
+                            vttFile.writeText(LyricsParser.toWebVtt(mergedLyrics), Charsets.UTF_8)
+                            log("Subtitle lokal disimpan: ${vttFile.name} (${mergedLyrics.size} baris)")
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
 
             historyDao.insertHistory(
                 HistoryEntity(
