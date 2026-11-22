@@ -549,7 +549,12 @@ fun AsmrOneBrowseScreen(
                                             isDownloaded = downloadedRjids.contains(work.rjid),
                                             isSavedToPlaylist = allSavedRjids.contains(work.rjid),
                                             showCardCircle = showCardCircle,
+                                            showCardSubtitle = showCardSubtitle,
+                                            showCardAgeRating = showCardAgeRating,
                                             showCardReleaseDate = showCardReleaseDate,
+                                            showCardRating = showCardRating,
+                                            showCardPrice = showCardPrice,
+                                            showCardSales = showCardSales,
                                             onCopyRj = {
                                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                                 val clip = ClipData.newPlainText("RJ Code", work.rjid)
@@ -616,6 +621,9 @@ fun AsmrOneBrowseScreen(
                                             showCardSubtitle = showCardSubtitle,
                                             showCardAgeRating = showCardAgeRating,
                                             showCardReleaseDate = showCardReleaseDate,
+                                            showCardRating = showCardRating,
+                                            showCardPrice = showCardPrice,
+                                            showCardSales = showCardSales,
                                             onCopyRj = {
                                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                                 val clip = ClipData.newPlainText("RJ Code", work.rjid)
@@ -734,6 +742,9 @@ fun AsmrOneWorkCard(
     showCardSubtitle: Boolean,
     showCardAgeRating: Boolean,
     showCardReleaseDate: Boolean,
+    showCardRating: Boolean = false,
+    showCardPrice: Boolean = false,
+    showCardSales: Boolean = false,
     onCopyRj: () -> Unit,
     onDownloadClick: () -> Unit,
     onAddToPlaylist: () -> Unit,
@@ -927,6 +938,70 @@ fun AsmrOneWorkCard(
                 }
 
                 // Genre / Tags - English Pill Badges
+                // Optional Badges: Rating, Price, Sales
+                if ((showCardRating && work.rating != null && work.rating > 0.0) ||
+                    (showCardPrice && work.price != null) ||
+                    (showCardSales && work.dlCount != null && work.dlCount > 0)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (showCardRating && work.rating != null && work.rating > 0.0) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFFFFB300).copy(alpha = 0.18f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFFB300),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = String.format(java.util.Locale.US, "%.1f", work.rating),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                        if (showCardPrice && work.price != null) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    text = if (work.price == 0) "FREE" else "¥${work.price}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (work.price == 0) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        if (showCardSales && work.dlCount != null && work.dlCount > 0) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                            ) {
+                                Text(
+                                    text = "${work.dlCount} DL",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 if (work.tags.isNotEmpty()) {
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(
@@ -1023,6 +1098,11 @@ fun AsmrOneWorkListItem(
     isSavedToPlaylist: Boolean,
     showCardCircle: Boolean,
     showCardReleaseDate: Boolean,
+    showCardSubtitle: Boolean = true,
+    showCardAgeRating: Boolean = true,
+    showCardRating: Boolean = false,
+    showCardPrice: Boolean = false,
+    showCardSales: Boolean = false,
     onCopyRj: () -> Unit,
     onDownloadClick: () -> Unit,
     onAddToPlaylist: () -> Unit,
@@ -1104,6 +1184,44 @@ fun AsmrOneWorkListItem(
                         }
                     }
                 }
+
+                // Top-Right Badge: Age Rating (SAFE / R-15 / R18)
+                if (showCardAgeRating) {
+                    val normalizedRating = com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper.normalize(work.ageRating)
+                    if (normalizedRating != "-") {
+                        val ageBgColor = com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper.getBadgeColor(normalizedRating)
+                        Surface(
+                            shape = RoundedCornerShape(bottomStart = 6.dp),
+                            color = ageBgColor,
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Text(
+                                text = normalizedRating,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Bottom-Left Badge: Subtitle
+                if (showCardSubtitle && work.hasSubtitle) {
+                    Surface(
+                        shape = RoundedCornerShape(topEnd = 6.dp),
+                        color = Color(0xFF2E7D32).copy(alpha = 0.88f),
+                        modifier = Modifier.align(Alignment.BottomStart)
+                    ) {
+                        Text(
+                            text = "SUB",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -1148,6 +1266,70 @@ fun AsmrOneWorkListItem(
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
+                    }
+                }
+
+                // Optional Badges: Rating, Price, Sales
+                if ((showCardRating && work.rating != null && work.rating > 0.0) ||
+                    (showCardPrice && work.price != null) ||
+                    (showCardSales && work.dlCount != null && work.dlCount > 0)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (showCardRating && work.rating != null && work.rating > 0.0) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFFFFB300).copy(alpha = 0.18f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFFB300),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = String.format(java.util.Locale.US, "%.1f", work.rating),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                        if (showCardPrice && work.price != null) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    text = if (work.price == 0) "FREE" else "¥${work.price}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (work.price == 0) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        if (showCardSales && work.dlCount != null && work.dlCount > 0) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                            ) {
+                                Text(
+                                    text = "${work.dlCount} DL",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                     }
                 }
 

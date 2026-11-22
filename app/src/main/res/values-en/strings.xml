@@ -495,6 +495,8 @@
     <string name="settings_ui_desc">Customize cards, buttons, and layout</string>
     <string name="settings_player_buttons">Player Buttons</string>
     <string name="settings_player_buttons_desc">Reorder player control buttons</string>
+    <string name="settings_player_buttons_row1">Active in Player (Row 1)</string>
+    <string name="settings_player_buttons_backup">Backup / Overflow</string>
     <string name="settings_work_card_display">Work Card Display</string>
     <string name="settings_work_card_desc">Customize information shown on work cards</string>
     <string name="settings_work_detail_display">Work Detail Display</string>

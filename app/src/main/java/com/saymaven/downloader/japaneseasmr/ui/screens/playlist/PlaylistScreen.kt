@@ -69,6 +69,7 @@ import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlayerViewModel
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlaylistSortType
 import com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
@@ -142,17 +143,26 @@ fun PlaylistScreen(
         }
     }
 
-    val pageSize = 20
+    val pageSize by viewModel.pageSize.collectAsState()
     var currentPage by rememberSaveable { mutableIntStateOf(1) }
     val totalPages = maxOf(1, (displayedPlaylist.size + pageSize - 1) / pageSize)
 
+    val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val gridState = rememberLazyStaggeredGridState()
 
+    val showCardRating by viewModel.showCardRating.collectAsState()
+    val showCardPrice by viewModel.showCardPrice.collectAsState()
+    val showCardDuration by viewModel.showCardDuration.collectAsState()
+    val showCardSales by viewModel.showCardSales.collectAsState()
+    val showCardReleaseDate by viewModel.showCardReleaseDate.collectAsState()
+    val showCardCircle by viewModel.showCardCircle.collectAsState()
+    val showCardSubtitle by viewModel.showCardSubtitle.collectAsState()
+    val showCardAgeRating by viewModel.showCardAgeRating.collectAsState()
+
     LaunchedEffect(sortState, selectedFolder, selectedTagFilters) {
         currentPage = 1
-        listState.scrollToItem(0)
-        gridState.scrollToItem(0)
+        if (isGridMode) gridState.scrollToItem(0) else listState.scrollToItem(0)
     }
 
     LaunchedEffect(displayedPlaylist.size) {
@@ -163,8 +173,11 @@ fun PlaylistScreen(
 
     LaunchedEffect(currentPage) {
         if (currentPage > 0) {
-            listState.scrollToItem(0)
-            gridState.scrollToItem(0)
+            if (isGridMode) {
+                gridState.scrollToItem(0)
+            } else {
+                listState.scrollToItem(0)
+            }
         }
     }
 
@@ -834,6 +847,10 @@ fun PlaylistScreen(
                                         isCurrentTrack = isCurrentTrack,
                                         isPlaying = (isCurrentTrack && isPlaying),
                                         isInPlaylist = allSavedRjids.contains(item.rjid),
+                                        showCardCircle = showCardCircle,
+                                        showCardSubtitle = showCardSubtitle,
+                                        showCardAgeRating = showCardAgeRating,
+                                        showCardReleaseDate = showCardReleaseDate,
                                         onClick = { onItemClickAction(item) },
                                         onMoveFolder = { onMoveFolderClick(item) },
                                         onCopyRj = { onCopyRjClick(item) },
@@ -850,7 +867,14 @@ fun PlaylistScreen(
                                         currentPage = currentPage,
                                         totalPages = totalPages,
                                         totalCount = displayedPlaylist.size,
-                                        onPageSelected = { currentPage = it },
+                                        onPageSelected = { targetPage ->
+                                            if (targetPage != currentPage) {
+                                                currentPage = targetPage
+                                                coroutineScope.launch {
+                                                    gridState.scrollToItem(0)
+                                                }
+                                            }
+                                        },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(top = 10.dp, bottom = 20.dp)
@@ -875,6 +899,10 @@ fun PlaylistScreen(
                                         isCurrentTrack = isCurrentTrack,
                                         isPlaying = (isCurrentTrack && isPlaying),
                                         isInPlaylist = allSavedRjids.contains(item.rjid),
+                                        showCardCircle = showCardCircle,
+                                        showCardSubtitle = showCardSubtitle,
+                                        showCardAgeRating = showCardAgeRating,
+                                        showCardReleaseDate = showCardReleaseDate,
                                         onClick = onItemClickAction,
                                         onMoveFolder = { onMoveFolderClick(item) },
                                         onCopyRj = { onCopyRjClick(item) },
@@ -891,7 +919,14 @@ fun PlaylistScreen(
                                         currentPage = currentPage,
                                         totalPages = totalPages,
                                         totalCount = displayedPlaylist.size,
-                                        onPageSelected = { currentPage = it },
+                                        onPageSelected = { targetPage ->
+                                            if (targetPage != currentPage) {
+                                                currentPage = targetPage
+                                                coroutineScope.launch {
+                                                    listState.scrollToItem(0)
+                                                }
+                                            }
+                                        },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(top = 10.dp, bottom = 20.dp)
@@ -2082,6 +2117,10 @@ fun LocalWorkPinterestCard(
     onAddToPlaylist: () -> Unit = {},
     onViewDetail: (() -> Unit)? = null,
     onLinkRj: (() -> Unit)? = null,
+    showCardCircle: Boolean = true,
+    showCardSubtitle: Boolean = true,
+    showCardAgeRating: Boolean = true,
+    showCardReleaseDate: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -2190,27 +2229,29 @@ fun LocalWorkPinterestCard(
                 }
 
                 // Top-Right Badge: Age Rating (SAFE / R-15 / R18)
-                val normalizedRating = AgeRatingHelper.normalize(item.ageRating)
-                if (normalizedRating != "-") {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = AgeRatingHelper.getBadgeColor(normalizedRating),
-                        modifier = Modifier
-                            .padding(6.dp)
-                            .align(Alignment.TopEnd)
-                    ) {
-                        Text(
-                            text = normalizedRating,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                        )
+                if (showCardAgeRating) {
+                    val normalizedRating = AgeRatingHelper.normalize(item.ageRating)
+                    if (normalizedRating != "-") {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = AgeRatingHelper.getBadgeColor(normalizedRating),
+                            modifier = Modifier
+                                .padding(6.dp)
+                                .align(Alignment.TopEnd)
+                        ) {
+                            Text(
+                                text = normalizedRating,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 
                 // Bottom-Left Badge: Subtitle
-                if (hasSubtitle) {
+                if (showCardSubtitle && hasSubtitle) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
                         color = Color(0xFF2E7D32).copy(alpha = 0.88f),
@@ -2228,7 +2269,7 @@ fun LocalWorkPinterestCard(
                     }
                 }
 
-                // Bottom-Right Badge: File Size
+                // Bottom-Right Badge: File Size / Date
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = Color.Black.copy(alpha = 0.7f),
@@ -2236,8 +2277,13 @@ fun LocalWorkPinterestCard(
                         .padding(6.dp)
                         .align(Alignment.BottomEnd)
                 ) {
+                    val badgeText = if (showCardReleaseDate && item.downloadDate.isNotBlank()) {
+                        "${item.fileSize} • ${item.downloadDate}"
+                    } else {
+                        item.fileSize
+                    }
                     Text(
-                        text = item.fileSize,
+                        text = badgeText,
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
@@ -2261,7 +2307,7 @@ fun LocalWorkPinterestCard(
                 )
 
                 // Circle Name (Plain text, no badge pill)
-                if (item.circle.isNotBlank() && item.circle != "-") {
+                if (showCardCircle && item.circle.isNotBlank() && item.circle != "-") {
                     Text(
                         text = item.circle,
                         style = MaterialTheme.typography.bodySmall,
@@ -2483,7 +2529,11 @@ fun LocalWorkListViewItem(
     onDelete: () -> Unit,
     onAddToPlaylist: () -> Unit = {},
     onViewDetail: (() -> Unit)? = null,
-    onLinkRj: (() -> Unit)? = null
+    onLinkRj: (() -> Unit)? = null,
+    showCardCircle: Boolean = true,
+    showCardSubtitle: Boolean = true,
+    showCardAgeRating: Boolean = true,
+    showCardReleaseDate: Boolean = true
 ) {
     val context = LocalContext.current
     var isMenuExpanded by remember { mutableStateOf(false) }
@@ -2593,25 +2643,27 @@ fun LocalWorkListViewItem(
                 }
 
                 // Top-Right Badge: Age Rating (SAFE / R-15 / R18)
-                val normalizedRating = AgeRatingHelper.normalize(item.ageRating)
-                if (normalizedRating != "-") {
-                    Surface(
-                        shape = RoundedCornerShape(bottomStart = 6.dp),
-                        color = AgeRatingHelper.getBadgeColor(normalizedRating),
-                        modifier = Modifier.align(Alignment.TopEnd)
-                    ) {
-                        Text(
-                            text = normalizedRating,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
+                if (showCardAgeRating) {
+                    val normalizedRating = AgeRatingHelper.normalize(item.ageRating)
+                    if (normalizedRating != "-") {
+                        Surface(
+                            shape = RoundedCornerShape(bottomStart = 6.dp),
+                            color = AgeRatingHelper.getBadgeColor(normalizedRating),
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Text(
+                                text = normalizedRating,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 
                 // Bottom-Left Badge: Subtitle
-                if (hasSubtitle) {
+                if (showCardSubtitle && hasSubtitle) {
                     Surface(
                         shape = RoundedCornerShape(topEnd = 6.dp),
                         color = Color(0xFF2E7D32).copy(alpha = 0.88f),
@@ -2649,7 +2701,7 @@ fun LocalWorkListViewItem(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (item.circle.isNotBlank() && item.circle != "-") {
+                    if (showCardCircle && item.circle.isNotBlank() && item.circle != "-") {
                         Text(
                             text = item.circle,
                             style = MaterialTheme.typography.bodySmall,
@@ -2659,7 +2711,7 @@ fun LocalWorkListViewItem(
                             modifier = Modifier.weight(1f, fill = false)
                         )
                     }
-                    if (item.downloadDate.isNotBlank()) {
+                    if (showCardReleaseDate && item.downloadDate.isNotBlank()) {
                         Text(
                             text = item.downloadDate,
                             style = MaterialTheme.typography.labelSmall,

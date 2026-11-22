@@ -473,6 +473,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         else chapters.indexOfLast { pos >= it.startMs }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), -1)
 
+    // Pagination & Work Card Display Preferences
+    val pageSize: StateFlow<Int> = prefs.pageSizeFlow.stateIn(viewModelScope, SharingStarted.Lazily, 40)
+    val showCardRating: StateFlow<Boolean> = prefs.cardShowRatingFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val showCardPrice: StateFlow<Boolean> = prefs.cardShowPriceFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val showCardDuration: StateFlow<Boolean> = prefs.cardShowDurationFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showCardSales: StateFlow<Boolean> = prefs.cardShowSalesFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val showCardReleaseDate: StateFlow<Boolean> = prefs.cardShowReleaseDateFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showCardCircle: StateFlow<Boolean> = prefs.cardShowCircleFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showCardSubtitle: StateFlow<Boolean> = prefs.cardShowSubtitleTagFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val showCardAgeRating: StateFlow<Boolean> = prefs.cardShowAgeRatingFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val playerButtonOrder: StateFlow<String> = prefs.playerButtonOrderFlow.stateIn(
+        viewModelScope,
+        SharingStarted.Lazily,
+        PreferencesManager.DEFAULT_PLAYER_BUTTON_ORDER
+    )
+    val playbackSpeed: StateFlow<Float> = prefs.defaultSpeedFlow.stateIn(viewModelScope, SharingStarted.Lazily, 1.0f)
+
+    fun setPlaybackSpeed(speed: Float) {
+        viewModelScope.launch {
+            prefs.setDefaultSpeed(speed)
+            player?.setPlaybackSpeed(speed)
+        }
+    }
+
     val activeChapter = combine(activeChapterIndex, _currentChapters) { idx, chapters ->
         if (idx in chapters.indices) chapters[idx] else null
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)

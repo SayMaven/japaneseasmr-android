@@ -27,21 +27,25 @@ fun PlayerButtonsSettingsScreen(
 
     val rawOrder by viewModel.playerButtonOrder.collectAsState()
     val buttonList = remember(rawOrder) {
-        rawOrder.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        val allValidKeys = listOf("repeat", "sleep_timer", "chapters", "translate", "shuffle", "speed", "volume", "bookmark")
+        val parsed = rawOrder.split(",").map { it.trim() }.filter { it in allValidKeys }.distinct().toMutableList()
+        allValidKeys.forEach { key ->
+            if (!parsed.contains(key)) parsed.add(key)
+        }
+        parsed
     }
 
+    @Composable
     fun getButtonLabel(btnKey: String): String {
         return when (btnKey) {
-            "repeat" -> "Repeat / Shuffle"
-            "speed" -> "Playback Speed"
-            "sleep_timer" -> "Sleep Timer"
-            "bookmark" -> "Save to Playlist"
-            "volume" -> "Audio Gain Boost"
-            "seek_backward" -> "Replay 10s"
-            "seek_forward" -> "Forward 10s"
-            "detail" -> "Work Info"
-            "subtitle" -> "Chapters & Lyrics"
-            "specs" -> "Audio Format Specs"
+            "repeat" -> stringResource(R.string.player_action_repeat)
+            "sleep_timer" -> stringResource(R.string.player_timer_dialog_title)
+            "chapters" -> stringResource(R.string.player_action_chapters)
+            "translate" -> stringResource(R.string.player_action_translate)
+            "shuffle" -> stringResource(R.string.player_action_shuffle)
+            "speed" -> stringResource(R.string.player_speed_dialog_title)
+            "volume" -> stringResource(R.string.settings_audio_gain)
+            "bookmark" -> stringResource(R.string.browse_action_add_to_playlist)
             else -> btnKey.replace("_", " ").replaceFirstChar { it.uppercase() }
         }
     }
@@ -75,7 +79,7 @@ fun PlayerButtonsSettingsScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        viewModel.setPlayerButtonOrder("repeat,speed,sleep_timer,bookmark,volume,seek_backward,seek_forward,detail,subtitle,specs")
+                        viewModel.setPlayerButtonOrder("repeat,sleep_timer,chapters,translate,shuffle,speed,volume,bookmark")
                     }) {
                         Icon(Icons.Default.Restore, contentDescription = stringResource(R.string.settings_restore_defaults))
                     }
@@ -110,7 +114,7 @@ fun PlayerButtonsSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 itemsIndexed(buttonList) { index, btnKey ->
-                    val isMainBar = index < 4
+                    val isMainBar = index < 5
                     Card(
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
@@ -149,7 +153,7 @@ fun PlayerButtonsSettingsScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = if (isMainBar) "Main Player Bar" else "Overflow Menu (3-Dots)",
+                                    text = if (isMainBar) stringResource(R.string.settings_player_buttons_row1) else stringResource(R.string.settings_player_buttons_backup),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (isMainBar) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )

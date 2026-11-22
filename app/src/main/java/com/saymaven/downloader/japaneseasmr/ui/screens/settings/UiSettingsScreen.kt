@@ -171,7 +171,7 @@ fun UiSettingsScreen(
             OutlinedButton(
                 onClick = {
                     viewModel.setPageSize(40)
-                    viewModel.setPlayerButtonOrder("repeat,speed,sleep_timer,bookmark,volume,seek_backward,seek_forward,detail,subtitle,specs")
+                    viewModel.setPlayerButtonOrder("repeat,sleep_timer,chapters,translate,shuffle,speed,volume,bookmark")
                     viewModel.setCardShowRating(false)
                     viewModel.setCardShowPrice(false)
                     viewModel.setCardShowDuration(true)

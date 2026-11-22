@@ -117,6 +117,8 @@ fun PlayerScreen(
     val privacyBlurInApp by viewModel.privacyBlurInApp.collectAsState()
     val privacyMaskTitle by viewModel.privacyMaskTitle.collectAsState()
     val privacyCustomMask by viewModel.privacyCustomMask.collectAsState()
+    val playerButtonOrder by viewModel.playerButtonOrder.collectAsState()
+    val playbackSpeed by viewModel.playbackSpeed.collectAsState()
     var temporaryUnblur by remember { mutableStateOf(false) }
 
     val activity = context as? Activity
@@ -139,6 +141,7 @@ fun PlayerScreen(
     var showCoverPickerSheet by remember { mutableStateOf(false) }
     var showPlaylistPickerSheet by remember { mutableStateOf(false) }
     var showAudioGainDialog by remember { mutableStateOf(false) }
+    var showSpeedDialog by remember { mutableStateOf(false) }
     val audioGainDb by viewModel.audioGainDb.collectAsState()
     var showLyricsView by remember { mutableStateOf(false) }
     var showSubtitlePickerSheet by remember { mutableStateOf(false) }
@@ -749,7 +752,18 @@ fun PlayerScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Control Row 1: Repeat, Sleep Timer, Bab (CUE), Shuffle
+            // Control Row 1: Dynamic Auxiliary Buttons based on User Order
+            val orderedButtons = remember(playerButtonOrder) {
+                val validKeys = listOf("repeat", "sleep_timer", "chapters", "translate", "shuffle", "speed", "volume", "bookmark")
+                val parsed = playerButtonOrder.split(",")
+                    .map { it.trim() }
+                    .filter { it in validKeys }
+                    .distinct()
+                    .toMutableList()
+                validKeys.forEach { k -> if (!parsed.contains(k)) parsed.add(k) }
+                parsed.take(5)
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -757,133 +771,185 @@ fun PlayerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Repeat Mode Button
-                IconButton(onClick = { viewModel.cycleRepeatMode() }) {
-                    Icon(
-                        imageVector = when (repeatMode) {
-                            Player.REPEAT_MODE_ONE -> Icons.Default.RepeatOne
-                            Player.REPEAT_MODE_ALL -> Icons.Default.Repeat
-                            else -> Icons.Default.Repeat
-                        },
-                        contentDescription = stringResource(R.string.player_action_repeat),
-                        tint = when (repeatMode) {
-                            Player.REPEAT_MODE_OFF -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-                            else -> MaterialTheme.colorScheme.primary
+                orderedButtons.forEach { btnKey ->
+                    when (btnKey) {
+                        "repeat" -> {
+                            IconButton(onClick = { viewModel.cycleRepeatMode() }) {
+                                Icon(
+                                    imageVector = when (repeatMode) {
+                                        Player.REPEAT_MODE_ONE -> Icons.Default.RepeatOne
+                                        Player.REPEAT_MODE_ALL -> Icons.Default.Repeat
+                                        else -> Icons.Default.Repeat
+                                    },
+                                    contentDescription = stringResource(R.string.player_action_repeat),
+                                    tint = when (repeatMode) {
+                                        Player.REPEAT_MODE_OFF -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                        else -> MaterialTheme.colorScheme.primary
+                                    }
+                                )
+                            }
                         }
-                    )
-                }
-
-                // Sleep Timer Button
-                Surface(
-                    onClick = { showSleepTimerSheet = true },
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                    modifier = Modifier.clip(RoundedCornerShape(20.dp))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bedtime,
-                            contentDescription = stringResource(R.string.player_timer_dialog_title),
-                            tint = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        if (sleepTimerRemainingMs != null) {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            val totalSecs = (sleepTimerRemainingMs!! / 1000).coerceAtLeast(0)
-                            val m = totalSecs / 60
-                            val s = totalSecs % 60
-                            Text(
-                                text = String.format("%02d:%02d", m, s),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                        "sleep_timer" -> {
+                            Surface(
+                                onClick = { showSleepTimerSheet = true },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Bedtime,
+                                        contentDescription = stringResource(R.string.player_timer_dialog_title),
+                                        tint = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    if (sleepTimerRemainingMs != null) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        val totalSecs = (sleepTimerRemainingMs!! / 1000).coerceAtLeast(0)
+                                        val m = totalSecs / 60
+                                        val s = totalSecs % 60
+                                        Text(
+                                            text = String.format("%02d:%02d", m, s),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    }
-                }
-
-                // Chapter List Button
-                Surface(
-                    onClick = { showChapterSheet = true },
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (chapters.isNotEmpty()) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                    modifier = Modifier.clip(RoundedCornerShape(20.dp))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bookmarks,
-                            contentDescription = stringResource(R.string.player_action_chapters),
-                            tint = if (chapters.isNotEmpty()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        if (chapters.isNotEmpty()) {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "${chapters.size}",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
+                        "chapters" -> {
+                            Surface(
+                                onClick = { showChapterSheet = true },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (chapters.isNotEmpty()) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                                modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Bookmarks,
+                                        contentDescription = stringResource(R.string.player_action_chapters),
+                                        tint = if (chapters.isNotEmpty()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    if (chapters.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "${chapters.size}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    }
-                }
-
-                // Translate Button (Terjemahkan Judul & Bab)
-                Surface(
-                    onClick = { viewModel.toggleTranslation() },
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (isTranslationActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                    border = if (isTranslationActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)) else null,
-                    modifier = Modifier.clip(RoundedCornerShape(20.dp))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (isTranslating) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Translate,
-                                contentDescription = stringResource(R.string.player_action_translate),
-                                tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                            if (isTranslationActive) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "ID",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                        "translate" -> {
+                            Surface(
+                                onClick = { viewModel.toggleTranslation() },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isTranslationActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                border = if (isTranslationActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)) else null,
+                                modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (isTranslating) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Translate,
+                                            contentDescription = stringResource(R.string.player_action_translate),
+                                            tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        if (isTranslationActive) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "ID",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        "shuffle" -> {
+                            IconButton(
+                                onClick = { if (!isOnlineStreaming) viewModel.toggleShuffleMode() },
+                                enabled = !isOnlineStreaming
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Shuffle,
+                                    contentDescription = stringResource(R.string.player_action_shuffle),
+                                    tint = if (isOnlineStreaming) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                                           else if (shuffleMode) MaterialTheme.colorScheme.primary
+                                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                )
+                            }
+                        }
+                        "speed" -> {
+                            Surface(
+                                onClick = { showSpeedDialog = true },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (playbackSpeed != 1.0f) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Speed,
+                                        contentDescription = stringResource(R.string.player_speed_dialog_title),
+                                        tint = if (playbackSpeed != 1.0f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    if (playbackSpeed != 1.0f) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "${playbackSpeed}x",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        "volume" -> {
+                            IconButton(onClick = { showAudioGainDialog = true }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                                    contentDescription = stringResource(R.string.settings_audio_gain),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                )
+                            }
+                        }
+                        "bookmark" -> {
+                            IconButton(onClick = { showPlaylistPickerSheet = true }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                    contentDescription = stringResource(R.string.browse_action_add_to_playlist),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                                 )
                             }
                         }
                     }
-                }
-
-                // Shuffle Mode Button (Disabled during online streaming)
-                IconButton(
-                    onClick = { if (!isOnlineStreaming) viewModel.toggleShuffleMode() },
-                    enabled = !isOnlineStreaming
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = stringResource(R.string.player_action_shuffle),
-                        tint = if (isOnlineStreaming) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
-                               else if (shuffleMode) MaterialTheme.colorScheme.primary
-                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-                    )
                 }
             }
 
@@ -1712,6 +1778,50 @@ fun PlayerScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
+
+    if (showSpeedDialog) {
+        val speedOptions = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
+        AlertDialog(
+            onDismissRequest = { showSpeedDialog = false },
+            title = { Text(stringResource(R.string.player_speed_dialog_title), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    speedOptions.forEach { speed ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    viewModel.setPlaybackSpeed(speed)
+                                    showSpeedDialog = false
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = (playbackSpeed == speed),
+                                onClick = {
+                                    viewModel.setPlaybackSpeed(speed)
+                                    showSpeedDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${speed}x",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (playbackSpeed == speed) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSpeedDialog = false }) {
+                    Text(stringResource(R.string.action_close))
+                }
+            }
+        )
     }
 }
 

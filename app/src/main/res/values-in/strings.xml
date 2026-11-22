@@ -495,6 +495,8 @@
     <string name="settings_ui_desc">Kustomisasi kartu, tombol, dan tata letak</string>
     <string name="settings_player_buttons">Tombol Pemutar</string>
     <string name="settings_player_buttons_desc">Atur urutan tombol kontrol pemutar</string>
+    <string name="settings_player_buttons_row1">Aktif di Pemutar (Row 1)</string>
+    <string name="settings_player_buttons_backup">Cadangan / Tambahan</string>
     <string name="settings_work_card_display">Tampilan Kartu Karya</string>
     <string name="settings_work_card_desc">Atur info yang ditampilkan pada kartu karya</string>
     <string name="settings_work_detail_display">Tampilan Detail Karya</string>

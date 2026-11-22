@@ -89,6 +89,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_DETAIL_SHOW_RECOMMENDATIONS = booleanPreferencesKey("detail_show_recommendations")
 
         val KEY_PLAYER_BUTTON_ORDER = stringPreferencesKey("player_button_order")
+        const val DEFAULT_PLAYER_BUTTON_ORDER = "repeat,sleep_timer,chapters,translate,shuffle,speed,volume,bookmark"
 
         // Privacy Mode (Anti-Malu)
         val KEY_PRIVACY_ENABLED = booleanPreferencesKey("privacy_enabled")
@@ -537,8 +538,13 @@ class PreferencesManager(private val context: Context) {
     suspend fun setDetailShowRecommendations(show: Boolean) = context.dataStore.edit { it[KEY_DETAIL_SHOW_RECOMMENDATIONS] = show }
 
     // UI Settings: Player Buttons Order
-    val playerButtonOrderFlow: Flow<String> = context.dataStore.data.map {
-        it[KEY_PLAYER_BUTTON_ORDER] ?: "repeat,speed,sleep_timer,bookmark,volume,seek_backward,seek_forward,detail,subtitle,specs"
+    val playerButtonOrderFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        val raw = preferences[KEY_PLAYER_BUTTON_ORDER]
+        if (raw.isNullOrBlank() || raw.contains("seek_backward") || !raw.contains("chapters")) {
+            DEFAULT_PLAYER_BUTTON_ORDER
+        } else {
+            raw
+        }
     }
 
     suspend fun setPlayerButtonOrder(order: String) = context.dataStore.edit { it[KEY_PLAYER_BUTTON_ORDER] = order }

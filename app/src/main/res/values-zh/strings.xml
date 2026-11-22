@@ -501,6 +501,8 @@
     <string name="settings_ui_desc">自定义卡片、按钮和界面布局</string>
     <string name="settings_player_buttons">播放器按钮设置</string>
     <string name="settings_player_buttons_desc">自定义播放器控制按钮顺序</string>
+    <string name="settings_player_buttons_row1">播放器有效 (Row 1)</string>
+    <string name="settings_player_buttons_backup">备用 / 附加</string>
     <string name="settings_work_card_display">作品卡片显示设置</string>
     <string name="settings_work_card_desc">自定义作品卡片显示的信息</string>
     <string name="settings_work_detail_display">作品详情显示设置</string>

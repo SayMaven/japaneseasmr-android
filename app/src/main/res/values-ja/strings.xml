@@ -501,6 +501,8 @@
     <string name="settings_ui_desc">カード、ボタン、レイアウトのカスタマイズ</string>
     <string name="settings_player_buttons">プレイヤーボタン設定</string>
     <string name="settings_player_buttons_desc">プレイヤーの操作ボタン順序を変更</string>
+    <string name="settings_player_buttons_row1">プレイヤーで有効 (Row 1)</string>
+    <string name="settings_player_buttons_backup">予備 / 追加</string>
     <string name="settings_work_card_display">作品カード表示設定</string>
     <string name="settings_work_card_desc">カード上に表示する情報のオン/オフ</string>
     <string name="settings_work_detail_display">作品詳細表示設定</string>
