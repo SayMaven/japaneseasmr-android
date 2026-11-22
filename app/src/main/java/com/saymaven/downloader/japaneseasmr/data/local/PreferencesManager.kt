@@ -27,6 +27,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_USE_DETAILED_FILENAME = booleanPreferencesKey("use_detailed_filename")
         val KEY_SHOW_CONSOLE = booleanPreferencesKey("show_console")
         val KEY_CREATE_CUE_SHEET = booleanPreferencesKey("create_cue_sheet")
+        val KEY_MERGE_DOWNLOADED_AUDIO = booleanPreferencesKey("merge_downloaded_audio")
         val KEY_APP_LANGUAGE = stringPreferencesKey("app_ui_language")
         val KEY_TRANSLATION_LANGUAGE = stringPreferencesKey("translation_language")
         val KEY_IS_TRANSLATION_ACTIVE = booleanPreferencesKey("is_translation_active")
@@ -240,6 +241,12 @@ class PreferencesManager(private val context: Context) {
     val createCueSheetFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_CREATE_CUE_SHEET] ?: false
     }
+
+    val mergeDownloadedAudioFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_MERGE_DOWNLOADED_AUDIO] ?: true
+    }
+
+    fun getInitialMergeDownloadedAudio(): Boolean = fastSp.getBoolean("cached_merge_downloaded_audio", true)
 
     val translationLanguageFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[KEY_TRANSLATION_LANGUAGE] ?: "auto"
@@ -659,6 +666,13 @@ class PreferencesManager(private val context: Context) {
     suspend fun setCreateCueSheet(create: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_CREATE_CUE_SHEET] = create
+        }
+    }
+
+    suspend fun setMergeDownloadedAudio(merge: Boolean) {
+        fastSp.edit().putBoolean("cached_merge_downloaded_audio", merge).apply()
+        context.dataStore.edit { preferences ->
+            preferences[KEY_MERGE_DOWNLOADED_AUDIO] = merge
         }
     }
 

@@ -79,7 +79,7 @@ object AudioStorageHelper {
         return if (ts > 0L) formatDateForDisplay(ts) else (dateStr ?: formatDateForDisplay(System.currentTimeMillis()))
     }
 
-    val AUDIO_EXTENSIONS = setOf("m4a", "mp3", "aac", "flac", "wav", "ogg")
+    val AUDIO_EXTENSIONS = setOf("m4a", "mp3", "aac", "flac", "wav", "ogg", "wma")
     val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
     private val COVER_CANDIDATE_NAMES = listOf("cover", "folder", "front", "main", "poster", "thumb", "artwork", "default")
     private val IMAGE_SUBDIRECTORIES = listOf("thumb", "thumbnail", "img", "image", "images", "jacket", "cover", "サムネイル", "画像")

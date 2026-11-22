@@ -15,6 +15,7 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadQueueItem
 import com.saymaven.downloader.japaneseasmr.data.model.DownloadStatus
+import com.saymaven.downloader.japaneseasmr.data.model.SourceType
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneFileNode
 import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
@@ -453,140 +454,315 @@ class DownloadService : Service() {
                 continue
             }
 
-            // 5. Finalizing & Metadata Tagging
-            log(DownloadLogHelper.mergingAndTaggingLog())
-            updateItem(itemRjid) {
-                it.copy(
-                    status = DownloadStatus.PROCESSING,
-                    statusText = DownloadLogHelper.statusMerging()
-                )
-            }
+            // 5. Finalizing & Metadata Tagging / Multi-Track Folder Distribution
+            val userWantsMerge = prefs.mergeDownloadedAudioFlow.first()
+            val isJapaneseAsmrSource = tracks.any { it.source.equals("japaneseasmr", ignoreCase = true) }
+            val isFastRemuxSupported = sourceExtension in setOf("mp3", "m4a", "wav")
 
-            val filename = if (useDetailedFilename) {
-                "[$itemRjid] ${sanitizeFilename(meta.title)}.$fileExtension"
-            } else {
-                "$itemRjid.$fileExtension"
-            }
-
-            val preferredOutputFile = File(downloadDir, filename)
-            val finalAudioFile = preferredOutputFile
-
-            if (downloadedTracks.size == 1) {
-                downloadedTracks[0].copyTo(preferredOutputFile, overwrite = true)
-            } else {
-                log(DownloadLogHelper.mergingTracksCount(downloadedTracks.size))
-                val allM4a = downloadedTracks.all { it.extension.equals("m4a", ignoreCase = true) }
-                if (allM4a) {
-                    AudioMerger.mergeM4aFiles(downloadedTracks, preferredOutputFile) { log("    $it") }
-                } else {
-                    AudioMerger.mergeMp3Files(downloadedTracks, preferredOutputFile) { log("    $it") }
+            val effectiveMerge = when {
+                isJapaneseAsmrSource -> {
+                    if (!userWantsMerge) {
+                        log(when (DownloadLogHelper.getAppLanguage()) {
+                            "in" -> "[i] Sumber unduhan dari JapaneseASMR (arsip flat). Trek otomatis digabungkan menjadi satu berkas."
+                            "ja" -> "[i] JapaneseASMR（階層構造なし）からのダウンロードのため、1つのファイルに自動結合します。"
+                            "zh" -> "[i] 下载来源为JapaneseASMR（无目录结构），自动合并为单文件。"
+                            else -> "[i] Download source is JapaneseASMR (flat archive). Automatically merging tracks into single file."
+                        })
+                    }
+                    true
                 }
+                userWantsMerge && isFastRemuxSupported -> true
+                userWantsMerge && !isFastRemuxSupported -> {
+                    log(when (DownloadLogHelper.getAppLanguage()) {
+                        "in" -> "[!] Format ${sourceExtension.uppercase()} tidak mendukung penggabungan instan tanpa kompresi ulang. Mengunduh secara aman sebagai struktur folder asli."
+                        "ja" -> "[!] ${sourceExtension.uppercase()}形式は無再エンコード結合に非対応です。安全のため元のフォルダ構造でダウンロードします。"
+                        "zh" -> "[!] ${sourceExtension.uppercase()}格式不支持无损快速合并，将以原始多音轨目录安全下载。"
+                        else -> "[!] Format ${sourceExtension.uppercase()} does not support instant remuxing without re-encoding. Downloading safely as original folder structure."
+                    })
+                    false
+                }
+                else -> false // Pengguna memilih mengunduh struktur folder multi-track asli
             }
 
-            AudioTagger.tagAudioFile(
-                audioFile = finalAudioFile,
-                coverFile = coverFile,
-                title = meta.title,
-                artist = meta.cv,
-                album = meta.circle,
-                genre = meta.genre,
-                comment = "Downloaded with JapaneseASMR by SayMaven (https://github.com/SayMaven)"
-            )
-
-            val fileSizeStr = AudioDownloader.formatFileSize(finalAudioFile.length())
-            val dateStr = AudioStorageHelper.formatDateForDisplay(System.currentTimeMillis())
-
-            // 6. Ekstraksi Bab (Chapters) & CUE Sheet
-            val trackNames = tracks.map { it.name }
-            val generatedChapters = ChapterDiscoveryService.generateChapters(
-                trackFiles = downloadedTracks,
-                trackNames = trackNames,
-                rjId = itemRjid
-            )
-
-            val actualIsM4a = finalAudioFile.extension.equals("m4a", ignoreCase = true)
-            val shouldCreateCue = prefs.createCueSheetFlow.first()
-            val chaptersJsonStr = if (generatedChapters.isNotEmpty()) {
-                log(DownloadLogHelper.chaptersMapped(generatedChapters.size))
-                if (!actualIsM4a && shouldCreateCue) {
-                    ChapterDiscoveryService.writeCueSheet(
-                        audioFile = finalAudioFile,
-                        chapters = generatedChapters,
-                        workTitle = meta.title,
-                        performer = meta.cv
+            if (effectiveMerge) {
+                log(DownloadLogHelper.mergingAndTaggingLog())
+                updateItem(itemRjid) {
+                    it.copy(
+                        status = DownloadStatus.PROCESSING,
+                        statusText = DownloadLogHelper.statusMerging()
                     )
-                    log(DownloadLogHelper.cueSheetCreated(finalAudioFile.nameWithoutExtension))
-                } else {
-                    log(DownloadLogHelper.cueSheetSkipped())
                 }
-                ChapterItem.toJsonArray(generatedChapters)
-            } else null
 
-            // 6b. Unduh & gabungkan subtitle (.vtt/.lrc/.srt) dari asmr.one jika tersedia
-            try {
-                val rawDigits = itemRjid.filter { it.isDigit() }
-                val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull() ?: 0
-                if (workId > 0) {
-                    val tree = AsmrOneApiService.getWorkFileTree(workId).getOrNull() ?: emptyList()
-                    val remoteSubs = mutableListOf<SubtitleSource>()
-                    fun collectSubs(nodes: List<AsmrOneFileNode>) {
-                        val exts = setOf("vtt", "lrc", "srt")
-                        for (node in nodes) {
-                            if (node.type == "folder") {
-                                collectSubs(node.children)
-                            } else {
-                                val ext = node.title.substringAfterLast('.', "").lowercase()
-                                if (ext in exts && node.streamUrl.isNotBlank()) {
-                                    remoteSubs.add(SubtitleSource(node.title, node.streamUrl, ext, true))
+                val filename = if (useDetailedFilename) {
+                    "[$itemRjid] ${sanitizeFilename(meta.title)}.$fileExtension"
+                } else {
+                    "$itemRjid.$fileExtension"
+                }
+
+                val preferredOutputFile = File(downloadDir, filename)
+                val finalAudioFile = preferredOutputFile
+
+                if (downloadedTracks.size == 1) {
+                    downloadedTracks[0].copyTo(preferredOutputFile, overwrite = true)
+                } else {
+                    log(DownloadLogHelper.mergingTracksCount(downloadedTracks.size))
+                    val allM4a = downloadedTracks.all { it.extension.equals("m4a", ignoreCase = true) }
+                    val allWav = downloadedTracks.all { it.extension.equals("wav", ignoreCase = true) }
+                    if (allM4a) {
+                        AudioMerger.mergeM4aFiles(downloadedTracks, preferredOutputFile) { log("    $it") }
+                    } else if (allWav) {
+                        AudioMerger.mergeWavFiles(downloadedTracks, preferredOutputFile) { log("    $it") }
+                    } else {
+                        AudioMerger.mergeMp3Files(downloadedTracks, preferredOutputFile) { log("    $it") }
+                    }
+                }
+
+                AudioTagger.tagAudioFile(
+                    audioFile = finalAudioFile,
+                    coverFile = coverFile,
+                    title = meta.title,
+                    artist = meta.cv,
+                    album = meta.circle,
+                    genre = meta.genre,
+                    comment = "Downloaded with JapaneseASMR by SayMaven (https://github.com/SayMaven)"
+                )
+
+                val fileSizeStr = AudioDownloader.formatFileSize(finalAudioFile.length())
+                val dateStr = AudioStorageHelper.formatDateForDisplay(System.currentTimeMillis())
+
+                // 6. Ekstraksi Bab (Chapters) & CUE Sheet
+                val trackNames = tracks.map { it.name }
+                val generatedChapters = ChapterDiscoveryService.generateChapters(
+                    trackFiles = downloadedTracks,
+                    trackNames = trackNames,
+                    rjId = itemRjid
+                )
+
+                val actualIsM4a = finalAudioFile.extension.equals("m4a", ignoreCase = true)
+                val shouldCreateCue = prefs.createCueSheetFlow.first()
+                val chaptersJsonStr = if (generatedChapters.isNotEmpty()) {
+                    log(DownloadLogHelper.chaptersMapped(generatedChapters.size))
+                    if (!actualIsM4a && shouldCreateCue) {
+                        ChapterDiscoveryService.writeCueSheet(
+                            audioFile = finalAudioFile,
+                            chapters = generatedChapters,
+                            workTitle = meta.title,
+                            performer = meta.cv
+                        )
+                        log(DownloadLogHelper.cueSheetCreated(finalAudioFile.nameWithoutExtension))
+                    } else {
+                        log(DownloadLogHelper.cueSheetSkipped())
+                    }
+                    ChapterItem.toJsonArray(generatedChapters)
+                } else null
+
+                // 6b. Unduh & gabungkan subtitle (.vtt/.lrc/.srt) dari asmr.one jika tersedia
+                try {
+                    val rawDigits = itemRjid.filter { it.isDigit() }
+                    val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull() ?: 0
+                    if (workId > 0) {
+                        val tree = AsmrOneApiService.getWorkFileTree(workId).getOrNull() ?: emptyList()
+                        val remoteSubs = mutableListOf<SubtitleSource>()
+                        fun collectSubs(nodes: List<AsmrOneFileNode>) {
+                            val exts = setOf("vtt", "lrc", "srt")
+                            for (node in nodes) {
+                                if (node.type == "folder") {
+                                    collectSubs(node.children)
+                                } else {
+                                    val ext = node.title.substringAfterLast('.', "").lowercase()
+                                    if (ext in exts && node.streamUrl.isNotBlank()) {
+                                        remoteSubs.add(SubtitleSource(node.title, node.streamUrl, ext, true))
+                                    }
                                 }
                             }
                         }
-                    }
-                    collectSubs(tree)
-                    if (remoteSubs.isNotEmpty()) {
-                        val mergedLyrics = LyricsParser.buildMergedWorkLyrics(
-                            rjid = itemRjid,
-                            chapters = generatedChapters,
-                            remoteSources = remoteSubs
-                        ) { src -> AsmrOneApiService.fetchRawText(src.pathOrUrl) }
-                        if (mergedLyrics.isNotEmpty()) {
-                            val vttFile = File(finalAudioFile.parentFile, "${finalAudioFile.nameWithoutExtension}.vtt")
-                            vttFile.writeText(LyricsParser.toWebVtt(mergedLyrics), Charsets.UTF_8)
-                            log("Subtitle lokal disimpan: ${vttFile.name} (${mergedLyrics.size} baris)")
+                        collectSubs(tree)
+                        if (remoteSubs.isNotEmpty()) {
+                            val mergedLyrics = LyricsParser.buildMergedWorkLyrics(
+                                rjid = itemRjid,
+                                chapters = generatedChapters,
+                                remoteSources = remoteSubs
+                            ) { src -> AsmrOneApiService.fetchRawText(src.pathOrUrl) }
+                            if (mergedLyrics.isNotEmpty()) {
+                                val vttFile = File(finalAudioFile.parentFile, "${finalAudioFile.nameWithoutExtension}.vtt")
+                                vttFile.writeText(LyricsParser.toWebVtt(mergedLyrics), Charsets.UTF_8)
+                                log("Subtitle lokal disimpan: ${vttFile.name} (${mergedLyrics.size} baris)")
+                            }
                         }
                     }
+                } catch (_: Exception) {
                 }
-            } catch (_: Exception) {
-            }
 
-            historyDao.insertHistory(
-                HistoryEntity(
-                    rjid = itemRjid,
-                    title = meta.title,
-                    cv = meta.cv,
-                    circle = meta.circle,
-                    genre = meta.genre,
-                    ageRating = meta.ageRating,
-                    coverUrl = meta.coverUrl,
-                    localFilePath = finalAudioFile.absolutePath,
-                    downloadDate = dateStr,
-                    fileSize = fileSizeStr,
-                    chaptersJson = chaptersJsonStr
+                historyDao.insertHistory(
+                    HistoryEntity(
+                        rjid = itemRjid,
+                        title = meta.title,
+                        cv = meta.cv,
+                        circle = meta.circle,
+                        genre = meta.genre,
+                        ageRating = meta.ageRating,
+                        coverUrl = meta.coverUrl,
+                        localFilePath = finalAudioFile.absolutePath,
+                        downloadDate = dateStr,
+                        fileSize = fileSizeStr,
+                        chaptersJson = chaptersJsonStr,
+                        sourceType = SourceType.DL_SITE.name
+                    )
                 )
-            )
 
-            updateItem(itemRjid) {
-                it.copy(
-                    status = DownloadStatus.COMPLETED,
-                    statusText = DownloadLogHelper.statusCompleted(),
-                    progress = 1f,
-                    speed = "-",
-                    eta = "-",
-                    downloadedSize = fileSizeStr
+                updateItem(itemRjid) {
+                    it.copy(
+                        status = DownloadStatus.COMPLETED,
+                        statusText = DownloadLogHelper.statusCompleted(),
+                        progress = 1f,
+                        speed = "-",
+                        eta = "-",
+                        downloadedSize = fileSizeStr
+                    )
+                }
+
+                log(DownloadLogHelper.itemSuccess(finalAudioFile.absolutePath, fileSizeStr))
+            } else {
+                // Unduh Struktur Folder Asli Multi-Track
+                updateItem(itemRjid) {
+                    it.copy(
+                        status = DownloadStatus.PROCESSING,
+                        statusText = "Menyimpan struktur folder asli..."
+                    )
+                }
+
+                val folderName = if (useDetailedFilename) {
+                    "[$itemRjid] ${sanitizeFilename(meta.title)}"
+                } else {
+                    itemRjid
+                }
+                val workFolder = File(downloadDir, folderName)
+                workFolder.mkdirs()
+
+                // Salin berkas audio ke struktur subfolder masing-masing
+                for (tIdx in tracks.indices) {
+                    val tFile = downloadedTracks.getOrNull(tIdx) ?: continue
+                    val tr = tracks[tIdx]
+                    val targetDir = if (tr.relativeSubPath.isNotBlank()) {
+                        File(workFolder, tr.relativeSubPath.replace('/', File.separatorChar)).apply { mkdirs() }
+                    } else {
+                        workFolder
+                    }
+                    val ext = tFile.extension.ifBlank { "mp3" }
+                    val cleanTrName = sanitizeFilename(tr.name)
+                    val destFile = File(targetDir, "$cleanTrName.$ext")
+                    tFile.copyTo(destFile, overwrite = true)
+
+                    AudioTagger.tagAudioFile(
+                        audioFile = destFile,
+                        coverFile = coverFile,
+                        title = tr.name,
+                        artist = meta.cv,
+                        album = meta.title,
+                        genre = meta.genre,
+                        comment = "Downloaded with JapaneseASMR by SayMaven (https://github.com/SayMaven)"
+                    )
+                }
+
+                // Salin sampul ke cover.jpg di folder utama
+                val folderCover = File(workFolder, "cover.jpg")
+                if (coverFile.exists() && coverFile.length() > 0) {
+                    coverFile.copyTo(folderCover, overwrite = true)
+                }
+
+                // Unduh subtitle (.vtt/.lrc/.srt) dari asmr.one langsung ke subfolder yang bersangkutan
+                try {
+                    val rawDigits = itemRjid.filter { it.isDigit() }
+                    val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull() ?: 0
+                    if (workId > 0) {
+                        val tree = AsmrOneApiService.getWorkFileTree(workId).getOrNull() ?: emptyList()
+                        suspend fun saveSubtitles(nodes: List<AsmrOneFileNode>, currentRelPath: String = "") {
+                            for (node in nodes) {
+                                if (node.type == "folder") {
+                                    val sub = if (currentRelPath.isBlank()) node.title else "$currentRelPath/${node.title}"
+                                    saveSubtitles(node.children, sub)
+                                } else {
+                                    val ext = node.title.substringAfterLast('.', "").lowercase()
+                                    if (ext in setOf("vtt", "lrc", "srt") && node.streamUrl.isNotBlank()) {
+                                        val subDir = if (currentRelPath.isNotBlank()) {
+                                            File(workFolder, currentRelPath.replace('/', File.separatorChar)).apply { mkdirs() }
+                                        } else {
+                                            workFolder
+                                        }
+                                        val subText = AsmrOneApiService.fetchRawText(node.streamUrl)
+                                        if (!subText.isNullOrBlank()) {
+                                            val subFile = File(subDir, sanitizeFilename(node.title.substringBeforeLast('.')) + ".$ext")
+                                            subFile.writeText(subText, Charsets.UTF_8)
+                                            log("    Subtitle tersimpan: ${subFile.name}")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        saveSubtitles(tree)
+                    }
+                } catch (_: Exception) {
+                }
+
+                // Hitung total ukuran dan bab virtual
+                val folderAudioFiles = AudioStorageHelper.getAudioFilesInFolder(workFolder)
+                val totalBytes = folderAudioFiles.sumOf { it.length() }
+                val fileSizeStr = AudioDownloader.formatFileSize(totalBytes)
+                val dateStr = AudioStorageHelper.formatDateForDisplay(System.currentTimeMillis())
+
+                var cumMs = 0L
+                val folderChapters = mutableListOf<ChapterItem>()
+                for (fa in folderAudioFiles) {
+                    val durMs = ChapterDiscoveryService.getAudioDurationMs(fa)
+                    val startMs = cumMs
+                    val endMs = cumMs + durMs
+                    cumMs = endMs
+                    val relPath = try {
+                        fa.relativeTo(workFolder).path.replace('\\', '/')
+                    } catch (_: Exception) {
+                        fa.name
+                    }
+                    folderChapters.add(
+                        ChapterItem(
+                            startMs = startMs,
+                            endMs = endMs,
+                            title = fa.nameWithoutExtension,
+                            fileName = relPath
+                        )
+                    )
+                }
+                val chaptersJsonStr = if (folderChapters.isNotEmpty()) ChapterItem.toJsonArray(folderChapters) else null
+
+                historyDao.insertHistory(
+                    HistoryEntity(
+                        rjid = itemRjid,
+                        title = meta.title,
+                        cv = meta.cv,
+                        circle = meta.circle,
+                        genre = meta.genre,
+                        ageRating = meta.ageRating,
+                        coverUrl = meta.coverUrl,
+                        localFilePath = workFolder.absolutePath,
+                        downloadDate = dateStr,
+                        fileSize = fileSizeStr,
+                        chaptersJson = chaptersJsonStr,
+                        sourceType = SourceType.LOCAL_FOLDER.name
+                    )
                 )
-            }
 
-            log(DownloadLogHelper.itemSuccess(finalAudioFile.absolutePath, fileSizeStr))
+                updateItem(itemRjid) {
+                    it.copy(
+                        status = DownloadStatus.COMPLETED,
+                        statusText = DownloadLogHelper.statusCompleted(),
+                        progress = 1f,
+                        speed = "-",
+                        eta = "-",
+                        downloadedSize = fileSizeStr
+                    )
+                }
+
+                log(DownloadLogHelper.itemSuccess(workFolder.absolutePath, fileSizeStr))
+            }
 
             downloadedTracks.forEach { it.delete() }
             coverFile.delete()

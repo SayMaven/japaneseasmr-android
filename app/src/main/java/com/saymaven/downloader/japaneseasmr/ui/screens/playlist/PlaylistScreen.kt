@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -74,12 +75,14 @@ fun PlaylistScreen(
     viewModel: PlayerViewModel,
     onOpenPlayer: () -> Unit,
     onOpenDrawer: () -> Unit = {},
+    onViewWorkDetail: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
     val playlist by viewModel.playlist.collectAsState()
+    val allDownloadedRjids = remember(playlist) { playlist.map { it.rjid.uppercase() }.toSet() }
     val filteredPlaylist by viewModel.filteredPlaylist.collectAsState()
     val availableFolders by viewModel.availableFolders.collectAsState()
     val folderItemsMap by viewModel.folderItemsMap.collectAsState()
@@ -106,8 +109,8 @@ fun PlaylistScreen(
         }
     }
 
-    // Tag Filter State
-    var selectedTagFilter by remember { mutableStateOf<String?>(null) }
+    // Tag Filter State (Multi-Tag Support)
+    var selectedTagFilters by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showTagFilterSheet by remember { mutableStateOf(false) }
 
     val allLocalTags = remember(playlist) {
@@ -119,17 +122,19 @@ fun PlaylistScreen(
             .distinct()
     }
 
-    val displayedPlaylist = remember(filteredPlaylist, selectedTagFilter) {
-        if (selectedTagFilter == null) filteredPlaylist
+    val displayedPlaylist = remember(filteredPlaylist, selectedTagFilters) {
+        if (selectedTagFilters.isEmpty()) filteredPlaylist
         else {
-            val filterEn = TagLocalizer.localize(null, selectedTagFilter!!)
-            val filterJp = TagLocalizer.getJapaneseName(selectedTagFilter!!)
             filteredPlaylist.filter { item ->
-                item.genre.split(",").any { g ->
-                    val gTrim = g.trim()
-                    gTrim.equals(selectedTagFilter, ignoreCase = true) ||
-                    (filterJp != null && gTrim.equals(filterJp, ignoreCase = true)) ||
-                    TagLocalizer.localize(null, gTrim).equals(filterEn, ignoreCase = true)
+                val itemGenres = item.genre.split(",").map { it.trim() }
+                selectedTagFilters.all { filterTag ->
+                    val filterEn = TagLocalizer.localize(null, filterTag)
+                    val filterJp = TagLocalizer.getJapaneseName(filterTag)
+                    itemGenres.any { g ->
+                        g.equals(filterTag, ignoreCase = true) ||
+                        (filterJp != null && g.equals(filterJp, ignoreCase = true)) ||
+                        TagLocalizer.localize(null, g).equals(filterEn, ignoreCase = true)
+                    }
                 }
             }
         }
@@ -139,7 +144,7 @@ fun PlaylistScreen(
     var currentPage by rememberSaveable { mutableIntStateOf(1) }
     val totalPages = maxOf(1, (displayedPlaylist.size + pageSize - 1) / pageSize)
 
-    LaunchedEffect(displayedPlaylist.size, selectedFolder, selectedTagFilter) {
+    LaunchedEffect(displayedPlaylist.size, selectedFolder, selectedTagFilters) {
         if (currentPage > totalPages) {
             currentPage = 1
         }
@@ -259,7 +264,7 @@ fun PlaylistScreen(
                 )
             }
 
-            // Tag Filter Button
+            // Tag Filter Button (Multi-Tag)
             IconButton(
                 onClick = { showTagFilterSheet = true },
                 modifier = Modifier.size(36.dp)
@@ -267,7 +272,7 @@ fun PlaylistScreen(
                 Icon(
                     imageVector = Icons.Default.LocalOffer,
                     contentDescription = stringResource(R.string.tag_filter_title),
-                    tint = if (selectedTagFilter != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = if (selectedTagFilters.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -296,26 +301,42 @@ fun PlaylistScreen(
             }
         }
 
-        // Active Tag Filter Badge
-        if (selectedTagFilter != null) {
+        // Active Tag Filter Badges (Horizontal scrolling row)
+        if (selectedTagFilters.isNotEmpty()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                InputChip(
-                    selected = true,
-                    onClick = { selectedTagFilter = null },
-                    label = { Text(TagLocalizer.getLocalizedDisplayName(context, null, selectedTagFilter!!)) },
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(R.string.tag_filter_clear),
-                            modifier = Modifier.size(16.dp)
-                        )
+                selectedTagFilters.forEach { tag ->
+                    val displayName = TagLocalizer.getLocalizedDisplayName(context, null, tag)
+                    InputChip(
+                        selected = true,
+                        onClick = {
+                            selectedTagFilters = selectedTagFilters - tag
+                        },
+                        label = { Text(displayName) },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.tag_filter_clear),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    )
+                }
+                if (selectedTagFilters.size > 1) {
+                    FilledTonalButton(
+                        onClick = { selectedTagFilters = emptySet() },
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Text(stringResource(R.string.tag_filter_reset), style = MaterialTheme.typography.labelSmall)
                     }
-                )
+                }
             }
         }
 
@@ -504,10 +525,12 @@ fun PlaylistScreen(
                             items(playlistItems, key = { it.id }) { item ->
                                 val isCurrentTrack = (item.rjid == currentRjId)
                                 val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
+                                val isOffline = allDownloadedRjids.contains(item.rjid.uppercase())
                                 PlaylistItemGridCard(
                                     item = item,
                                     displayTitle = displayTitle,
                                     isCurrentTrack = isCurrentTrack,
+                                    isOffline = isOffline,
                                     onClick = {
                                         viewModel.playPlaylistItem(item)
                                         onOpenPlayer()
@@ -520,6 +543,9 @@ fun PlaylistScreen(
                                         clipboard.setPrimaryClip(ClipData.newPlainText("RJ Code", item.rjid))
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         Toast.makeText(context, context.getString(R.string.browse_toast_rj_copied, item.rjid), Toast.LENGTH_SHORT).show()
+                                    },
+                                    onViewDetail = {
+                                        onViewWorkDetail(item.rjid)
                                     }
                                 )
                             }
@@ -532,9 +558,11 @@ fun PlaylistScreen(
                         ) {
                             items(playlistItems, key = { it.id }) { item ->
                                 val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
+                                val isOffline = allDownloadedRjids.contains(item.rjid.uppercase())
                                 PlaylistItemRow(
                                     item = item,
                                     displayTitle = displayTitle,
+                                    isOffline = isOffline,
                                     onClick = {
                                         viewModel.playPlaylistItem(item)
                                         onOpenPlayer()
@@ -547,6 +575,9 @@ fun PlaylistScreen(
                                         clipboard.setPrimaryClip(ClipData.newPlainText("RJ Code", item.rjid))
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         Toast.makeText(context, context.getString(R.string.browse_toast_rj_copied, item.rjid), Toast.LENGTH_SHORT).show()
+                                    },
+                                    onViewDetail = {
+                                        onViewWorkDetail(item.rjid)
                                     }
                                 )
                             }
@@ -1175,12 +1206,13 @@ fun PlaylistScreen(
         )
     }
 
-    // Tag Filter Sheet
+    // Tag Filter Sheet (Multi-Tag)
     if (showTagFilterSheet) {
         TagFilterSheet(
             availableTags = allLocalTags,
-            onTagSelected = { tag ->
-                selectedTagFilter = tag
+            initialSelectedTags = selectedTagFilters,
+            onApplyTags = { tags ->
+                selectedTagFilters = tags
                 showTagFilterSheet = false
             },
             onDismiss = { showTagFilterSheet = false }
@@ -1599,6 +1631,7 @@ fun ExplorerFolderListRow(
 private fun PlaylistItemOptionsMenu(
     onCopyRj: () -> Unit,
     onRemove: () -> Unit,
+    onViewDetail: (() -> Unit)? = null,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     modifier: Modifier = Modifier
 ) {
@@ -1618,6 +1651,16 @@ private fun PlaylistItemOptionsMenu(
             expanded = isMenuExpanded,
             onDismissRequest = { isMenuExpanded = false }
         ) {
+            if (onViewDetail != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.browse_action_view_detail)) },
+                    leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    onClick = {
+                        isMenuExpanded = false
+                        onViewDetail()
+                    }
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.browse_action_copy_id)) },
                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
@@ -1627,7 +1670,7 @@ private fun PlaylistItemOptionsMenu(
                 }
             )
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.playlist_dialog_delete)) },
+                text = { Text(stringResource(R.string.playlist_dialog_delete), color = MaterialTheme.colorScheme.error) },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 onClick = {
                     isMenuExpanded = false
@@ -1643,9 +1686,11 @@ fun PlaylistItemGridCard(
     item: PlaylistItemEntity,
     displayTitle: String = item.title,
     isCurrentTrack: Boolean = false,
+    isOffline: Boolean = false,
     onClick: () -> Unit,
     onRemove: () -> Unit,
     onCopyRj: () -> Unit,
+    onViewDetail: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val cardShape = RoundedCornerShape(10.dp)
@@ -1710,6 +1755,23 @@ fun PlaylistItemGridCard(
                     )
                 }
 
+                // Badge Status Unduhan (OFFLINE vs ONLINE)
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (isOffline) Color(0xFF2E7D32).copy(alpha = 0.9f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f),
+                    modifier = Modifier
+                        .padding(6.dp)
+                        .align(Alignment.BottomStart)
+                ) {
+                    Text(
+                        text = if (isOffline) stringResource(R.string.playlist_badge_offline) else stringResource(R.string.playlist_badge_online),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+
                 Surface(
                     shape = CircleShape,
                     color = Color.Black.copy(alpha = 0.55f),
@@ -1720,6 +1782,7 @@ fun PlaylistItemGridCard(
                     PlaylistItemOptionsMenu(
                         onCopyRj = onCopyRj,
                         onRemove = onRemove,
+                        onViewDetail = onViewDetail,
                         tint = Color.White
                     )
                 }
@@ -1773,9 +1836,11 @@ fun PlaylistItemGridCard(
 fun PlaylistItemRow(
     item: PlaylistItemEntity,
     displayTitle: String = item.title,
+    isOffline: Boolean = false,
     onClick: () -> Unit,
     onRemove: () -> Unit,
     onCopyRj: () -> Unit,
+    onViewDetail: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -1805,17 +1870,32 @@ fun PlaylistItemRow(
             Spacer(modifier = Modifier.width(10.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                ) {
-                    Text(
-                        text = item.rjid,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    ) {
+                        Text(
+                            text = item.rjid,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (isOffline) Color(0xFF2E7D32).copy(alpha = 0.9f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f)
+                    ) {
+                        Text(
+                            text = if (isOffline) stringResource(R.string.playlist_badge_offline) else stringResource(R.string.playlist_badge_online),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -1838,7 +1918,8 @@ fun PlaylistItemRow(
 
             PlaylistItemOptionsMenu(
                 onCopyRj = onCopyRj,
-                onRemove = onRemove
+                onRemove = onRemove,
+                onViewDetail = onViewDetail
             )
         }
     }

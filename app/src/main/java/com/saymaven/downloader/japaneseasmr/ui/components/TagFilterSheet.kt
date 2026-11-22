@@ -25,12 +25,15 @@ import com.saymaven.downloader.japaneseasmr.service.TagLocalizer
 @Composable
 fun TagFilterSheet(
     availableTags: List<String>? = null,
-    onTagSelected: (String) -> Unit,
+    initialSelectedTags: Set<String> = emptySet(),
+    onApplyTags: (Set<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     var searchKeyword by remember { mutableStateOf("") }
     val allTags = remember(availableTags) { availableTags ?: TagLocalizer.getAllKnownTags() }
+
+    var selectedTags by remember { mutableStateOf(initialSelectedTags.toMutableSet()) }
 
     val filteredTags = remember(searchKeyword) {
         val q = searchKeyword.trim().lowercase()
@@ -116,20 +119,27 @@ fun TagFilterSheet(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp),
+                        .heightIn(max = 340.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     items(filteredTags) { tag ->
                         val displayName = TagLocalizer.getLocalizedDisplayName(context, null, tag)
+                        val isSelected = selectedTags.contains(displayName) || selectedTags.contains(tag)
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    onTagSelected(displayName)
-                                    onDismiss()
+                                    val next = selectedTags.toMutableSet()
+                                    if (isSelected) {
+                                        next.remove(displayName)
+                                        next.remove(tag)
+                                    } else {
+                                        next.add(displayName)
+                                    }
+                                    selectedTags = next
                                 }
                         ) {
                             Row(
@@ -139,18 +149,29 @@ fun TagFilterSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = displayName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                                 val subName = if (displayName != tag) tag else (TagLocalizer.getJapaneseName(tag) ?: "")
                                 if (subName.isNotBlank() && subName != displayName) {
                                     Text(
                                         text = subName,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                     )
                                 }
                             }
@@ -159,7 +180,38 @@ fun TagFilterSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Action Buttons: Reset & Apply
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        selectedTags = mutableSetOf()
+                        onApplyTags(emptySet())
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(stringResource(R.string.tag_filter_reset))
+                }
+
+                Button(
+                    onClick = {
+                        onApplyTags(selectedTags)
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(stringResource(R.string.tag_filter_apply_count, selectedTags.size))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
         }
     }
 }

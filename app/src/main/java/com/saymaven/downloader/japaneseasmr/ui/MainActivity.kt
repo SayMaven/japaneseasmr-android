@@ -395,7 +395,14 @@ class MainActivity : ComponentActivity() {
                                 PlaylistScreen(
                                     viewModel = playerViewModel,
                                     onOpenPlayer = { isPlayerExpanded = true },
-                                    onOpenDrawer = { drawerScope.launch { drawerState.open() } }
+                                    onOpenDrawer = { drawerScope.launch { drawerState.open() } },
+                                    onViewWorkDetail = { rjid ->
+                                        if (!visitedTabs.contains(NavTab.BROWSE)) {
+                                            visitedTabs.add(NavTab.BROWSE)
+                                        }
+                                        currentTab = NavTab.BROWSE
+                                        browseViewModel.selectWorkByRjid(rjid)
+                                    }
                                 )
                             }
 

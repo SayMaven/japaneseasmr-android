@@ -27,7 +27,7 @@ object TrackDiscoveryService {
         "Accept-Language" to "zh-CN,zh;q=0.9,ja;q=0.8,en;q=0.7"
     )
 
-    private val AUDIO_EXTENSIONS = setOf(".mp3", ".wav", ".m4a", ".flac", ".aac", ".ogg")
+    private val AUDIO_EXTENSIONS = setOf(".mp3", ".wav", ".m4a", ".flac", ".aac", ".ogg", ".wma")
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(6, TimeUnit.SECONDS)
@@ -397,7 +397,7 @@ object TrackDiscoveryService {
                     if (item.optString("type") == "folder") {
                         val fTitle = item.optString("title")
                         if (fTitle.contains("本編") && (fTitle.contains("mp3", ignoreCase = true) || fTitle.contains("m4a", ignoreCase = true))) {
-                            val mp3Tracks = extractAudiosFromNode(item).filter { it.url.contains(".mp3", ignoreCase = true) || it.url.contains(".m4a", ignoreCase = true) }
+                            val mp3Tracks = extractAudiosFromNode(item, item.optString("title", "").trim()).filter { it.url.contains(".mp3", ignoreCase = true) || it.url.contains(".m4a", ignoreCase = true) }
                             if (mp3Tracks.size >= 2) {
                                 return mp3Tracks.sortedWith { t1, t2 -> naturalOrderComparator.compare(t1.name, t2.name) }
                             }
@@ -458,6 +458,7 @@ object TrackDiscoveryService {
 
         for (bestFolder in folders) {
             var targetNode = bestFolder
+            var pathAccumulator = bestFolder.optString("title", "").trim()
             while (true) {
                 val children = targetNode.optJSONArray("children") ?: break
                 val subFolders = mutableListOf<JSONObject>()
@@ -470,9 +471,13 @@ object TrackDiscoveryService {
                 if (subFolders.isEmpty()) break
                 subFolders.sortByDescending { folderScore(it.optString("title")) }
                 targetNode = subFolders[0]
+                val subTitle = targetNode.optString("title", "").trim()
+                if (subTitle.isNotBlank()) {
+                    pathAccumulator = if (pathAccumulator.isBlank()) subTitle else "$pathAccumulator/$subTitle"
+                }
             }
 
-            val tracks = extractAudiosFromNode(targetNode)
+            val tracks = extractAudiosFromNode(targetNode, pathAccumulator)
             if (tracks.isNotEmpty()) {
                 // Deduplikasi format: jika ada format MP3 dan WAV untuk nama yang sama, pilih MP3
                 val seenBases = mutableMapOf<String, TrackInfo>()
@@ -489,12 +494,14 @@ object TrackDiscoveryService {
                             pref == "flac" || pref == "wav" -> tr.url.contains(".flac", ignoreCase = true) || tr.url.contains(".wav", ignoreCase = true)
                             pref == "m4a" || pref == "aac" -> tr.url.contains(".m4a", ignoreCase = true) || tr.url.contains(".aac", ignoreCase = true)
                             pref.startsWith("mp3") -> tr.url.contains(".mp3", ignoreCase = true)
+                            pref == "wma" -> tr.url.contains(".wma", ignoreCase = true)
                             else -> tr.url.contains(".mp3", ignoreCase = true) || tr.url.contains(".m4a", ignoreCase = true)
                         }
                         val exIsPref = when {
                             pref == "flac" || pref == "wav" -> existing.url.contains(".flac", ignoreCase = true) || existing.url.contains(".wav", ignoreCase = true)
                             pref == "m4a" || pref == "aac" -> existing.url.contains(".m4a", ignoreCase = true) || existing.url.contains(".aac", ignoreCase = true)
                             pref.startsWith("mp3") -> existing.url.contains(".mp3", ignoreCase = true)
+                            pref == "wma" -> existing.url.contains(".wma", ignoreCase = true)
                             else -> existing.url.contains(".mp3", ignoreCase = true) || existing.url.contains(".m4a", ignoreCase = true)
                         }
                         if (trIsPref && !exIsPref) {
@@ -513,7 +520,8 @@ object TrackDiscoveryService {
         val allAudios = mutableListOf<TrackInfo>()
         for (i in 0 until tree.length()) {
             val item = tree.optJSONObject(i) ?: continue
-            allAudios.addAll(extractAudiosFromNode(item))
+            val itemFolder = if (item.optString("type") == "folder") item.optString("title", "").trim() else ""
+            allAudios.addAll(extractAudiosFromNode(item, itemFolder))
         }
 
         val uniqueAudios = mutableListOf<TrackInfo>()
@@ -529,7 +537,7 @@ object TrackDiscoveryService {
         return uniqueAudios.sortedWith { t1, t2 -> naturalOrderComparator.compare(t1.name, t2.name) }
     }
 
-    private fun extractAudiosFromNode(node: JSONObject): List<TrackInfo> {
+    private fun extractAudiosFromNode(node: JSONObject, parentPath: String = ""): List<TrackInfo> {
         val audios = mutableListOf<TrackInfo>()
         if (node.optString("type") == "audio") {
             val streamUrl = resolveAsmrOneStreamUrl(node)
@@ -543,7 +551,8 @@ object TrackDiscoveryService {
                         isHls = streamUrl.contains(".m3u8", ignoreCase = true),
                         duration = node.optDouble("duration", 0.0),
                         referer = REFERER_ASMRONE,
-                        source = "asmr.one"
+                        source = "asmr.one",
+                        relativeSubPath = parentPath
                     )
                 )
             }
@@ -551,9 +560,15 @@ object TrackDiscoveryService {
 
         val children = node.optJSONArray("children")
         if (children != null) {
+            val folderTitle = if (node.optString("type") == "folder") node.optString("title", "").trim() else ""
+            val nextParent = when {
+                parentPath.isBlank() -> folderTitle
+                folderTitle.isBlank() || parentPath.endsWith(folderTitle) -> parentPath
+                else -> "$parentPath/$folderTitle"
+            }
             for (i in 0 until children.length()) {
                 val child = children.optJSONObject(i) ?: continue
-                audios.addAll(extractAudiosFromNode(child))
+                audios.addAll(extractAudiosFromNode(child, nextParent))
             }
         }
 

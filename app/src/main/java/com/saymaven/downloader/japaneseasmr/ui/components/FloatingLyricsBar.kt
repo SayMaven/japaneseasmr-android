@@ -46,7 +46,7 @@ fun FloatingLyricsBar(
     val isLocked by viewModel.floatingLyricsLocked.collectAsState()
     val isTranslated by viewModel.isLyricsTranslated.collectAsState()
 
-    val activeLine = lyrics.getOrNull(activeIdx) ?: lyrics.firstOrNull()
+    val activeLine = lyrics.getOrNull(activeIdx)
     val isVisible = enabled && lyrics.isNotEmpty() && activeLine != null
 
     var offsetY by remember { mutableFloatStateOf(0f) }

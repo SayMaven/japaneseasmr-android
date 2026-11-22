@@ -54,6 +54,7 @@ fun QueueScreen(
     val isLoadingPreview by viewModel.isLoadingPreview.collectAsState()
     val logs by DownloadService.logsState.collectAsState()
     val showConsole by viewModel.showConsole.collectAsState()
+    val mergeDownloadedAudio by viewModel.mergeDownloadedAudio.collectAsState()
     val listState = rememberLazyListState()
 
     var showLogsInside by remember { mutableStateOf(true) }
@@ -130,6 +131,41 @@ fun QueueScreen(
                         contentDescription = if (showConsole) stringResource(R.string.queue_hide_console) else stringResource(R.string.queue_show_console),
                         tint = if (showConsole) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+
+        // ================= 0b. MERGE AUDIO DOWNLOAD OPTION CARD =================
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.download_merge_tracks_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.download_merge_tracks_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Switch(
+                        checked = mergeDownloadedAudio,
+                        onCheckedChange = { viewModel.toggleMergeDownloadedAudio(context) }
                     )
                 }
             }

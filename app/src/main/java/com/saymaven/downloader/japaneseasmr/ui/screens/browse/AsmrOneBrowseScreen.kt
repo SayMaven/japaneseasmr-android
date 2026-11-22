@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -387,7 +389,7 @@ fun AsmrOneBrowseScreen(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(54.dp)
                 )
             }
         }
@@ -397,23 +399,57 @@ fun AsmrOneBrowseScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (searchQuery.isNotEmpty()) {
-                    InputChip(
-                        selected = true,
-                        onClick = { viewModel.onSearchQueryChange("") },
-                        label = { Text("\"$searchQuery\"") },
-                        trailingIcon = {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Clear",
-                                modifier = Modifier.size(14.dp)
+                    val searchParts = searchQuery.split("\\s+".toRegex()).filter { it.isNotBlank() }
+                    if (searchParts.size > 1) {
+                        searchParts.forEach { part ->
+                            InputChip(
+                                selected = true,
+                                onClick = {
+                                    val remaining = searchParts.filter { it != part }.joinToString(" ")
+                                    viewModel.onSearchQueryChange(remaining)
+                                },
+                                label = { Text(part) },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Remove $part",
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
                             )
                         }
-                    )
+                        InputChip(
+                            selected = false,
+                            onClick = { viewModel.onSearchQueryChange("") },
+                            label = { Text(stringResource(R.string.tag_filter_reset)) },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Clear All",
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        )
+                    } else {
+                        InputChip(
+                            selected = true,
+                            onClick = { viewModel.onSearchQueryChange("") },
+                            label = { Text("\"$searchQuery\"") },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Clear",
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        )
+                    }
                 }
                 if (sortField != AsmrSortField.RELEASE_DATE) {
                     InputChip(
@@ -716,9 +752,15 @@ fun AsmrOneBrowseScreen(
 
     // Tag Filter Sheet
     if (showTagFilterSheet) {
+        val currentTags = remember(searchQuery) {
+            if (searchQuery.isBlank()) emptySet()
+            else searchQuery.split("\\s+".toRegex()).filter { it.isNotBlank() }.toSet()
+        }
         TagFilterSheet(
-            onTagSelected = { tag ->
-                viewModel.onSearchQueryChange(tag)
+            initialSelectedTags = currentTags,
+            onApplyTags = { tags ->
+                viewModel.onSearchQueryChange(tags.joinToString(" "))
+                showTagFilterSheet = false
             },
             onDismiss = { showTagFilterSheet = false }
         )

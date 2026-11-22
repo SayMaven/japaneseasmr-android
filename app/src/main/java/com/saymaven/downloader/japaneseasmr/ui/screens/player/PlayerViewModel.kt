@@ -681,6 +681,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         _playlist.value = sorted
         saveFastCachedPlaylist(sorted)
+
+        // Preload judul terjemahan yang sudah tersimpan di database Room
+        val preloadedTranslations = mutableMapOf<String, String>()
+        for (item in sorted) {
+            if (!item.translatedTitle.isNullOrBlank()) {
+                preloadedTranslations[item.rjid] = item.translatedTitle
+            }
+        }
+        if (preloadedTranslations.isNotEmpty()) {
+            val merged = _playlistTranslatedTitles.value.toMutableMap()
+            merged.putAll(preloadedTranslations)
+            _playlistTranslatedTitles.value = merged
+        }
+
+        // Jika terjemahan daftar aktif, otomatis terjemahkan karya yang belum memiliki terjemahan
+        if (_isTranslationActive.value) {
+            val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+            translatePlaylistTitles(targetLang)
+        }
     }
 
     fun createNewFolder(folderName: String) {
@@ -768,16 +787,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             prefs.isTranslationActiveFlow.distinctUntilChanged().collect { active ->
                 _isTranslationActive.value = active
-                if (active && !_currentRjId.value.isNullOrBlank()) {
-                    loadOrFetchTranslations(_currentRjId.value)
+                if (active) {
+                    val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+                    translatePlaylistTitles(targetLang)
+                    if (!_currentRjId.value.isNullOrBlank()) {
+                        loadOrFetchTranslations(_currentRjId.value)
+                    }
                 }
             }
         }
         viewModelScope.launch {
             prefs.autoTranslateListsFlow.distinctUntilChanged().collect { autoActive ->
-                if (autoActive && !_isTranslationActive.value) {
-                    _isTranslationActive.value = true
-                    prefs.setTranslationActive(true)
+                if (autoActive) {
+                    if (!_isTranslationActive.value) {
+                        _isTranslationActive.value = true
+                        prefs.setTranslationActive(true)
+                    }
+                    val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+                    translatePlaylistTitles(targetLang)
                 }
             }
         }

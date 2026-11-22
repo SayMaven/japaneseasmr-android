@@ -292,6 +292,19 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    fun selectWorkByRjid(rjid: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val res = AsmrOneApiService.getWork(rjid)
+            res.onSuccess { work ->
+                selectWork(work)
+            }.onFailure {
+                onSearchQueryChange(rjid)
+            }
+            _isLoading.value = false
+        }
+    }
+
     fun loadWorkDetails(workId: Int) {
         viewModelScope.launch {
             _isLoadingTracks.value = true

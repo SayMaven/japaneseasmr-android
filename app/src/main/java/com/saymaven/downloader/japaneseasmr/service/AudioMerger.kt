@@ -9,6 +9,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
  * AudioMerger Engine:
@@ -379,6 +380,201 @@ object AudioMerger {
             false
         } finally {
             try { muxer?.release() } catch (e: Exception) {}
+        }
+    }
+
+    private data class WavSlice(
+        val file: File,
+        val fmtBytes: ByteArray,
+        val channels: Int,
+        val sampleRate: Long,
+        val blockAlign: Int,
+        val bitsPerSample: Int,
+        val dataStart: Long,
+        val dataLength: Long
+    )
+
+    fun mergeWavFiles(
+        trackFiles: List<File>,
+        destFile: File,
+        onLog: ((String) -> Unit)? = null
+    ): Boolean {
+        if (trackFiles.isEmpty()) return false
+        if (trackFiles.size == 1) {
+            trackFiles[0].copyTo(destFile, overwrite = true)
+            return true
+        }
+
+        return try {
+            onLog?.invoke("Memulai penggabungan WAV Fast Remux (${trackFiles.size} trek)...")
+
+            val slices = mutableListOf<WavSlice>()
+            var totalDataBytes = 0L
+
+            for (file in trackFiles) {
+                val slice = inspectWavFast(file) ?: return false
+                slices.add(slice)
+                totalDataBytes += slice.dataLength
+            }
+
+            val master = slices[0]
+            val isRf64 = totalDataBytes > (0xFFFFFFFFL - 1000L)
+
+            destFile.parentFile?.mkdirs()
+            FileOutputStream(destFile).use { fos ->
+                val outChan = fos.channel
+
+                if (isRf64) {
+                    onLog?.invoke("Ukuran WAV melebihi 4GB. Menggunakan format RF64 (chunk ds64)...")
+                    val headerSize = 12 + 36 + (8 + master.fmtBytes.size) + 8
+                    val totalFileSize = headerSize.toLong() + totalDataBytes
+                    val headerBuf = ByteBuffer.allocate(headerSize)
+                    headerBuf.order(ByteOrder.LITTLE_ENDIAN)
+
+                    headerBuf.put("RF64".toByteArray(Charsets.US_ASCII))
+                    headerBuf.putInt(-1)
+                    headerBuf.put("WAVE".toByteArray(Charsets.US_ASCII))
+
+                    headerBuf.put("ds64".toByteArray(Charsets.US_ASCII))
+                    headerBuf.putInt(28)
+                    headerBuf.putLong(totalFileSize - 8L)
+                    headerBuf.putLong(totalDataBytes)
+                    val sampleCount = if (master.blockAlign > 0) totalDataBytes / master.blockAlign else 0L
+                    headerBuf.putLong(sampleCount)
+                    headerBuf.putInt(0)
+
+                    headerBuf.put("fmt ".toByteArray(Charsets.US_ASCII))
+                    headerBuf.putInt(master.fmtBytes.size)
+                    headerBuf.put(master.fmtBytes)
+
+                    headerBuf.put("data".toByteArray(Charsets.US_ASCII))
+                    headerBuf.putInt(-1)
+
+                    headerBuf.flip()
+                    outChan.write(headerBuf)
+                } else {
+                    val headerSize = 12 + (8 + master.fmtBytes.size) + 8
+                    val totalFileSize = headerSize.toLong() + totalDataBytes
+                    val headerBuf = ByteBuffer.allocate(headerSize)
+                    headerBuf.order(ByteOrder.LITTLE_ENDIAN)
+
+                    headerBuf.put("RIFF".toByteArray(Charsets.US_ASCII))
+                    headerBuf.putInt((totalFileSize - 8L).toInt())
+                    headerBuf.put("WAVE".toByteArray(Charsets.US_ASCII))
+
+                    headerBuf.put("fmt ".toByteArray(Charsets.US_ASCII))
+                    headerBuf.putInt(master.fmtBytes.size)
+                    headerBuf.put(master.fmtBytes)
+
+                    headerBuf.put("data".toByteArray(Charsets.US_ASCII))
+                    headerBuf.putInt(totalDataBytes.toInt())
+
+                    headerBuf.flip()
+                    outChan.write(headerBuf)
+                }
+
+                for (slice in slices) {
+                    if (slice.dataLength > 0L) {
+                        FileInputStream(slice.file).use { fis ->
+                            val inChan = fis.channel
+                            var transferred = 0L
+                            while (transferred < slice.dataLength) {
+                                val count = inChan.transferTo(
+                                    slice.dataStart + transferred,
+                                    slice.dataLength - transferred,
+                                    outChan
+                                )
+                                if (count <= 0) break
+                                transferred += count
+                            }
+                        }
+                    }
+                }
+            }
+
+            val finalSizeMb = destFile.length() / (1024.0 * 1024.0)
+            onLog?.invoke("Penggabungan WAV ${if (isRf64) "RF64 " else ""}berhasil: %.2f MB".format(finalSizeMb))
+            true
+        } catch (e: Exception) {
+            onLog?.invoke("Gagal menggabungkan WAV: ${e.message}")
+            false
+        }
+    }
+
+    private fun inspectWavFast(file: File): WavSlice? {
+        return try {
+            RandomAccessFile(file, "r").use { raf ->
+                val fileLen = raf.length()
+                if (fileLen < 44) return null
+
+                val header12 = ByteArray(12)
+                raf.readFully(header12)
+                val riff = String(header12, 0, 4, Charsets.US_ASCII)
+                val wave = String(header12, 8, 4, Charsets.US_ASCII)
+                if ((riff != "RIFF" && riff != "RF64") || wave != "WAVE") return null
+
+                var fmtBytes: ByteArray? = null
+                var channels = 2
+                var sampleRate = 44100L
+                var blockAlign = 4
+                var bitsPerSample = 16
+                var dataStart = -1L
+                var dataLength = -1L
+
+                while (raf.filePointer < fileLen - 8) {
+                    val chunkIdBytes = ByteArray(4)
+                    raf.readFully(chunkIdBytes)
+                    val chunkId = String(chunkIdBytes, Charsets.US_ASCII)
+
+                    val sizeBytes = ByteArray(4)
+                    raf.readFully(sizeBytes)
+                    val chunkSize = ((sizeBytes[0].toLong() and 0xFF)) or
+                            ((sizeBytes[1].toLong() and 0xFF) shl 8) or
+                            ((sizeBytes[2].toLong() and 0xFF) shl 16) or
+                            ((sizeBytes[3].toLong() and 0xFF) shl 24)
+
+                    if (chunkId == "fmt ") {
+                        val fmtLen = chunkSize.toInt().coerceIn(16, 1024)
+                        val fb = ByteArray(fmtLen)
+                        raf.readFully(fb)
+                        fmtBytes = fb
+
+                        channels = ((fb[2].toInt() and 0xFF)) or ((fb[3].toInt() and 0xFF) shl 8)
+                        sampleRate = ((fb[4].toLong() and 0xFF)) or
+                                ((fb[5].toLong() and 0xFF) shl 8) or
+                                ((fb[6].toLong() and 0xFF) shl 16) or
+                                ((fb[7].toLong() and 0xFF) shl 24)
+                        blockAlign = ((fb[12].toInt() and 0xFF)) or ((fb[13].toInt() and 0xFF) shl 8)
+                        bitsPerSample = ((fb[14].toInt() and 0xFF)) or ((fb[15].toInt() and 0xFF) shl 8)
+                    } else if (chunkId == "data") {
+                        dataStart = raf.filePointer
+                        dataLength = if (chunkSize == -1L || chunkSize == 0xFFFFFFFFL || dataStart + chunkSize > fileLen) {
+                            fileLen - dataStart
+                        } else {
+                            chunkSize
+                        }
+                        break
+                    } else {
+                        val skipBytes = if (chunkSize > 0) chunkSize else 0L
+                        raf.seek(raf.filePointer + skipBytes)
+                    }
+                }
+
+                if (fmtBytes != null && dataStart >= 0L && dataLength >= 0L) {
+                    WavSlice(
+                        file = file,
+                        fmtBytes = fmtBytes,
+                        channels = channels,
+                        sampleRate = sampleRate,
+                        blockAlign = blockAlign,
+                        bitsPerSample = bitsPerSample,
+                        dataStart = dataStart,
+                        dataLength = dataLength
+                    )
+                } else null
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 }

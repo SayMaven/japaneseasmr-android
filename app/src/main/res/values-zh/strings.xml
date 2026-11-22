@@ -605,4 +605,17 @@
     <string name="settings_cat_auto_translate">自动翻译</string>
     <string name="settings_speed_title">默认播放速度</string>
     <string name="settings_speed_desc">开始播放音频时的默认速度</string>
+
+    <!-- Downloads, Tags, and Playlist Enhancements -->
+    <string name="download_merge_tracks_title">合并音频轨道</string>
+    <string name="download_merge_tracks_desc">将所有音轨快速合并为一个文件。关闭则按原始多音轨文件夹结构下载。</string>
+    <string name="download_merge_tracks_short">合并音轨</string>
+    <string name="download_source_flat_merged_log">下载来源为JapaneseASMR，自动合并为单文件。</string>
+    <string name="download_format_autofallback_folder_log">%1$s格式不支持无损快速合并，将以原始多音轨目录安全下载。</string>
+    <string name="tag_filter_apply_count">应用 (%1$d)</string>
+    <string name="tag_filter_reset">重置</string>
+    <string name="playlist_badge_offline">OFFLINE</string>
+    <string name="playlist_badge_online">ONLINE</string>
+    <string name="browse_action_view_detail">查看作品详情</string>
+    <string name="error_wma_codec_unsupported">此作品为WMA格式（传统Windows格式），当前设备无内置WMA解码器。建议通过电脑播放。</string>
 </resources>

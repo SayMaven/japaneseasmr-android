@@ -64,9 +64,12 @@ object StorageSyncManager {
             var totalAudioTracks = 0
             var unreadableCount = 0
 
+            val prefs = PreferencesManager(context)
+            val formatPriority = prefs.getInitialAudioFormatPriority()
             val leafFolders = AudioStorageHelper.findLeafAudioFolders(directFile, maxDepth = 5)
             for (leaf in leafFolders) {
-                val audios = AudioStorageHelper.getAudioFilesInFolder(leaf)
+                val rawAudios = AudioStorageHelper.getAudioFilesInFolder(leaf)
+                val audios = filterAudioFilesByPriority(rawAudios, formatPriority)
                 if (leaf == directFile && leafFolders.size > 1) {
                     // directFile memiliki subfolder audio sekaligus file audio di root -> hitung file root sebagai single
                     singleCount += audios.size
@@ -258,6 +261,33 @@ object StorageSyncManager {
     }
 
     /**
+     * Menyaring daftar berkas audio agar tidak terjadi duplikasi format dengan stem nama yang sama
+     * berdasarkan urutan prioritas format audio yang dikonfigurasi pengguna.
+     */
+    private fun filterAudioFilesByPriority(audioFiles: List<File>, priorityList: List<String>): List<File> {
+        if (audioFiles.size <= 1) return audioFiles
+
+        val grouped = audioFiles.groupBy { it.nameWithoutExtension.lowercase().trim() }
+        val selectedFiles = mutableListOf<File>()
+
+        for ((_, files) in grouped) {
+            if (files.size == 1) {
+                selectedFiles.add(files.first())
+            } else {
+                val best = files.minByOrNull { file ->
+                    val ext = file.extension.lowercase().trim()
+                    val idx = priorityList.indexOf(ext)
+                    if (idx >= 0) idx else 999
+                } ?: files.first()
+                selectedFiles.add(best)
+            }
+        }
+        return selectedFiles.distinctBy { it.canonicalPath }.sortedWith { f1, f2 ->
+            AudioStorageHelper.NATURAL_ORDER_COMPARATOR.compare(f1.name, f2.name)
+        }
+    }
+
+    /**
      * Memindai folder fisik: membedakan multi-track album dan single track audio secara akurat.
      */
     private suspend fun scanPhysicalDirectory(
@@ -266,10 +296,14 @@ object StorageSyncManager {
         rootDir: File,
         isImported: Boolean
     ) {
+        val prefs = PreferencesManager(context)
+        val formatPriority = prefs.getInitialAudioFormatPriority()
         val leafFolders = AudioStorageHelper.findLeafAudioFolders(rootDir, maxDepth = 5)
 
         for (leaf in leafFolders) {
-            val audioFiles = AudioStorageHelper.getAudioFilesInFolder(leaf)
+            val rawAudioFiles = AudioStorageHelper.getAudioFilesInFolder(leaf)
+            if (rawAudioFiles.isEmpty()) continue
+            val audioFiles = filterAudioFilesByPriority(rawAudioFiles, formatPriority)
             if (audioFiles.isEmpty()) continue
 
             val fallbackCover = AudioStorageHelper.findCoverInPath(leaf, rootBoundary = rootDir)

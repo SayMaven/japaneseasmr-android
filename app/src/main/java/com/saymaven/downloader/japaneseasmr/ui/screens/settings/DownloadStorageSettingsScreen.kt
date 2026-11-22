@@ -44,6 +44,7 @@ fun DownloadStorageSettingsScreen(
     val autoClipboard by viewModel.autoClipboard.collectAsState()
     val useDetailedFilename by viewModel.useDetailedFilename.collectAsState()
     val createCueSheet by viewModel.createCueSheet.collectAsState()
+    val mergeDownloadedAudio by viewModel.mergeDownloadedAudio.collectAsState()
 
     var showManageStorageDialog by remember { mutableStateOf(false) }
     var pendingPickerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -267,6 +268,26 @@ fun DownloadStorageSettingsScreen(
                             Switch(
                                 checked = createCueSheet,
                                 onCheckedChange = { viewModel.setCreateCueSheet(it) }
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = {
+                            Text(stringResource(R.string.download_merge_tracks_title), fontWeight = FontWeight.SemiBold)
+                        },
+                        supportingContent = {
+                            Text(stringResource(R.string.download_merge_tracks_desc), style = MaterialTheme.typography.bodySmall)
+                        },
+                        leadingContent = {
+                            Icon(Icons.Default.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = mergeDownloadedAudio,
+                                onCheckedChange = { viewModel.setMergeDownloadedAudio(it) }
                             )
                         }
                     )

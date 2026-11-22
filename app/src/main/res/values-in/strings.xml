@@ -599,4 +599,17 @@
     <string name="settings_cat_auto_translate">Terjemahan Otomatis</string>
     <string name="settings_speed_title">Kecepatan Putar Default</string>
     <string name="settings_speed_desc">Kecepatan putar default saat memulai trek audio</string>
+
+    <!-- Downloads, Tags, and Playlist Enhancements -->
+    <string name="download_merge_tracks_title">Gabungkan Trek Audio</string>
+    <string name="download_merge_tracks_desc">Fast remux seluruh trek menjadi 1 berkas audio. Matikan untuk mengunduh struktur folder multi-track asli.</string>
+    <string name="download_merge_tracks_short">Gabung Trek</string>
+    <string name="download_source_flat_merged_log">Sumber unduhan dari JapaneseASMR. Trek otomatis digabungkan menjadi satu berkas.</string>
+    <string name="download_format_autofallback_folder_log">Format %1$s tidak mendukung penggabungan instan tanpa kompresi ulang. Mengunduh secara aman sebagai struktur folder asli.</string>
+    <string name="tag_filter_apply_count">Terapkan (%1$d)</string>
+    <string name="tag_filter_reset">Reset</string>
+    <string name="playlist_badge_offline">OFFLINE</string>
+    <string name="playlist_badge_online">ONLINE</string>
+    <string name="browse_action_view_detail">Lihat Detail Karya</string>
+    <string name="error_wma_codec_unsupported">Karya ini berformat WMA (arsip jadul Windows) dan perangkat ini tidak memiliki decoder WMA bawaan. Disarankan memutar melalui PC.</string>
 </resources>

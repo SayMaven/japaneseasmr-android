@@ -321,6 +321,38 @@ object AsmrOneApiService {
     }
 
     /**
+     * Get single work info by integer ID or RJ-code (e.g. RJ01234567 or 1234567).
+     */
+    suspend fun getWork(idOrRj: String): Result<AsmrOneWork> = withContext(Dispatchers.IO) {
+        try {
+            val digits = idOrRj.trim().replace(Regex("[^0-9]"), "")
+            val endpoint = if (digits.isNotEmpty()) "/api/work/$digits" else "/api/work/$idOrRj"
+            val responseBody = executeRequest(endpoint)
+            if (responseBody != null) {
+                val obj = JSONObject(responseBody)
+                val work = parseWorkJson(obj)
+                if (work != null) {
+                    return@withContext Result.success(work)
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback to search below
+        }
+
+        try {
+            val searchRes = searchWorks(idOrRj, page = 1, pageSize = 5)
+            searchRes.mapCatching { list ->
+                val cleanQuery = idOrRj.trim().uppercase()
+                list.firstOrNull { it.rjid.uppercase() == cleanQuery }
+                    ?: list.firstOrNull()
+                    ?: throw Exception("Work not found for $idOrRj")
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
      * Get file and folder tree for a work for KikoFlu-style Resource Files view.
      */
     suspend fun getWorkFileTree(workId: Int): Result<List<AsmrOneFileNode>> = withContext(Dispatchers.IO) {

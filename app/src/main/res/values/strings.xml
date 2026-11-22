@@ -599,4 +599,17 @@
     <string name="settings_cat_auto_translate">Auto-Translation</string>
     <string name="settings_speed_title">Default Playback Speed</string>
     <string name="settings_speed_desc">Default speed when starting audio playback</string>
+
+    <!-- Downloads, Tags, and Playlist Enhancements -->
+    <string name="download_merge_tracks_title">Merge Audio Tracks</string>
+    <string name="download_merge_tracks_desc">Fast remux all tracks into a single audio file. Turn off to download as original multi-track folder structure.</string>
+    <string name="download_merge_tracks_short">Merge Tracks</string>
+    <string name="download_source_flat_merged_log">Download source is JapaneseASMR. Automatically merging tracks into single file.</string>
+    <string name="download_format_autofallback_folder_log">Format %1$s does not support instant remuxing without re-encoding. Downloading safely as original folder structure.</string>
+    <string name="tag_filter_apply_count">Apply (%1$d)</string>
+    <string name="tag_filter_reset">Reset</string>
+    <string name="playlist_badge_offline">OFFLINE</string>
+    <string name="playlist_badge_online">ONLINE</string>
+    <string name="browse_action_view_detail">View Work Details</string>
+    <string name="error_wma_codec_unsupported">This work is in WMA format (legacy Windows archive) and this device does not have a native WMA decoder. We recommend playing via PC.</string>
 </resources>

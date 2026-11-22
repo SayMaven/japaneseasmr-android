@@ -127,6 +127,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         false
     )
 
+    val mergeDownloadedAudio = preferencesManager.mergeDownloadedAudioFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        true
+    )
+
     val translationLanguage = preferencesManager.translationLanguageFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
@@ -251,6 +257,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setCreateCueSheet(enabled: Boolean) {
         viewModelScope.launch {
             preferencesManager.setCreateCueSheet(enabled)
+        }
+    }
+
+    fun setMergeDownloadedAudio(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setMergeDownloadedAudio(enabled)
         }
     }
 

@@ -44,6 +44,9 @@ class QueueViewModel : ViewModel() {
     private val _showConsole = MutableStateFlow(true)
     val showConsole = _showConsole.asStateFlow()
 
+    private val _mergeDownloadedAudio = MutableStateFlow(true)
+    val mergeDownloadedAudio = _mergeDownloadedAudio.asStateFlow()
+
     private var previewJob: Job? = null
     private var lastProcessedClipboardText: String? = null
     private var isFirstResume = true
@@ -57,6 +60,11 @@ class QueueViewModel : ViewModel() {
             launch {
                 prefs.showConsoleFlow.collect {
                     _showConsole.value = it
+                }
+            }
+            launch {
+                prefs.mergeDownloadedAudioFlow.collect {
+                    _mergeDownloadedAudio.value = it
                 }
             }
             launch {
@@ -100,6 +108,14 @@ class QueueViewModel : ViewModel() {
         _showConsole.value = next
         viewModelScope.launch {
             PreferencesManager(context).setShowConsole(next)
+        }
+    }
+
+    fun toggleMergeDownloadedAudio(context: Context) {
+        val next = !_mergeDownloadedAudio.value
+        _mergeDownloadedAudio.value = next
+        viewModelScope.launch {
+            PreferencesManager(context).setMergeDownloadedAudio(next)
         }
     }
 
