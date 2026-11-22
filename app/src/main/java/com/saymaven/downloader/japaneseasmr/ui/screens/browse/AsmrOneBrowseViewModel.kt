@@ -58,6 +58,9 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
+    private val _selectedTags = MutableStateFlow<Set<String>>(emptySet())
+    val selectedTags = _selectedTags.asStateFlow()
+
     private val _currentTab = MutableStateFlow(BrowseTabType.ALL)
     val currentTab = _currentTab.asStateFlow()
 
@@ -138,6 +141,9 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
     private val _selectedWork = MutableStateFlow<AsmrOneWork?>(null)
     val selectedWork = _selectedWork.asStateFlow()
 
+    private val _isFetchingWorkDetail = MutableStateFlow(false)
+    val isFetchingWorkDetail = _isFetchingWorkDetail.asStateFlow()
+
     private val _workTracks = MutableStateFlow<List<AsmrOneTrack>>(emptyList())
     val workTracks = _workTracks.asStateFlow()
 
@@ -173,9 +179,10 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun setTab(tab: BrowseTabType) {
-        if (_currentTab.value == tab && _searchQuery.value.isEmpty()) return
+        if (_currentTab.value == tab && _searchQuery.value.isEmpty() && _selectedTags.value.isEmpty()) return
         _currentTab.value = tab
         _searchQuery.value = ""
+        _selectedTags.value = emptySet()
         when (tab) {
             BrowseTabType.ALL -> {
                 _sortField.value = AsmrSortField.RELEASE_DATE
@@ -215,6 +222,24 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    fun setTagFilters(tags: Set<String>) {
+        _selectedTags.value = tags
+        _currentPage.value = 1
+        loadPage(1)
+    }
+
+    fun removeTagFilter(tag: String) {
+        _selectedTags.value = _selectedTags.value - tag
+        _currentPage.value = 1
+        loadPage(1)
+    }
+
+    fun clearTagFilters() {
+        _selectedTags.value = emptySet()
+        _currentPage.value = 1
+        loadPage(1)
+    }
+
     fun goToPage(page: Int) {
         if (page < 1 || page == _currentPage.value) return
         _currentPage.value = page
@@ -226,7 +251,14 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
             _isLoading.value = true
             _errorMessage.value = null
 
-            val query = _searchQuery.value.trim()
+            val rawQuery = _searchQuery.value.trim()
+            val tagQuery = _selectedTags.value.joinToString(" ")
+            val query = when {
+                rawQuery.isNotBlank() && tagQuery.isNotBlank() -> "$rawQuery $tagQuery"
+                rawQuery.isNotBlank() -> rawQuery
+                tagQuery.isNotBlank() -> tagQuery
+                else -> ""
+            }
             val isAllAges = _sortField.value == AsmrSortField.ALL_AGES
             val orderParam = if (isAllAges) "nsfw" else _sortField.value.apiValue
             val sortParam = if (isAllAges) "asc" else _sortDirection.value.apiValue
@@ -287,21 +319,26 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
         _workTracks.value = emptyList()
         _fileTree.value = emptyList()
         _tracksError.value = null
+        _isFetchingWorkDetail.value = false
         if (work != null) {
             loadWorkDetails(work.id)
         }
     }
 
-    fun selectWorkByRjid(rjid: String) {
+    fun selectWorkByRjid(rjid: String, onNotFound: (() -> Unit)? = null) {
         viewModelScope.launch {
-            _isLoading.value = true
+            _isFetchingWorkDetail.value = true
             val res = AsmrOneApiService.getWork(rjid)
             res.onSuccess { work ->
                 selectWork(work)
             }.onFailure {
-                onSearchQueryChange(rjid)
+                _isFetchingWorkDetail.value = false
+                if (onNotFound != null) {
+                    onNotFound()
+                } else {
+                    onSearchQueryChange(rjid)
+                }
             }
-            _isLoading.value = false
         }
     }
 

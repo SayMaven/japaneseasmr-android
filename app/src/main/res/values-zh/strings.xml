@@ -413,6 +413,7 @@
     <string name="browse_action_download">下载作品</string>
     <string name="browse_toast_rj_copied">RJ 号已复制: %1$s</string>
     <string name="browse_toast_enqueued">已加入下载队列: %1$s</string>
+    <string name="browse_work_not_found">未找到 %1$s 的作品详情。</string>
     <string name="browse_empty_title">未找到相关作品</string>
     <string name="browse_empty_desc">请尝试使用其他关键词或筛选条件。</string>
     <string name="browse_error_title">连接服务器失败</string>
@@ -421,7 +422,7 @@
     <!-- 作品更多操作菜单与音频规格 -->
     <string name="player_menu_more">作品操作</string>
     <string name="player_menu_copy_rj">复制 RJ 号</string>
-    <string name="player_menu_audio_info">音频规格详情</string>
+    <string name="player_menu_audio_info">音频文件信息</string>
     <string name="player_menu_play_now">从头播放</string>
     <string name="player_menu_delete">从存储中删除</string>
     <string name="player_audio_info_title">音频文件详情</string>
@@ -486,6 +487,7 @@
     <string name="playlist_dialog_delete">删除播放列表</string>
     <string name="playlist_dialog_name_hint">播放列表名称</string>
     <string name="playlist_empty">暂无播放列表</string>
+    <string name="playlist_items_empty">此播放列表暂无作品。</string>
     <string name="playlist_item_count">共 %1$d 部作品</string>
     <string name="playlist_added_toast">已添加到 %1$s</string>
     <string name="playlist_removed_toast">已从 %1$s 移除</string>
@@ -608,7 +610,7 @@
 
     <!-- Downloads, Tags, and Playlist Enhancements -->
     <string name="download_merge_tracks_title">合并音频轨道</string>
-    <string name="download_merge_tracks_desc">将所有音轨快速合并为一个文件。关闭则按原始多音轨文件夹结构下载。</string>
+    <string name="download_merge_tracks_desc">将所有音频合并为单个文件。关闭则按文件夹分别下载。</string>
     <string name="download_merge_tracks_short">合并音轨</string>
     <string name="download_source_flat_merged_log">下载来源为JapaneseASMR，自动合并为单文件。</string>
     <string name="download_format_autofallback_folder_log">%1$s格式不支持无损快速合并，将以原始多音轨目录安全下载。</string>

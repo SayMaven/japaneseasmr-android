@@ -296,7 +296,7 @@ object AsmrOneApiService {
         subtitle: Int = 0
     ): Result<AsmrOneWorksPage> = withContext(Dispatchers.IO) {
         try {
-            val encodedKeyword = URLEncoder.encode(keyword.trim(), "UTF-8")
+            val encodedKeyword = URLEncoder.encode(keyword.trim(), "UTF-8").replace("+", "%20")
             val endpoint = "/api/search/$encodedKeyword?page=$page&pageSize=$pageSize&subtitle=$subtitle"
             val responseBody = executeRequest(endpoint)
                 ?: return@withContext Result.failure(Exception("Failed to search works from server"))

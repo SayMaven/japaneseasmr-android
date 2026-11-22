@@ -132,8 +132,9 @@ fun PlaylistScreen(
                     val filterJp = TagLocalizer.getJapaneseName(filterTag)
                     itemGenres.any { g ->
                         g.equals(filterTag, ignoreCase = true) ||
-                        (filterJp != null && g.equals(filterJp, ignoreCase = true)) ||
-                        TagLocalizer.localize(null, g).equals(filterEn, ignoreCase = true)
+                        (filterJp != null && (g.equals(filterJp, ignoreCase = true) || g.contains(filterJp, ignoreCase = true))) ||
+                        TagLocalizer.localize(null, g).equals(filterEn, ignoreCase = true) ||
+                        (filterEn.isNotBlank() && TagLocalizer.localize(null, g).contains(filterEn, ignoreCase = true))
                     }
                 }
             }
@@ -453,7 +454,7 @@ fun PlaylistScreen(
             if (selectedUserPlaylist != null) {
                 BackHandler { selectedUserPlaylist = null }
                 val currentPl = selectedUserPlaylist!!
-                val playlistItems by viewModel.getItemsForPlaylist(currentPl.id).collectAsState(emptyList())
+                val playlistItems by viewModel.getItemsForPlaylist(currentPl.id).collectAsState(initial = null)
 
                 Column(
                     modifier = Modifier
@@ -481,16 +482,18 @@ fun PlaylistScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Text(
-                                text = stringResource(R.string.playlist_item_count, playlistItems.size),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (playlistItems != null) {
+                                Text(
+                                    text = stringResource(R.string.playlist_item_count, playlistItems!!.size),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                        if (playlistItems.isNotEmpty()) {
+                        if (!playlistItems.isNullOrEmpty()) {
                             FilledTonalButton(
                                 onClick = {
-                                    viewModel.playPlaylistItem(playlistItems.first())
+                                    viewModel.playPlaylistItem(playlistItems!!.first())
                                     onOpenPlayer()
                                 }
                             ) {
@@ -501,7 +504,20 @@ fun PlaylistScreen(
                         }
                     }
 
-                    if (playlistItems.isEmpty()) {
+                    if (playlistItems == null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                strokeWidth = 2.5.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                            )
+                        }
+                    } else if (playlistItems!!.isEmpty()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -509,12 +525,13 @@ fun PlaylistScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = stringResource(R.string.playlist_empty),
+                                text = stringResource(R.string.playlist_items_empty),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     } else if (isGridMode) {
+                        val itemsList = playlistItems!!
                         LazyVerticalStaggeredGrid(
                             columns = StaggeredGridCells.Fixed(2),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -522,7 +539,7 @@ fun PlaylistScreen(
                             contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(playlistItems, key = { it.id }) { item ->
+                            items(itemsList, key = { it.id }) { item ->
                                 val isCurrentTrack = (item.rjid == currentRjId)
                                 val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
                                 val isOffline = allDownloadedRjids.contains(item.rjid.uppercase())
@@ -551,12 +568,13 @@ fun PlaylistScreen(
                             }
                         }
                     } else {
+                        val itemsList = playlistItems ?: emptyList()
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp)
                         ) {
-                            items(playlistItems, key = { it.id }) { item ->
+                            items(itemsList, key = { it.id }) { item ->
                                 val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
                                 val isOffline = allDownloadedRjids.contains(item.rjid.uppercase())
                                 PlaylistItemRow(
@@ -799,7 +817,8 @@ fun PlaylistScreen(
                                         onCopyRj = { onCopyRjClick(item) },
                                         onAudioInfo = { onAudioInfoClick(item) },
                                         onDelete = { onDeleteClick(item) },
-                                        onAddToPlaylist = { workForPlaylist = item }
+                                        onAddToPlaylist = { workForPlaylist = item },
+                                        onViewDetail = { onViewWorkDetail(item.linkedRjId ?: item.rjid) }
                                     )
                                 }
 
@@ -838,7 +857,8 @@ fun PlaylistScreen(
                                         onCopyRj = { onCopyRjClick(item) },
                                         onAudioInfo = { onAudioInfoClick(item) },
                                         onDelete = { onDeleteClick(item) },
-                                        onAddToPlaylist = { workForPlaylist = item }
+                                        onAddToPlaylist = { workForPlaylist = item },
+                                        onViewDetail = { onViewWorkDetail(item.linkedRjId ?: item.rjid) }
                                     )
                                 }
 
@@ -1082,6 +1102,7 @@ fun PlaylistScreen(
         val fieldOptions = remember {
             listOf(
                 SortOptionItem(value = PlaylistSortType.DATE, labelRes = R.string.playlist_sort_date),
+                SortOptionItem(value = PlaylistSortType.ALL_AGES, labelRes = R.string.browse_sort_all_ages),
                 SortOptionItem(value = PlaylistSortType.TITLE, labelRes = R.string.playlist_sort_title),
                 SortOptionItem(value = PlaylistSortType.DURATION, labelRes = R.string.playlist_sort_duration),
                 SortOptionItem(value = PlaylistSortType.RJID, labelRes = R.string.playlist_sort_rj),
@@ -1959,6 +1980,7 @@ fun LocalWorkPinterestCard(
     onAudioInfo: () -> Unit,
     onDelete: () -> Unit,
     onAddToPlaylist: () -> Unit = {},
+    onViewDetail: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -2232,6 +2254,19 @@ fun LocalWorkPinterestCard(
                             expanded = isMenuExpanded,
                             onDismissRequest = { isMenuExpanded = false }
                         ) {
+                            if (onViewDetail != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.browse_action_view_detail)) },
+                                    onClick = {
+                                        isMenuExpanded = false
+                                        onViewDetail()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Info, contentDescription = null)
+                                    }
+                                )
+                            }
+
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.browse_action_add_to_playlist)) },
                                 onClick = {
@@ -2239,7 +2274,7 @@ fun LocalWorkPinterestCard(
                                     onAddToPlaylist()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.PlaylistAdd, contentDescription = null)
+                                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null)
                                 }
                             )
 
@@ -2272,7 +2307,7 @@ fun LocalWorkPinterestCard(
                                     onAudioInfo()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Info, contentDescription = null)
+                                    Icon(Icons.Default.AudioFile, contentDescription = null)
                                 }
                             )
 
@@ -2332,7 +2367,8 @@ fun LocalWorkListViewItem(
     onCopyRj: () -> Unit,
     onAudioInfo: () -> Unit,
     onDelete: () -> Unit,
-    onAddToPlaylist: () -> Unit = {}
+    onAddToPlaylist: () -> Unit = {},
+    onViewDetail: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var isMenuExpanded by remember { mutableStateOf(false) }
@@ -2606,6 +2642,19 @@ fun LocalWorkListViewItem(
                         expanded = isMenuExpanded,
                         onDismissRequest = { isMenuExpanded = false }
                     ) {
+                        if (onViewDetail != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.browse_action_view_detail)) },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onViewDetail()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Info, contentDescription = null)
+                                }
+                            )
+                        }
+
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.browse_action_add_to_playlist)) },
                             onClick = {
@@ -2613,7 +2662,7 @@ fun LocalWorkListViewItem(
                                 onAddToPlaylist()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.PlaylistAdd, contentDescription = null)
+                                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null)
                             }
                         )
 
@@ -2649,7 +2698,7 @@ fun LocalWorkListViewItem(
                                 onAudioInfo()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.Info, contentDescription = null)
+                                Icon(Icons.Default.AudioFile, contentDescription = null)
                             }
                         )
 
@@ -2869,7 +2918,7 @@ fun PlaylistItemCard(
                             onAudioInfo()
                         },
                         leadingIcon = {
-                            Icon(Icons.Default.Info, contentDescription = null)
+                            Icon(Icons.Default.AudioFile, contentDescription = null)
                         }
                     )
 

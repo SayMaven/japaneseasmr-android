@@ -46,7 +46,14 @@ fun AudioFormatSettingsScreen(
     val autoResume by viewModel.autoResume.collectAsState()
 
     val formatList = remember(rawPriority) {
-        rawPriority.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        val list = rawPriority.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toMutableList()
+        if (list.contains("m4a") && list.contains("aac")) {
+            list.remove("aac")
+        } else if (!list.contains("m4a") && list.contains("aac")) {
+            val idx = list.indexOf("aac")
+            list[idx] = "m4a"
+        }
+        list
     }
 
     fun getFormatLabel(formatKey: String): String {
@@ -90,7 +97,7 @@ fun AudioFormatSettingsScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        viewModel.setAudioFormatPriority("mp3_se,mp3,flac,wav,opus,m4a,aac")
+                        viewModel.setAudioFormatPriority("mp3_se,mp3,flac,wav,opus,m4a")
                         viewModel.setAudioPreloadSeconds(15)
                         viewModel.setAudioGainDb(0f)
                         viewModel.setDefaultSpeed(1.0f)

@@ -413,6 +413,7 @@
     <string name="browse_action_download">作品をダウンロード</string>
     <string name="browse_toast_rj_copied">RJコードをコピーしました: %1$s</string>
     <string name="browse_toast_enqueued">キューに追加しました: %1$s</string>
+    <string name="browse_work_not_found">%1$s の作品詳細が見つかりませんでした。</string>
     <string name="browse_empty_title">作品が見つかりません</string>
     <string name="browse_empty_desc">別のキーワードやフィルターをお試しください。</string>
     <string name="browse_error_title">サーバーに接続できません</string>
@@ -421,7 +422,7 @@
     <!-- 作品オーバーフローメニュー（3点リーダー）＆オーディオ詳細 -->
     <string name="player_menu_more">作品オプション</string>
     <string name="player_menu_copy_rj">RJコードをコピー</string>
-    <string name="player_menu_audio_info">音声フォーマット詳細</string>
+    <string name="player_menu_audio_info">音声ファイル情報</string>
     <string name="player_menu_play_now">最初から再生</string>
     <string name="player_menu_delete">ストレージから削除</string>
     <string name="player_audio_info_title">音声ファイル仕様</string>
@@ -486,6 +487,7 @@
     <string name="playlist_dialog_delete">プレイリストを削除</string>
     <string name="playlist_dialog_name_hint">プレイリスト名</string>
     <string name="playlist_empty">プレイリストがありません</string>
+    <string name="playlist_items_empty">このプレイリストには作品がありません。</string>
     <string name="playlist_item_count">合計 %1$d 件</string>
     <string name="playlist_added_toast">%1$s に追加しました</string>
     <string name="playlist_removed_toast">%1$s から削除しました</string>
@@ -608,7 +610,7 @@
 
     <!-- Downloads, Tags, and Playlist Enhancements -->
     <string name="download_merge_tracks_title">音声を1つに結合</string>
-    <string name="download_merge_tracks_desc">全トラックを1つの音声ファイルに高速統合。オフ時は元のフォルダ構造で保存します。</string>
+    <string name="download_merge_tracks_desc">全音声を1つのファイルに結合。オフ時はフォルダごとに保存。</string>
     <string name="download_merge_tracks_short">トラック結合</string>
     <string name="download_source_flat_merged_log">JapaneseASMRからのダウンロードのため、1つのファイルに自動結合します。</string>
     <string name="download_format_autofallback_folder_log">%1$s形式は無再エンコード結合に非対応です。安全のため元のフォルダ構造でダウンロードします。</string>

@@ -136,41 +136,6 @@ fun QueueScreen(
             }
         }
 
-        // ================= 0b. MERGE AUDIO DOWNLOAD OPTION CARD =================
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.download_merge_tracks_title),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = stringResource(R.string.download_merge_tracks_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Switch(
-                        checked = mergeDownloadedAudio,
-                        onCheckedChange = { viewModel.toggleMergeDownloadedAudio(context) }
-                    )
-                }
-            }
-        }
-
         // ================= 1. INPUT CARD =================
         item {
             Card(
@@ -330,7 +295,42 @@ fun QueueScreen(
             }
         }
 
-        // ================= 2. QUEUE LIST SECTION =================
+        // ================= 2. MERGE AUDIO DOWNLOAD OPTION CARD =================
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.download_merge_tracks_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.download_merge_tracks_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Switch(
+                        checked = mergeDownloadedAudio,
+                        onCheckedChange = { viewModel.toggleMergeDownloadedAudio(context) }
+                    )
+                }
+            }
+        }
+
+        // ================= 3. QUEUE LIST SECTION =================
         if (queue.isEmpty()) {
             item {
                 Card(

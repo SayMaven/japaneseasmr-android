@@ -147,7 +147,7 @@ object DLsiteScraper {
                                 }
                             }
                             if (tagNames.isNotEmpty()) {
-                                curGenre = tagNames.take(6).joinToString(", ")
+                                curGenre = tagNames.take(30).joinToString(", ")
                             }
                         }
                     }
@@ -293,7 +293,7 @@ object DLsiteScraper {
                 // 4. Ambil Genre / Tags
                 val genreRows = doc.select("th:matches(ジャンル) + td a")
                 if (genreRows.isNotEmpty()) {
-                    genre = genreRows.eachText().take(6).joinToString(", ")
+                    genre = genreRows.eachText().take(30).joinToString(", ")
                 }
 
                 // 5. Ambil Age Rating

@@ -407,6 +407,7 @@
     <string name="browse_action_download">Download Work</string>
     <string name="browse_toast_rj_copied">RJ Code copied: %1$s</string>
     <string name="browse_toast_enqueued">Added to queue: %1$s</string>
+    <string name="browse_work_not_found">Work details for %1$s not found.</string>
     <string name="browse_empty_title">No works found</string>
     <string name="browse_empty_desc">Try searching with a different keyword or filter.</string>
     <string name="browse_error_title">Failed to connect to asmr server</string>
@@ -415,7 +416,7 @@
     <!-- Work Overflow Menu (3-dots) & Audio Specs -->
     <string name="player_menu_more">Work Options</string>
     <string name="player_menu_copy_rj">Copy RJ Code</string>
-    <string name="player_menu_audio_info">Audio Format Details</string>
+    <string name="player_menu_audio_info">Audio File Information</string>
     <string name="player_menu_play_now">Play from Beginning</string>
     <string name="player_menu_delete">Delete from Storage</string>
     <string name="player_audio_info_title">Audio File Specification</string>
@@ -480,6 +481,7 @@
     <string name="playlist_dialog_delete">Delete Playlist</string>
     <string name="playlist_dialog_name_hint">Playlist name</string>
     <string name="playlist_empty">No playlists yet</string>
+    <string name="playlist_items_empty">This playlist is empty.</string>
     <string name="playlist_item_count">%1$d items</string>
     <string name="playlist_added_toast">Added to %1$s</string>
     <string name="playlist_removed_toast">Removed from %1$s</string>
@@ -602,7 +604,7 @@
 
     <!-- Downloads, Tags, and Playlist Enhancements -->
     <string name="download_merge_tracks_title">Merge Audio Tracks</string>
-    <string name="download_merge_tracks_desc">Fast remux all tracks into a single audio file. Turn off to download as original multi-track folder structure.</string>
+    <string name="download_merge_tracks_desc">Merge all audio tracks into 1 file. Turn off to download as separate folders.</string>
     <string name="download_merge_tracks_short">Merge Tracks</string>
     <string name="download_source_flat_merged_log">Download source is JapaneseASMR. Automatically merging tracks into single file.</string>
     <string name="download_format_autofallback_folder_log">Format %1$s does not support instant remuxing without re-encoding. Downloading safely as original folder structure.</string>

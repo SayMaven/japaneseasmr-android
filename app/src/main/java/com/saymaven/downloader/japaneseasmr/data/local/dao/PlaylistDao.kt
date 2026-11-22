@@ -42,4 +42,7 @@ interface PlaylistDao {
 
     @Query("SELECT COUNT(*) FROM playlist_items WHERE playlistId = :playlistId")
     fun getItemCountFlow(playlistId: Long): Flow<Int>
+
+    @Query("SELECT * FROM playlist_items")
+    suspend fun getAllPlaylistItemsDirect(): List<PlaylistItemEntity>
 }

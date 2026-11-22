@@ -73,7 +73,8 @@ enum class PlaylistSortType {
     DATE,
     TITLE,
     DURATION,
-    RJID
+    RJID,
+    ALL_AGES
 }
 
 data class PlaylistSortState(
@@ -282,6 +283,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     folderFiltered.sortedBy { it.rjid.filter { c -> c.isDigit() }.toLongOrNull() ?: 0L }
                 } else {
                     folderFiltered.sortedByDescending { it.rjid.filter { c -> c.isDigit() }.toLongOrNull() ?: 0L }
+                }
+            }
+            PlaylistSortType.ALL_AGES -> {
+                fun getAgeScore(rating: String?): Int = when (rating?.uppercase()?.trim()) {
+                    "SAFE", "ALL", "ALL AGES", "全年齢", "全年龄" -> 0
+                    "R-15", "R15" -> 1
+                    "R-18", "R18" -> 2
+                    else -> 3
+                }
+                if (sort.isAscending) {
+                    folderFiltered.sortedBy { getAgeScore(it.ageRating) }
+                } else {
+                    folderFiltered.sortedByDescending { getAgeScore(it.ageRating) }
                 }
             }
         }
@@ -785,26 +799,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun observeTranslationPreference() {
         viewModelScope.launch {
-            prefs.isTranslationActiveFlow.distinctUntilChanged().collect { active ->
-                _isTranslationActive.value = active
-                if (active) {
-                    val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-                    translatePlaylistTitles(targetLang)
-                    if (!_currentRjId.value.isNullOrBlank()) {
-                        loadOrFetchTranslations(_currentRjId.value)
-                    }
-                }
-            }
-        }
-        viewModelScope.launch {
             prefs.autoTranslateListsFlow.distinctUntilChanged().collect { autoActive ->
+                _isTranslationActive.value = autoActive
                 if (autoActive) {
-                    if (!_isTranslationActive.value) {
-                        _isTranslationActive.value = true
-                        prefs.setTranslationActive(true)
-                    }
                     val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
                     translatePlaylistTitles(targetLang)
+                } else {
+                    _playlistTranslatedTitles.value = emptyMap()
                 }
             }
         }
@@ -815,7 +816,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     isFirstLang = false
                     return@collect
                 }
-                if (_isTranslationActive.value && !_currentRjId.value.isNullOrBlank()) {
+                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+                if (_isTranslationActive.value) {
+                    _playlistTranslatedTitles.value = emptyMap()
+                    translatePlaylistTitles(targetLang)
+                }
+                if (!_currentRjId.value.isNullOrBlank()) {
                     loadOrFetchTranslations(_currentRjId.value, forceOnline = true)
                 }
             }
@@ -2076,7 +2082,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val next = !_isTranslationActive.value
         _isTranslationActive.value = next
         viewModelScope.launch {
-            prefs.setTranslationActive(next)
             if (next) {
                 val targetLang = TranslationService.getActiveTargetLanguage(context ?: getApplication())
                 translatePlaylistTitles(targetLang)
@@ -2091,21 +2096,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun translatePlaylistTitles(targetLang: String) {
+    fun translatePlaylistTitles(targetLang: String = TranslationService.getActiveTargetLanguage(getApplication())) {
         viewModelScope.launch(Dispatchers.IO) {
-            val items = _playlist.value
+            val localItems = _playlist.value
+            val playlistItems = try { playlistDao.getAllPlaylistItemsDirect() } catch (_: Exception) { emptyList() }
+
+            val allRjAndTitles = mutableMapOf<String, String>()
+            localItems.forEach { allRjAndTitles[it.rjid] = it.title }
+            playlistItems.forEach { allRjAndTitles[it.rjid] = it.title }
+
             val currentMap = _playlistTranslatedTitles.value.toMutableMap()
-            items.forEach { item ->
-                if (!currentMap.containsKey(item.rjid)) {
-                    val dbHistory = historyDao.getHistoryById(item.rjid)
-                    if (!dbHistory?.translatedTitle.isNullOrBlank()) {
-                        currentMap[item.rjid] = dbHistory!!.translatedTitle!!
-                    } else {
-                        val translated = TranslationService.translateText(item.title, targetLang)
-                        if (translated.isNotBlank() && translated != item.title) {
-                            currentMap[item.rjid] = translated
-                            historyDao.updateTranslations(item.rjid, translated, dbHistory?.translatedChaptersJson)
-                        }
+            allRjAndTitles.forEach { (rjid, title) ->
+                val translated = TranslationService.translateText(title, targetLang)
+                if (translated.isNotBlank() && translated != title) {
+                    currentMap[rjid] = translated
+                    val dbHistory = historyDao.getHistoryById(rjid)
+                    if (dbHistory != null) {
+                        historyDao.updateTranslations(rjid, translated, dbHistory.translatedChaptersJson)
                     }
                 }
             }

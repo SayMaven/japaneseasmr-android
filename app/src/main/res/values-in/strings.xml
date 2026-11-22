@@ -407,6 +407,7 @@
     <string name="browse_action_download">Unduh Karya</string>
     <string name="browse_toast_rj_copied">Kode RJ disalin: %1$s</string>
     <string name="browse_toast_enqueued">Ditambahkan ke antrean: %1$s</string>
+    <string name="browse_work_not_found">Detail karya %1$s tidak ditemukan.</string>
     <string name="browse_empty_title">Karya tidak ditemukan</string>
     <string name="browse_empty_desc">Coba gunakan kata kunci atau filter lain.</string>
     <string name="browse_error_title">Gagal terhubung ke server asmr</string>
@@ -415,7 +416,7 @@
     <!-- Menu Titik Tiga (Overflow Menu) & Info Audio -->
     <string name="player_menu_more">Opsi Karya</string>
     <string name="player_menu_copy_rj">Salin Kode RJ</string>
-    <string name="player_menu_audio_info">Detail Format Audio</string>
+    <string name="player_menu_audio_info">Informasi Berkas Audio</string>
     <string name="player_menu_play_now">Putar dari Awal</string>
     <string name="player_menu_delete">Hapus dari Penyimpanan</string>
     <string name="player_audio_info_title">Spesifikasi Berkas Audio</string>
@@ -480,6 +481,7 @@
     <string name="playlist_dialog_delete">Hapus Playlist</string>
     <string name="playlist_dialog_name_hint">Nama playlist</string>
     <string name="playlist_empty">Belum ada playlist</string>
+    <string name="playlist_items_empty">Playlist ini masih kosong.</string>
     <string name="playlist_item_count">%1$d karya</string>
     <string name="playlist_added_toast">Ditambahkan ke %1$s</string>
     <string name="playlist_removed_toast">Dihapus dari %1$s</string>
@@ -602,7 +604,7 @@
 
     <!-- Downloads, Tags, and Playlist Enhancements -->
     <string name="download_merge_tracks_title">Gabungkan Trek Audio</string>
-    <string name="download_merge_tracks_desc">Fast remux seluruh trek menjadi 1 berkas audio. Matikan untuk mengunduh struktur folder multi-track asli.</string>
+    <string name="download_merge_tracks_desc">Gabungkan semua audio menjadi 1 file. Matikan untuk mengunduh per folder.</string>
     <string name="download_merge_tracks_short">Gabung Trek</string>
     <string name="download_source_flat_merged_log">Sumber unduhan dari JapaneseASMR. Trek otomatis digabungkan menjadi satu berkas.</string>
     <string name="download_format_autofallback_folder_log">Format %1$s tidak mendukung penggabungan instan tanpa kompresi ulang. Mengunduh secara aman sebagai struktur folder asli.</string>

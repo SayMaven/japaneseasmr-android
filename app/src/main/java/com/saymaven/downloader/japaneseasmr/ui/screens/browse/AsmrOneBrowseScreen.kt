@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -75,13 +74,9 @@ fun AsmrOneBrowseScreen(
     val totalPages by viewModel.totalPages.collectAsState()
     val totalCount by viewModel.totalCount.collectAsState()
 
-    val selectedWork by viewModel.selectedWork.collectAsState()
-    val workTracks by viewModel.workTracks.collectAsState()
-    val fileTree by viewModel.fileTree.collectAsState()
-    val isLoadingTracks by viewModel.isLoadingTracks.collectAsState()
-
     val isTranslationActive by viewModel.isTranslationActive.collectAsState()
     val translatedTitles by viewModel.translatedTitles.collectAsState()
+    val selectedTags by viewModel.selectedTags.collectAsState()
 
     // Persistent View Mode
     val browseViewMode by viewModel.browseViewMode.collectAsState()
@@ -101,16 +96,6 @@ fun AsmrOneBrowseScreen(
     val showCardCircle by viewModel.showCardCircle.collectAsState()
     val showCardSubtitle by viewModel.showCardSubtitle.collectAsState()
     val showCardAgeRating by viewModel.showCardAgeRating.collectAsState()
-
-    // Work Detail Display Toggles from UI settings
-    val showDetailRating by viewModel.showDetailRating.collectAsState()
-    val showDetailPrice by viewModel.showDetailPrice.collectAsState()
-    val showDetailDuration by viewModel.showDetailDuration.collectAsState()
-    val showDetailSales by viewModel.showDetailSales.collectAsState()
-    val showDetailReleaseDate by viewModel.showDetailReleaseDate.collectAsState()
-    val showDetailTranslateBtn by viewModel.showDetailTranslateBtn.collectAsState()
-    val showDetailSubtitle by viewModel.showDetailSubtitle.collectAsState()
-    val showDetailAgeRating by viewModel.showDetailAgeRating.collectAsState()
 
     var isSearchExpanded by remember { mutableStateOf(false) }
     var showSortSheet by remember { mutableStateOf(false) }
@@ -155,41 +140,6 @@ fun AsmrOneBrowseScreen(
                 viewModel.scrollOffset = listState.firstVisibleItemScrollOffset
             }
         }
-    }
-
-    // If a work is selected, show KikoFlu-style full Work Detail screen
-    if (selectedWork != null) {
-        val work = selectedWork!!
-        BackHandler {
-            viewModel.selectWork(null)
-        }
-        AsmrOneWorkDetailScreen(
-            work = work,
-            fileTree = fileTree,
-            audioTracks = workTracks,
-            isLoadingFiles = isLoadingTracks,
-            playerViewModel = playerViewModel,
-            showRating = showDetailRating,
-            showPrice = showDetailPrice,
-            showDuration = showDetailDuration,
-            showSales = showDetailSales,
-            showReleaseDate = showDetailReleaseDate,
-            showTranslateBtn = showDetailTranslateBtn,
-            showSubtitle = showDetailSubtitle,
-            showAgeRating = showDetailAgeRating,
-            onBack = { viewModel.selectWork(null) },
-            onOpenPlayer = onOpenPlayer,
-            onDownload = {
-                viewModel.enqueueDownload(work)
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.browse_toast_enqueued, work.rjid),
-                    Toast.LENGTH_SHORT
-                ).show()
-            },
-            modifier = modifier
-        )
-        return
     }
 
     Column(
@@ -395,7 +345,8 @@ fun AsmrOneBrowseScreen(
         }
 
         // Active Search / Sort / Filter Chip Bar
-        if (searchQuery.isNotEmpty() || sortField != AsmrSortField.RELEASE_DATE) {
+        val hasActiveFilters = searchQuery.isNotEmpty() || selectedTags.isNotEmpty() || sortField != AsmrSortField.RELEASE_DATE
+        if (hasActiveFilters) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -405,51 +356,46 @@ fun AsmrOneBrowseScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (searchQuery.isNotEmpty()) {
-                    val searchParts = searchQuery.split("\\s+".toRegex()).filter { it.isNotBlank() }
-                    if (searchParts.size > 1) {
-                        searchParts.forEach { part ->
-                            InputChip(
-                                selected = true,
-                                onClick = {
-                                    val remaining = searchParts.filter { it != part }.joinToString(" ")
-                                    viewModel.onSearchQueryChange(remaining)
-                                },
-                                label = { Text(part) },
-                                trailingIcon = {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Remove $part",
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
+                    InputChip(
+                        selected = true,
+                        onClick = { viewModel.onSearchQueryChange("") },
+                        label = { Text("\"$searchQuery\"") },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Clear Search",
+                                modifier = Modifier.size(14.dp)
                             )
                         }
-                        InputChip(
-                            selected = false,
-                            onClick = { viewModel.onSearchQueryChange("") },
-                            label = { Text(stringResource(R.string.tag_filter_reset)) },
-                            trailingIcon = {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Clear All",
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        )
-                    } else {
-                        InputChip(
-                            selected = true,
-                            onClick = { viewModel.onSearchQueryChange("") },
-                            label = { Text("\"$searchQuery\"") },
-                            trailingIcon = {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Clear",
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        )
-                    }
+                    )
+                }
+                selectedTags.forEach { tag ->
+                    InputChip(
+                        selected = true,
+                        onClick = { viewModel.removeTagFilter(tag) },
+                        label = { Text(tag) },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Remove $tag",
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    )
+                }
+                if (selectedTags.size > 1) {
+                    InputChip(
+                        selected = false,
+                        onClick = { viewModel.clearTagFilters() },
+                        label = { Text(stringResource(R.string.tag_filter_reset)) },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Clear All Tags",
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    )
                 }
                 if (sortField != AsmrSortField.RELEASE_DATE) {
                     InputChip(
@@ -752,14 +698,10 @@ fun AsmrOneBrowseScreen(
 
     // Tag Filter Sheet
     if (showTagFilterSheet) {
-        val currentTags = remember(searchQuery) {
-            if (searchQuery.isBlank()) emptySet()
-            else searchQuery.split("\\s+".toRegex()).filter { it.isNotBlank() }.toSet()
-        }
         TagFilterSheet(
-            initialSelectedTags = currentTags,
+            initialSelectedTags = selectedTags,
             onApplyTags = { tags ->
-                viewModel.onSearchQueryChange(tags.joinToString(" "))
+                viewModel.setTagFilters(tags)
                 showTagFilterSheet = false
             },
             onDismiss = { showTagFilterSheet = false }

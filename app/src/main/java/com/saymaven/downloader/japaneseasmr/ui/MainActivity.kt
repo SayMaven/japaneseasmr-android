@@ -50,6 +50,8 @@ import com.saymaven.downloader.japaneseasmr.ui.screens.settings.SettingsScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.settings.SettingsViewModel
 import com.saymaven.downloader.japaneseasmr.ui.screens.browse.AsmrOneBrowseScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.browse.AsmrOneBrowseViewModel
+import com.saymaven.downloader.japaneseasmr.data.model.AsmrOneWork
+import com.saymaven.downloader.japaneseasmr.ui.screens.browse.AsmrOneWorkDetailScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Explore
@@ -120,6 +122,8 @@ class MainActivity : ComponentActivity() {
             val colorPalette by settingsViewModel.colorPalette.collectAsState()
             val appLanguage by settingsViewModel.appLanguage.collectAsState()
 
+            val selectedWork by browseViewModel.selectedWork.collectAsState()
+
             val baseContext = LocalContext.current
             val localizedConfig = remember(appLanguage) {
                 LocaleHelper.getLocalizedConfiguration(baseContext, appLanguage)
@@ -174,7 +178,11 @@ class MainActivity : ComponentActivity() {
                     drawerScope.launch { drawerState.close() }
                 }
 
-                BackHandler(enabled = !drawerState.isOpen && currentTab == NavTab.SETTINGS) {
+                BackHandler(enabled = !drawerState.isOpen && selectedWork != null) {
+                    browseViewModel.selectWork(null)
+                }
+
+                BackHandler(enabled = !drawerState.isOpen && selectedWork == null && currentTab == NavTab.SETTINGS) {
                     currentTab = NavTab.HOME
                 }
 
@@ -190,7 +198,7 @@ class MainActivity : ComponentActivity() {
 
                 ModalNavigationDrawer(
                     drawerState = drawerState,
-                    gesturesEnabled = !isPlayerExpanded,
+                    gesturesEnabled = !isPlayerExpanded && selectedWork == null,
                     drawerContent = {
                         ModalDrawerSheet(
                             modifier = Modifier.width(300.dp),
@@ -214,18 +222,6 @@ class MainActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.secondaryContainer
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.drawer_audio_engine_status),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
                             }
 
                             HorizontalDivider()
@@ -238,6 +234,7 @@ class MainActivity : ComponentActivity() {
                                 shape = drawerItemShape,
                                 colors = drawerItemColors,
                                 onClick = {
+                                    browseViewModel.selectWork(null)
                                     currentTab = NavTab.HOME
                                     drawerScope.launch { drawerState.close() }
                                 },
@@ -251,6 +248,7 @@ class MainActivity : ComponentActivity() {
                                 shape = drawerItemShape,
                                 colors = drawerItemColors,
                                 onClick = {
+                                    browseViewModel.selectWork(null)
                                     if (!visitedTabs.contains(NavTab.BROWSE)) {
                                         visitedTabs.add(NavTab.BROWSE)
                                     }
@@ -267,6 +265,7 @@ class MainActivity : ComponentActivity() {
                                 shape = drawerItemShape,
                                 colors = drawerItemColors,
                                 onClick = {
+                                    browseViewModel.selectWork(null)
                                     if (!visitedTabs.contains(NavTab.QUEUE)) {
                                         visitedTabs.add(NavTab.QUEUE)
                                     }
@@ -283,6 +282,7 @@ class MainActivity : ComponentActivity() {
                                 shape = drawerItemShape,
                                 colors = drawerItemColors,
                                 onClick = {
+                                    browseViewModel.selectWork(null)
                                     if (!visitedTabs.contains(NavTab.HISTORY)) {
                                         visitedTabs.add(NavTab.HISTORY)
                                     }
@@ -299,6 +299,7 @@ class MainActivity : ComponentActivity() {
                                 shape = drawerItemShape,
                                 colors = drawerItemColors,
                                 onClick = {
+                                    browseViewModel.selectWork(null)
                                     if (!visitedTabs.contains(NavTab.SETTINGS)) {
                                         visitedTabs.add(NavTab.SETTINGS)
                                     }
@@ -330,6 +331,9 @@ class MainActivity : ComponentActivity() {
                                 BottomNavBar(
                                     currentTab = currentTab,
                                     onTabSelected = { tab ->
+                                        if (tab != currentTab) {
+                                            browseViewModel.selectWork(null)
+                                        }
                                         if (!visitedTabs.contains(tab)) {
                                             visitedTabs.add(tab)
                                         }
@@ -397,11 +401,13 @@ class MainActivity : ComponentActivity() {
                                     onOpenPlayer = { isPlayerExpanded = true },
                                     onOpenDrawer = { drawerScope.launch { drawerState.open() } },
                                     onViewWorkDetail = { rjid ->
-                                        if (!visitedTabs.contains(NavTab.BROWSE)) {
-                                            visitedTabs.add(NavTab.BROWSE)
+                                        browseViewModel.selectWorkByRjid(rjid) {
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                getString(R.string.browse_work_not_found, rjid),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
-                                        currentTab = NavTab.BROWSE
-                                        browseViewModel.selectWorkByRjid(rjid)
                                     }
                                 )
                             }
@@ -512,6 +518,16 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             }
+
+                            // Loading Work Detail Card (isolated to avoid root recomposition)
+                            WorkDetailLoadingOverlay(browseViewModel = browseViewModel)
+
+                            // Detail Screen Overlay (Presented over whatever tab is active)
+                            WorkDetailOverlay(
+                                browseViewModel = browseViewModel,
+                                playerViewModel = playerViewModel,
+                                onOpenPlayer = { isPlayerExpanded = true }
+                            )
                         }
                     }
                 }
@@ -603,5 +619,115 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+    }
+}
+
+@Composable
+private fun WorkDetailLoadingOverlay(
+    browseViewModel: AsmrOneBrowseViewModel,
+    modifier: Modifier = Modifier
+) {
+    val isFetchingWorkDetail by browseViewModel.isFetchingWorkDetail.collectAsState()
+    if (isFetchingWorkDetail) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .zIndex(20f),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.5.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = stringResource(R.string.queue_status_fetching),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkDetailOverlay(
+    browseViewModel: AsmrOneBrowseViewModel,
+    playerViewModel: PlayerViewModel,
+    onOpenPlayer: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val selectedWork by browseViewModel.selectedWork.collectAsState()
+    var activeWorkDetail by remember { mutableStateOf<AsmrOneWork?>(null) }
+    LaunchedEffect(selectedWork) {
+        if (selectedWork != null) {
+            activeWorkDetail = selectedWork
+        }
+    }
+
+    androidx.compose.animation.AnimatedVisibility(
+        visible = selectedWork != null,
+        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+        modifier = modifier
+            .fillMaxSize()
+            .zIndex(10f)
+    ) {
+        val work = selectedWork ?: activeWorkDetail
+        if (work != null) {
+            val fileTree by browseViewModel.fileTree.collectAsState()
+            val workTracks by browseViewModel.workTracks.collectAsState()
+            val isLoadingTracks by browseViewModel.isLoadingTracks.collectAsState()
+
+            val showDetailRating by browseViewModel.showDetailRating.collectAsState()
+            val showDetailPrice by browseViewModel.showDetailPrice.collectAsState()
+            val showDetailDuration by browseViewModel.showDetailDuration.collectAsState()
+            val showDetailSales by browseViewModel.showDetailSales.collectAsState()
+            val showDetailReleaseDate by browseViewModel.showDetailReleaseDate.collectAsState()
+            val showDetailTranslateBtn by browseViewModel.showDetailTranslateBtn.collectAsState()
+            val showDetailSubtitle by browseViewModel.showDetailSubtitle.collectAsState()
+            val showDetailAgeRating by browseViewModel.showDetailAgeRating.collectAsState()
+
+            val context = LocalContext.current
+            AsmrOneWorkDetailScreen(
+                work = work,
+                fileTree = fileTree,
+                audioTracks = workTracks,
+                isLoadingFiles = isLoadingTracks,
+                playerViewModel = playerViewModel,
+                showRating = showDetailRating,
+                showPrice = showDetailPrice,
+                showDuration = showDetailDuration,
+                showSales = showDetailSales,
+                showReleaseDate = showDetailReleaseDate,
+                showTranslateBtn = showDetailTranslateBtn,
+                showSubtitle = showDetailSubtitle,
+                showAgeRating = showDetailAgeRating,
+                onBack = { browseViewModel.selectWork(null) },
+                onOpenPlayer = onOpenPlayer,
+                onDownload = {
+                    browseViewModel.enqueueDownload(work)
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.browse_toast_enqueued, work.rjid),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { clip = true }
+            )
+        }
     }
 }
