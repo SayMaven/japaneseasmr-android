@@ -2,6 +2,7 @@ package com.saymaven.downloader.japaneseasmr.service
 
 import android.media.MediaMetadataRetriever
 import com.saymaven.downloader.japaneseasmr.data.model.ChapterItem
+import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService
 import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -283,10 +284,11 @@ object ChapterDiscoveryService {
         if (cleanTarget.isBlank()) return@withContext emptyList()
 
         // 1. UTAMAKAN BASIS DATA asmr.one (STRUKTUR RESMI & LENGKAP)
-        val numId = cleanTarget.replace(Regex("^[A-Za-z]+"), "")
-        if (numId.isNotBlank()) {
+        val workId = AsmrOneApiService.resolveWorkId(cleanTarget)
+        val targetTreeId = workId?.toString() ?: cleanTarget.replace(Regex("^[A-Za-z]+"), "").trimStart('0')
+        if (targetTreeId.isNotBlank()) {
             try {
-                val asmrOneTree = TrackDiscoveryService.fetchAsmrOneTree(numId)
+                val asmrOneTree = TrackDiscoveryService.fetchAsmrOneTree(targetTreeId)
                 if (asmrOneTree != null && asmrOneTree.length() > 0) {
                     val candTracks = TrackDiscoveryService.filterSmartAsmrOneTracks(asmrOneTree)
                     if (candTracks.size > 1) {

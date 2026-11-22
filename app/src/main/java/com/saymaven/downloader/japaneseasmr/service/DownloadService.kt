@@ -315,7 +315,20 @@ class DownloadService : Service() {
 
             // 2. Scrape Metadata
             val meta = try {
-                DLsiteScraper.fetchMetadata(itemRjid)
+                val scraped = DLsiteScraper.fetchMetadata(itemRjid)
+                val qItem = _queueState.value.firstOrNull { it.rjid.equals(itemRjid, ignoreCase = true) }
+                val resolvedTitle = if (scraped.title.isNotBlank() && scraped.title != itemRjid) scraped.title else (qItem?.title?.takeIf { it.isNotBlank() } ?: scraped.title)
+                val resolvedCv = if (scraped.cv.isNotBlank() && scraped.cv != "-") scraped.cv else (qItem?.cv?.takeIf { it.isNotBlank() && it != "-" } ?: scraped.cv)
+                val resolvedCircle = if (scraped.circle.isNotBlank() && scraped.circle != "-") scraped.circle else (qItem?.circle?.takeIf { it.isNotBlank() && it != "-" } ?: scraped.circle)
+                val resolvedGenre = if (scraped.genre.isNotBlank() && scraped.genre != "-") scraped.genre else (qItem?.genre?.takeIf { it.isNotBlank() && it != "-" } ?: scraped.genre)
+                val resolvedAgeRating = if (scraped.ageRating.isNotBlank() && scraped.ageRating != "-") scraped.ageRating else (qItem?.ageRating?.takeIf { it.isNotBlank() && it != "-" } ?: scraped.ageRating)
+                scraped.copy(
+                    title = resolvedTitle,
+                    cv = resolvedCv,
+                    circle = resolvedCircle,
+                    genre = resolvedGenre,
+                    ageRating = resolvedAgeRating
+                )
             } catch (e: Exception) {
                 log(DownloadLogHelper.metadataFetchFailed(itemRjid, e.message))
                 updateItem(itemRjid) {
@@ -558,11 +571,8 @@ class DownloadService : Service() {
 
                 // 6b. Unduh & gabungkan subtitle (.vtt/.lrc/.srt) dari asmr.one jika tersedia
                 try {
-                    val rawDigits = itemRjid.filter { it.isDigit() }
-                    val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull() ?: 0
-                    if (workId > 0) {
-                        val tree = AsmrOneApiService.getWorkFileTree(workId).getOrNull() ?: emptyList()
-                        val remoteSubs = mutableListOf<SubtitleSource>()
+                    val tree = AsmrOneApiService.getWorkFileTree(itemRjid).getOrNull() ?: emptyList()
+                    val remoteSubs = mutableListOf<SubtitleSource>()
                         fun collectSubs(nodes: List<AsmrOneFileNode>) {
                             val exts = setOf("vtt", "lrc", "srt")
                             for (node in nodes) {
@@ -589,7 +599,6 @@ class DownloadService : Service() {
                                 log("Subtitle lokal disimpan: ${vttFile.name} (${mergedLyrics.size} baris)")
                             }
                         }
-                    }
                 } catch (_: Exception) {
                 }
 
@@ -672,11 +681,8 @@ class DownloadService : Service() {
 
                 // Unduh subtitle (.vtt/.lrc/.srt) dari asmr.one langsung ke subfolder yang bersangkutan
                 try {
-                    val rawDigits = itemRjid.filter { it.isDigit() }
-                    val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull() ?: 0
-                    if (workId > 0) {
-                        val tree = AsmrOneApiService.getWorkFileTree(workId).getOrNull() ?: emptyList()
-                        suspend fun saveSubtitles(nodes: List<AsmrOneFileNode>, currentRelPath: String = "") {
+                    val tree = AsmrOneApiService.getWorkFileTree(itemRjid).getOrNull() ?: emptyList()
+                    suspend fun saveSubtitles(nodes: List<AsmrOneFileNode>, currentRelPath: String = "") {
                             for (node in nodes) {
                                 if (node.type == "folder") {
                                     val sub = if (currentRelPath.isBlank()) node.title else "$currentRelPath/${node.title}"
@@ -700,7 +706,6 @@ class DownloadService : Service() {
                             }
                         }
                         saveSubtitles(tree)
-                    }
                 } catch (_: Exception) {
                 }
 

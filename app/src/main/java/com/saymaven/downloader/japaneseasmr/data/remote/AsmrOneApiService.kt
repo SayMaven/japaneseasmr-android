@@ -8,6 +8,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -320,18 +321,37 @@ object AsmrOneApiService {
         searchWorksPage(keyword, page, pageSize, subtitle).map { it.works }
     }
 
+    private val workIdCache = ConcurrentHashMap<String, Int>()
+
     /**
-     * Get single work info by integer ID or RJ-code (e.g. RJ01234567 or 1234567).
+     * Get single work info by integer ID or RJ/VJ/BJ code (e.g. RJ01234567, VJ01005847, or 1234567).
      */
     suspend fun getWork(idOrRj: String): Result<AsmrOneWork> = withContext(Dispatchers.IO) {
+        val clean = idOrRj.trim().uppercase()
+        if (clean.isBlank()) return@withContext Result.failure(Exception("Empty work identifier"))
+
+        // For VJ and BJ codes, asmr.one uses synthetic integer IDs (e.g. 100000063 for VJ01005847).
+        // Directly querying /api/work/$digits fails (404), so search by source_id first!
+        if (clean.startsWith("VJ") || clean.startsWith("BJ")) {
+            val searchRes = searchWorks(clean, page = 1, pageSize = 5)
+            val found = searchRes.getOrNull()?.let { list ->
+                list.firstOrNull { it.rjid.uppercase() == clean } ?: list.firstOrNull()
+            }
+            if (found != null) {
+                workIdCache[clean] = found.id
+                return@withContext Result.success(found)
+            }
+        }
+
         try {
-            val digits = idOrRj.trim().replace(Regex("[^0-9]"), "")
-            val endpoint = if (digits.isNotEmpty()) "/api/work/$digits" else "/api/work/$idOrRj"
+            val digits = clean.filter { it.isDigit() }
+            val endpoint = if (digits.isNotEmpty()) "/api/work/$digits" else "/api/work/$clean"
             val responseBody = executeRequest(endpoint)
             if (responseBody != null) {
                 val obj = JSONObject(responseBody)
                 val work = parseWorkJson(obj)
                 if (work != null) {
+                    workIdCache[clean] = work.id
                     return@withContext Result.success(work)
                 }
             }
@@ -340,15 +360,62 @@ object AsmrOneApiService {
         }
 
         try {
-            val searchRes = searchWorks(idOrRj, page = 1, pageSize = 5)
+            val searchRes = searchWorks(clean, page = 1, pageSize = 5)
             searchRes.mapCatching { list ->
-                val cleanQuery = idOrRj.trim().uppercase()
-                list.firstOrNull { it.rjid.uppercase() == cleanQuery }
+                val work = list.firstOrNull { it.rjid.uppercase() == clean }
                     ?: list.firstOrNull()
                     ?: throw Exception("Work not found for $idOrRj")
+                workIdCache[clean] = work.id
+                work
             }
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Resolves the real integer work ID in asmr.one from any ID, RJ code, VJ code, or BJ code.
+     * Uses memory cache for fast instantaneous returns.
+     */
+    suspend fun resolveWorkId(idOrCode: String): Int? = withContext(Dispatchers.IO) {
+        val clean = idOrCode.trim().uppercase()
+        if (clean.isBlank()) return@withContext null
+
+        workIdCache[clean]?.let { return@withContext it }
+
+        // VJ/BJ codes have synthetic IDs in asmr.one
+        if (clean.startsWith("VJ") || clean.startsWith("BJ")) {
+            val work = getWork(clean).getOrNull()
+            if (work != null && work.id > 0) {
+                workIdCache[clean] = work.id
+                return@withContext work.id
+            }
+        }
+
+        val digits = clean.filter { it.isDigit() }
+        val numId = digits.trimStart('0').ifBlank { digits }.toIntOrNull()
+        if (numId != null && numId > 0 && (clean.startsWith("RJ") || digits == clean)) {
+            workIdCache[clean] = numId
+            return@withContext numId
+        }
+
+        val fallbackWork = getWork(clean).getOrNull()
+        val resolved = fallbackWork?.id?.takeIf { it > 0 } ?: numId
+        if (resolved != null && resolved > 0) {
+            workIdCache[clean] = resolved
+        }
+        resolved
+    }
+
+    /**
+     * Get file and folder tree for a work for KikoFlu-style Resource Files view (by string ID/code).
+     */
+    suspend fun getWorkFileTree(idOrRj: String): Result<List<AsmrOneFileNode>> = withContext(Dispatchers.IO) {
+        val resolvedId = resolveWorkId(idOrRj)
+        if (resolvedId != null && resolvedId > 0) {
+            getWorkFileTree(resolvedId)
+        } else {
+            Result.failure(Exception("Cannot resolve work ID for $idOrRj"))
         }
     }
 
@@ -435,6 +502,18 @@ object AsmrOneApiService {
             }
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /**
+     * Get primary track list for a work for streaming or offline playback (by string ID/code).
+     */
+    suspend fun getWorkTracks(idOrRj: String, formatPriority: String = "mp3_se,mp3,flac,wav,opus,m4a,aac"): Result<List<AsmrOneTrack>> = withContext(Dispatchers.IO) {
+        val resolvedId = resolveWorkId(idOrRj)
+        if (resolvedId != null && resolvedId > 0) {
+            getWorkTracks(resolvedId, formatPriority)
+        } else {
+            Result.failure(Exception("Cannot resolve work ID for $idOrRj"))
         }
     }
 

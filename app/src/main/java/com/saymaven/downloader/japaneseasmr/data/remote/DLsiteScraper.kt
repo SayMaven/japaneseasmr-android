@@ -89,96 +89,126 @@ object DLsiteScraper {
         var curGenre = genre
         var curAgeRating = ageRating
 
+        val isVjOrBj = cleanId.startsWith("VJ", ignoreCase = true) || cleanId.startsWith("BJ", ignoreCase = true)
         val rawDigits = cleanId.replace(Regex("^[A-Za-z]+"), "")
         val numId = rawDigits.trimStart('0').ifBlank { rawDigits }
-        if (numId.isBlank()) return arrayOf(curTitle, curCv, curCircle, curGenre, curAgeRating)
+
+        val endpointsToTry = mutableListOf<String>()
+        if (!isVjOrBj && numId.isNotBlank()) {
+            endpointsToTry.add("/api/work/$numId")
+        }
+        endpointsToTry.add("/api/search/$cleanId?pageSize=5")
+        if (numId.isNotBlank() && !endpointsToTry.contains("/api/work/$numId")) {
+            endpointsToTry.add("/api/work/$numId")
+        }
 
         for (host in listOf("https://api.asmr-200.com", "https://api.asmr.one")) {
-            val url = "$host/api/work/$numId"
-            try {
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", USER_AGENT)
-                .header("Referer", REFERER_ASMRONE)
-                .header("Origin", "https://asmr.one")
-                .header("Accept-Language", "ja-JP,ja;q=0.9,en;q=0.8")
-                .build()
+            for (endpoint in endpointsToTry) {
+                try {
+                    val url = "$host$endpoint"
+                    val req = Request.Builder()
+                        .url(url)
+                        .header("User-Agent", USER_AGENT)
+                        .header("Referer", REFERER_ASMRONE)
+                        .header("Origin", "https://asmr.one")
+                        .header("Accept-Language", "ja-JP,ja;q=0.9,en;q=0.8")
+                        .build()
 
-            client.newCall(req).execute().use { resp ->
-                if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: return arrayOf(curTitle, curCv, curCircle, curGenre, curAgeRating)
-                    val data = JSONObject(bodyStr)
+                    client.newCall(req).execute().use { resp ->
+                        if (resp.isSuccessful) {
+                            val bodyStr = resp.body?.string() ?: return@use
+                            val root = JSONObject(bodyStr)
+                            val data = if (root.has("works")) {
+                                val arr = root.optJSONArray("works")
+                                if (arr != null && arr.length() > 0) {
+                                    var matched: JSONObject? = null
+                                    for (i in 0 until arr.length()) {
+                                        val item = arr.optJSONObject(i) ?: continue
+                                        val sid = item.optString("source_id").ifBlank { item.optString("rjid") }
+                                        if (sid.equals(cleanId, ignoreCase = true)) {
+                                            matched = item
+                                            break
+                                        }
+                                    }
+                                    matched ?: arr.optJSONObject(0)
+                                } else null
+                            } else if (root.has("id") || root.has("title")) {
+                                root
+                            } else null
 
-                    // 1. Judul karya jika masih kode RJ
-                    if (curTitle == cleanId || curTitle.isBlank()) {
-                        val name = data.optString("title").ifBlank { data.optString("name") }
-                        if (name.isNotBlank()) curTitle = name.trim()
-                    }
-
-                    // 2. CV / Seiyuu
-                    if (curCv == "-" || curCv.isBlank()) {
-                        val vasArr = data.optJSONArray("vas")
-                        if (vasArr != null && vasArr.length() > 0) {
-                            val vaNames = mutableListOf<String>()
-                            for (i in 0 until vasArr.length()) {
-                                val vaObj = vasArr.optJSONObject(i)
-                                val vaName = vaObj?.optString("name")?.trim() ?: ""
-                                if (vaName.isNotBlank() && !vaNames.contains(vaName)) {
-                                    vaNames.add(vaName)
+                            if (data != null) {
+                                // 1. Judul karya jika masih kode RJ/VJ/BJ
+                                if (curTitle == cleanId || curTitle.isBlank()) {
+                                    val name = data.optString("title").ifBlank { data.optString("name") }
+                                    if (name.isNotBlank()) curTitle = name.trim()
                                 }
-                            }
-                            if (vaNames.isNotEmpty()) {
-                                curCv = vaNames.joinToString(", ")
-                            }
-                        }
-                    }
 
-                    // 3. Genre / Tags (utamakan tag Jepang melalui i18n jika ada agar seragam dengan DLsite)
-                    if (curGenre == "-" || curGenre.isBlank()) {
-                        val tagsArr = data.optJSONArray("tags")
-                        if (tagsArr != null && tagsArr.length() > 0) {
-                            val tagNames = mutableListOf<String>()
-                            for (i in 0 until tagsArr.length()) {
-                                val tObj = tagsArr.optJSONObject(i) ?: continue
-                                val i18nJa = tObj.optJSONObject("i18n")?.optJSONObject("ja-jp")?.optString("name")
-                                val tName = if (!i18nJa.isNullOrBlank()) i18nJa.trim() else tObj.optString("name").trim()
-                                if (tName.isNotBlank() && !tagNames.contains(tName)) {
-                                    tagNames.add(tName)
+                                // 2. CV / Seiyuu
+                                if (curCv == "-" || curCv.isBlank()) {
+                                    val vasArr = data.optJSONArray("vas")
+                                    if (vasArr != null && vasArr.length() > 0) {
+                                        val vaNames = mutableListOf<String>()
+                                        for (i in 0 until vasArr.length()) {
+                                            val vaObj = vasArr.optJSONObject(i)
+                                            val vaName = vaObj?.optString("name")?.trim() ?: ""
+                                            if (vaName.isNotBlank() && !vaNames.contains(vaName)) {
+                                                vaNames.add(vaName)
+                                            }
+                                        }
+                                        if (vaNames.isNotEmpty()) {
+                                            curCv = vaNames.joinToString(", ")
+                                        }
+                                    }
                                 }
-                            }
-                            if (tagNames.isNotEmpty()) {
-                                curGenre = tagNames.take(30).joinToString(", ")
-                            }
-                        }
-                    }
 
-                    // 4. Circle / Maker
-                    if (curCircle == "-" || curCircle.isBlank()) {
-                        val cObj = data.optJSONObject("circle")
-                        val cName = cObj?.optString("name")?.trim() ?: ""
-                        if (cName.isNotBlank()) {
-                            curCircle = cName
-                        } else {
-                            val name = data.optString("name").trim()
-                            if (name.isNotBlank() && name != curTitle) {
-                                curCircle = name
+                                // 3. Genre / Tags (utamakan tag Jepang melalui i18n jika ada agar seragam dengan DLsite)
+                                if (curGenre == "-" || curGenre.isBlank()) {
+                                    val tagsArr = data.optJSONArray("tags")
+                                    if (tagsArr != null && tagsArr.length() > 0) {
+                                        val tagNames = mutableListOf<String>()
+                                        for (i in 0 until tagsArr.length()) {
+                                            val tObj = tagsArr.optJSONObject(i) ?: continue
+                                            val i18nJa = tObj.optJSONObject("i18n")?.optJSONObject("ja-jp")?.optString("name")
+                                            val tName = if (!i18nJa.isNullOrBlank()) i18nJa.trim() else tObj.optString("name").trim()
+                                            if (tName.isNotBlank() && !tagNames.contains(tName)) {
+                                                tagNames.add(tName)
+                                            }
+                                        }
+                                        if (tagNames.isNotEmpty()) {
+                                            curGenre = tagNames.take(30).joinToString(", ")
+                                        }
+                                    }
+                                }
+
+                                // 4. Circle / Maker
+                                if (curCircle == "-" || curCircle.isBlank()) {
+                                    val cObj = data.optJSONObject("circle")
+                                    val cName = cObj?.optString("name")?.trim() ?: ""
+                                    if (cName.isNotBlank()) {
+                                        curCircle = cName
+                                    } else {
+                                        val name = data.optString("name").trim()
+                                        if (name.isNotBlank() && name != curTitle) {
+                                            curCircle = name
+                                        }
+                                    }
+                                }
+
+                                // 5. Age rating
+                                if (curAgeRating == "-" || curAgeRating.isBlank()) {
+                                    val age = data.optString("age_category_string").trim()
+                                    if (age.isNotBlank()) {
+                                        curAgeRating = age
+                                    }
+                                }
+                                return arrayOf(curTitle, curCv, curCircle, curGenre, curAgeRating)
                             }
                         }
                     }
-
-                    // 5. Age rating
-                    if (curAgeRating == "-" || curAgeRating.isBlank()) {
-                        val age = data.optString("age_category_string").trim()
-                        if (age.isNotBlank()) {
-                            curAgeRating = age
-                        }
-                    }
-                    return arrayOf(curTitle, curCv, curCircle, curGenre, curAgeRating)
+                } catch (e: Exception) {
+                    // Coba endpoint atau host berikutnya
                 }
             }
-        } catch (e: Exception) {
-            // Abaikan kesalahan request fallback asmr.one
-        }
         }
 
         return arrayOf(curTitle, curCv, curCircle, curGenre, curAgeRating)
@@ -305,6 +335,50 @@ object DLsiteScraper {
                         ageText.contains("15") || ageText.contains("R-15") || ageText.contains("R15") -> "R-15"
                         ageText.contains("全年齢") || ageText.contains("All") || ageText.contains("Safe") -> "SAFE"
                         else -> ageText.take(15).trim()
+                    }
+                }
+
+                // 6. Fallback JSON-LD Product schema (terutama untuk halaman DLsite Pro / VJ / BJ)
+                if (title == cleanId || circle == "-" || ageRating == "-") {
+                    for (script in doc.select("script[type=application/ld+json]")) {
+                        try {
+                            val jsonText = script.data().ifBlank { script.html() }
+                            if (jsonText.contains("\"Product\"")) {
+                                val sObj = JSONObject(jsonText)
+                                if (sObj.optString("@type") == "Product") {
+                                    if (title == cleanId || title.isBlank()) {
+                                        val pName = sObj.optString("name")
+                                        if (pName.isNotBlank()) title = pName.trim()
+                                    }
+                                    if (circle == "-" || circle.isBlank()) {
+                                        val bObj = sObj.optJSONObject("brand")
+                                        val bName = bObj?.optString("name")?.trim() ?: ""
+                                        if (bName.isNotBlank()) circle = bName
+                                    }
+                                    if (ageRating == "-" || ageRating.isBlank()) {
+                                        val adultCond = sObj.optString("hasAdultConsideration")
+                                        if (adultCond.contains("SexualContent", ignoreCase = true)) {
+                                            ageRating = "R18"
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+
+                // Fallback Circle dari judul halaman jika berbentuk [CircleName] | DLsite
+                if (circle == "-" || circle.isBlank()) {
+                    val m = Regex("\\[([^\\]]+)\\]\\s*\\|\\s*DLsite").find(doc.title())
+                    if (m != null) {
+                        circle = m.groupValues[1].trim()
+                    }
+                }
+
+                // Fallback Age Rating jika kategori Pro / R18 di URL atau judul
+                if (ageRating == "-" || ageRating.isBlank()) {
+                    if (url.contains("/pro/") || doc.title().contains("R18") || doc.title().contains("R-18")) {
+                        ageRating = "R18"
                     }
                 }
 

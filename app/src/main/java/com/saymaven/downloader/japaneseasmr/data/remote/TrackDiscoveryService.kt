@@ -133,10 +133,10 @@ object TrackDiscoveryService {
         // =========================================================================
         // 1. TAHAP 1: SUMBER UTAMA (asmr.one API via Smart Filter)
         // =========================================================================
-        val rawDigits = cleanId.replace(Regex("^[A-Za-z]+"), "")
-        val numericId = rawDigits.trimStart('0').ifBlank { rawDigits }
-        if (numericId.isNotBlank()) {
-            val asmrOneTree = fetchAsmrOneTree(numericId) ?: if (rawDigits != numericId) fetchAsmrOneTree(rawDigits) else null
+        val workId = AsmrOneApiService.resolveWorkId(cleanId)
+        val treeId = workId?.toString() ?: cleanId.replace(Regex("^[A-Za-z]+"), "").trimStart('0')
+        if (treeId.isNotBlank()) {
+            val asmrOneTree = fetchAsmrOneTree(treeId)
             if (asmrOneTree != null && asmrOneTree.length() > 0) {
                 val filteredTracks = filterSmartAsmrOneTracks(asmrOneTree, preferredFormat)
                 if (filteredTracks.isNotEmpty()) {

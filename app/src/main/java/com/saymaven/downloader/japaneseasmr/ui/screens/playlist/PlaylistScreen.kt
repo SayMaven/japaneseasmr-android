@@ -2131,8 +2131,14 @@ fun LocalWorkPinterestCard(
         (!item.chaptersJson.isNullOrBlank() && (item.chaptersJson.contains(".vtt") || item.chaptersJson.contains(".lrc") || item.chaptersJson.contains(".srt"))) ||
         try {
             val f = java.io.File(item.localFilePath)
-            val d = if (f.isDirectory) f else f.parentFile
-            d?.walkTopDown()?.maxDepth(2)?.any { it.isFile && it.extension.lowercase() in setOf("vtt", "lrc", "srt") } == true
+            if (f.isDirectory) {
+                f.walkTopDown().maxDepth(3).any { it.isFile && it.extension.lowercase() in setOf("vtt", "lrc", "srt") }
+            } else if (f.isFile) {
+                val subExts = setOf("vtt", "lrc", "srt")
+                subExts.any { ext -> java.io.File(f.parentFile, "${f.nameWithoutExtension}.$ext").exists() }
+            } else {
+                false
+            }
         } catch (_: Exception) { false }
     }
 
@@ -2542,8 +2548,14 @@ fun LocalWorkListViewItem(
         (!item.chaptersJson.isNullOrBlank() && (item.chaptersJson.contains(".vtt") || item.chaptersJson.contains(".lrc") || item.chaptersJson.contains(".srt"))) ||
         try {
             val f = java.io.File(item.localFilePath)
-            val d = if (f.isDirectory) f else f.parentFile
-            d?.walkTopDown()?.maxDepth(2)?.any { it.isFile && it.extension.lowercase() in setOf("vtt", "lrc", "srt") } == true
+            if (f.isDirectory) {
+                f.walkTopDown().maxDepth(3).any { it.isFile && it.extension.lowercase() in setOf("vtt", "lrc", "srt") }
+            } else if (f.isFile) {
+                val subExts = setOf("vtt", "lrc", "srt")
+                subExts.any { ext -> java.io.File(f.parentFile, "${f.nameWithoutExtension}.$ext").exists() }
+            } else {
+                false
+            }
         } catch (_: Exception) { false }
     }
 

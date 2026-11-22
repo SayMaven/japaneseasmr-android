@@ -1902,26 +1902,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             playLocalTrack(history, _playlist.value, startPositionMs = savedPos)
                         } else {
                             // Resume online stream from asmr.one when no local history exists
-                            val workId = rj.filter { it.isDigit() }.toIntOrNull() ?: 0
-                            if (workId > 0) {
-                                val priority = prefs.audioFormatPriorityFlow.first()
-                                val tracks = withContext(Dispatchers.IO) {
-                                    AsmrOneApiService.getWorkTracks(workId, priority).getOrNull() ?: emptyList()
-                                }
-                                if (tracks.isNotEmpty()) {
-                                    val cleanTitle = _currentTitle.value
-                                        .replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+]\\s*"), "")
-                                        .trim()
-                                        .ifBlank { rj }
-                                    playOnlineWork(
-                                        rjid = rj,
-                                        workTitle = cleanTitle,
-                                        cv = _currentArtist.value,
-                                        coverUrl = _currentCoverUrl.value ?: "",
-                                        tracks = tracks,
-                                        startPositionMs = savedPos
-                                    )
-                                }
+                            val priority = prefs.audioFormatPriorityFlow.first()
+                            val tracks = withContext(Dispatchers.IO) {
+                                AsmrOneApiService.getWorkTracks(rj, priority).getOrNull() ?: emptyList()
+                            }
+                            if (tracks.isNotEmpty()) {
+                                val cleanTitle = _currentTitle.value
+                                    .replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+]\\s*"), "")
+                                    .trim()
+                                    .ifBlank { rj }
+                                playOnlineWork(
+                                    rjid = rj,
+                                    workTitle = cleanTitle,
+                                    cv = _currentArtist.value,
+                                    coverUrl = _currentCoverUrl.value ?: "",
+                                    tracks = tracks,
+                                    startPositionMs = savedPos
+                                )
                             }
                         }
                     }
@@ -2125,15 +2122,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         if (forceOnline && !history.linkedRjId.isNullOrBlank()) {
                             withContext(Dispatchers.IO) {
                                 try {
-                                    val meta = DLsiteScraper.fetchMetadata(history.linkedRjId)
-                                    if (meta != null) {
-                                        val updated = history.copy(
-                                            title = if (meta.title.isNotBlank()) meta.title else history.title,
-                                            cv = if (meta.cv.isNotBlank() && meta.cv != "-") meta.cv else history.cv,
-                                            circle = if (meta.circle.isNotBlank() && meta.circle != "-") meta.circle else history.circle
-                                        )
-                                        historyDao.insertHistory(updated)
+                                    var meta = DLsiteScraper.fetchMetadata(history.linkedRjId)
+                                    if (meta.title == history.linkedRjId || meta.cv == "-" || meta.circle == "-" || meta.genre == "-") {
+                                        val asmrWork = AsmrOneApiService.getWork(history.linkedRjId).getOrNull()
+                                        if (asmrWork != null) {
+                                            meta = meta.copy(
+                                                title = if (meta.title.isNotBlank() && meta.title != history.linkedRjId) meta.title else asmrWork.title,
+                                                cv = if (meta.cv.isNotBlank() && meta.cv != "-") meta.cv else asmrWork.cv,
+                                                circle = if (meta.circle.isNotBlank() && meta.circle != "-") meta.circle else asmrWork.circle,
+                                                genre = if (meta.genre.isNotBlank() && meta.genre != "-") meta.genre else asmrWork.tags.joinToString(", "),
+                                                ageRating = if (meta.ageRating.isNotBlank() && meta.ageRating != "-") meta.ageRating else asmrWork.ageRating
+                                            )
+                                        }
                                     }
+                                    val updated = history.copy(
+                                        title = if (meta.title.isNotBlank()) meta.title else history.title,
+                                        cv = if (meta.cv.isNotBlank() && meta.cv != "-") meta.cv else history.cv,
+                                        circle = if (meta.circle.isNotBlank() && meta.circle != "-") meta.circle else history.circle,
+                                        genre = if (meta.genre.isNotBlank() && meta.genre != "-") meta.genre else history.genre,
+                                        ageRating = if (meta.ageRating.isNotBlank() && meta.ageRating != "-") meta.ageRating else history.ageRating
+                                    )
+                                    historyDao.insertHistory(updated)
                                 } catch (e: Exception) {}
                             }
                         }
@@ -2508,7 +2517,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val targetRj = rjMatch.value.uppercase()
             val meta = withContext(Dispatchers.IO) {
                 try {
-                    DLsiteScraper.fetchMetadata(targetRj)
+                    var m = DLsiteScraper.fetchMetadata(targetRj)
+                    if (m.title == targetRj || m.cv == "-" || m.circle == "-" || m.genre == "-") {
+                        val asmrWork = AsmrOneApiService.getWork(targetRj).getOrNull()
+                        if (asmrWork != null) {
+                            m = m.copy(
+                                title = if (m.title.isNotBlank() && m.title != targetRj) m.title else asmrWork.title,
+                                cv = if (m.cv.isNotBlank() && m.cv != "-") m.cv else asmrWork.cv,
+                                circle = if (m.circle.isNotBlank() && m.circle != "-") m.circle else asmrWork.circle,
+                                genre = if (m.genre.isNotBlank() && m.genre != "-") m.genre else asmrWork.tags.joinToString(", "),
+                                ageRating = if (m.ageRating.isNotBlank() && m.ageRating != "-") m.ageRating else asmrWork.ageRating,
+                                coverUrl = if (!m.coverUrl.isNullOrBlank()) m.coverUrl else asmrWork.coverUrl
+                            )
+                        }
+                    }
+                    m
                 } catch (e: Exception) {
                     null
                 }
@@ -2683,9 +2706,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     playLocalTrack(local)
                 }
             } else {
-                val workId = item.rjid.filter { it.isDigit() }.toIntOrNull() ?: 0
                 val priority = prefs.audioFormatPriorityFlow.first()
-                val tracksRes = com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService.getWorkTracks(workId, priority)
+                val tracksRes = com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService.getWorkTracks(item.rjid, priority)
                 val tracks = tracksRes.getOrNull() ?: emptyList()
                 if (tracks.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
@@ -2834,10 +2856,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             if (_isOnlineStreaming.value) {
                 val rj = _currentRjId.value ?: ""
-                val rawDigits = rj.filter { it.isDigit() }
-                val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull()
-                if (workId != null && workId > 0) {
-                    val tree = workTreeCache[rj] ?: AsmrOneApiService.getWorkFileTree(workId).getOrNull()?.also {
+                if (rj.isNotBlank()) {
+                    val tree = workTreeCache[rj] ?: AsmrOneApiService.getWorkFileTree(rj).getOrNull()?.also {
                         workTreeCache[rj] = it
                     } ?: emptyList()
                     collectRemoteSubtitles(tree, sources)
@@ -2875,10 +2895,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 // Auto-backfill from asmr.one for already-downloaded works that don't have local .vtt yet
                 if (sources.isEmpty()) {
                     val lookupRj = (resolvedHistory?.linkedRjId?.takeIf { it.isNotBlank() } ?: rj).orEmpty()
-                    val rawDigits = lookupRj.filter { it.isDigit() }
-                    val workId = rawDigits.trimStart('0').ifBlank { rawDigits }.toIntOrNull()
-                    if (workId != null && workId > 0) {
-                        val tree = workTreeCache[lookupRj] ?: AsmrOneApiService.getWorkFileTree(workId).getOrNull()?.also {
+                    if (lookupRj.isNotBlank()) {
+                        val tree = workTreeCache[lookupRj] ?: AsmrOneApiService.getWorkFileTree(lookupRj).getOrNull()?.also {
                             workTreeCache[lookupRj] = it
                         } ?: emptyList()
                         val remoteSubs = mutableListOf<SubtitleSource>()
