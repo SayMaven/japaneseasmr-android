@@ -479,6 +479,9 @@ object StorageSyncManager {
             if (needsUpdate) {
                 dao.insertHistory(updated)
             }
+            if (finalLinkedRjId != null && (existing.genre == "-" || existing.ageRating == "-" || existing.cv == "-")) {
+                scope.launch { fetchAndCacheMetadata(context, dao, updated) }
+            }
         }
     }
 
@@ -587,6 +590,9 @@ object StorageSyncManager {
             if (needsUpdate) {
                 dao.insertHistory(updated)
             }
+            if (finalLinkedRjId != null && (existing.genre == "-" || existing.ageRating == "-" || existing.cv == "-")) {
+                scope.launch { fetchAndCacheMetadata(context, dao, updated) }
+            }
         }
     }
 
@@ -635,6 +641,8 @@ object StorageSyncManager {
                         if (isOfficialRj) {
                             scope.launch { fetchAndCacheMetadata(context, dao, newEntity) }
                         }
+                    } else if (isOfficialRj && (existing.genre == "-" || existing.ageRating == "-" || existing.cv == "-")) {
+                        scope.launch { fetchAndCacheMetadata(context, dao, existing) }
                     }
                 }
 

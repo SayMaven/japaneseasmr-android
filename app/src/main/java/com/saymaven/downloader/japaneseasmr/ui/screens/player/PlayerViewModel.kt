@@ -48,6 +48,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -192,7 +195,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             sp.edit().putBoolean("playlist_sort_asc", newAsc).apply()
         } else {
             val defaultAsc = when (type) {
-                PlaylistSortType.TITLE -> true
+                PlaylistSortType.TITLE, PlaylistSortType.ALL_AGES -> true
                 else -> false
             }
             _sortState.value = PlaylistSortState(type = type, isAscending = defaultAsc)
@@ -286,16 +289,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
             PlaylistSortType.ALL_AGES -> {
-                fun getAgeScore(rating: String?): Int = when (rating?.uppercase()?.trim()) {
-                    "SAFE", "ALL", "ALL AGES", "全年齢", "全年龄" -> 0
-                    "R-15", "R15" -> 1
-                    "R-18", "R18" -> 2
-                    else -> 3
+                val safeWorks = folderFiltered.filter { item ->
+                    val normalized = AgeRatingHelper.normalize(item.ageRating)
+                    normalized == AgeRatingHelper.RATING_SAFE
                 }
                 if (sort.isAscending) {
-                    folderFiltered.sortedBy { getAgeScore(it.ageRating) }
+                    safeWorks.sortedByDescending { AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath) }
                 } else {
-                    folderFiltered.sortedByDescending { getAgeScore(it.ageRating) }
+                    safeWorks.sortedBy { it.title.lowercase(Locale.ROOT) }
                 }
             }
         }
@@ -713,6 +714,76 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (_isTranslationActive.value) {
             val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
             translatePlaylistTitles(targetLang)
+        }
+
+        // Otomatis lengkapi metadata karya lokal yang belum memiliki tag/usia
+        autoEnrichIncompleteMetadata(sorted)
+    }
+
+    private val attemptedEnrichmentRj = ConcurrentHashMap.newKeySet<String>()
+    private var enrichmentJob: Job? = null
+
+    private fun autoEnrichIncompleteMetadata(items: List<HistoryEntity>) {
+        val incompleteItems = items.filter { item ->
+            item.genre == "-" || item.genre.isBlank() || item.ageRating == "-" || item.cv == "-"
+        }
+        if (incompleteItems.isEmpty()) return
+
+        enrichmentJob?.cancel()
+        enrichmentJob = viewModelScope.launch(Dispatchers.IO) {
+            for (item in incompleteItems) {
+                if (!isActive) break
+                val rjCandidate = item.linkedRjId?.takeIf { it.isNotBlank() }
+                    ?: StorageSyncManager.RJ_REGEX.find(item.rjid)?.value
+                    ?: StorageSyncManager.RJ_REGEX.find(item.title)?.value
+                    ?: StorageSyncManager.RJ_REGEX.find(File(item.localFilePath).name)?.value
+                    ?: AudioStorageHelper.findRjCodeInPath(File(item.localFilePath))
+
+                if (rjCandidate == null) continue
+                val cleanRj = rjCandidate.uppercase().trim()
+                if (attemptedEnrichmentRj.contains(cleanRj)) continue
+                attemptedEnrichmentRj.add(cleanRj)
+
+                try {
+                    val meta = DLsiteScraper.fetchMetadata(cleanRj)
+                    if (meta.title.isNotBlank() || meta.cv.isNotBlank() || (meta.genre.isNotBlank() && meta.genre != "-")) {
+                        var resolvedCover = item.coverUrl
+                        if (!meta.coverUrl.isNullOrBlank() && (resolvedCover.isBlank() || resolvedCover == "-")) {
+                            try {
+                                val coversDir = File(getApplication<Application>().cacheDir, "covers").apply { if (!exists()) mkdirs() }
+                                val targetCoverFile = File(coversDir, "$cleanRj.jpg")
+                                val req = Request.Builder()
+                                    .url(meta.coverUrl)
+                                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                                    .header("Referer", "https://japaneseasmr.com")
+                                    .build()
+                                val client = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).build()
+                                val resp = client.newCall(req).execute()
+                                if (resp.isSuccessful) {
+                                    resp.body?.byteStream()?.use { input ->
+                                        FileOutputStream(targetCoverFile).use { output -> input.copyTo(output) }
+                                    }
+                                    if (targetCoverFile.exists() && targetCoverFile.length() > 0) {
+                                        resolvedCover = targetCoverFile.absolutePath
+                                    }
+                                }
+                            } catch (_: Exception) {}
+                        }
+
+                        val updated = item.copy(
+                            title = if (meta.title.isNotBlank()) meta.title else item.title,
+                            cv = if (meta.cv.isNotBlank() && meta.cv != "-") meta.cv else item.cv,
+                            circle = if (meta.circle.isNotBlank() && meta.circle != "-") meta.circle else item.circle,
+                            genre = if (meta.genre.isNotBlank() && meta.genre != "-") meta.genre else item.genre,
+                            ageRating = if (meta.ageRating.isNotBlank() && meta.ageRating != "-") meta.ageRating else item.ageRating,
+                            coverUrl = resolvedCover,
+                            linkedRjId = cleanRj
+                        )
+                        historyDao.insertHistory(updated)
+                    }
+                } catch (_: Exception) {}
+                delay(400)
+            }
         }
     }
 

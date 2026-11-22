@@ -112,11 +112,9 @@ fun AsmrOneBrowseScreen(
         initialFirstVisibleItemScrollOffset = viewModel.scrollOffset
     )
 
-    LaunchedEffect(currentPage) {
-        if (currentPage > 0) {
-            gridState.scrollToItem(0)
-            listState.scrollToItem(0)
-        }
+    LaunchedEffect(currentPage, sortField, sortDirection) {
+        gridState.scrollToItem(0)
+        listState.scrollToItem(0)
     }
 
     LaunchedEffect(isOnline) {

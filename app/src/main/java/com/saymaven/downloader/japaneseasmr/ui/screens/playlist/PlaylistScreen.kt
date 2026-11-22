@@ -58,6 +58,7 @@ import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
 import com.saymaven.downloader.japaneseasmr.data.local.entity.PlaylistItemEntity
 import com.saymaven.downloader.japaneseasmr.data.local.entity.UserPlaylistEntity
+import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import com.saymaven.downloader.japaneseasmr.service.TagLocalizer
 import com.saymaven.downloader.japaneseasmr.ui.components.PaginationBar
 import com.saymaven.downloader.japaneseasmr.ui.components.PlaylistSelectionSheet
@@ -145,9 +146,25 @@ fun PlaylistScreen(
     var currentPage by rememberSaveable { mutableIntStateOf(1) }
     val totalPages = maxOf(1, (displayedPlaylist.size + pageSize - 1) / pageSize)
 
-    LaunchedEffect(displayedPlaylist.size, selectedFolder, selectedTagFilters) {
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyStaggeredGridState()
+
+    LaunchedEffect(sortState, selectedFolder, selectedTagFilters) {
+        currentPage = 1
+        listState.scrollToItem(0)
+        gridState.scrollToItem(0)
+    }
+
+    LaunchedEffect(displayedPlaylist.size) {
         if (currentPage > totalPages) {
             currentPage = 1
+        }
+    }
+
+    LaunchedEffect(currentPage) {
+        if (currentPage > 0) {
+            listState.scrollToItem(0)
+            gridState.scrollToItem(0)
         }
     }
 
@@ -172,18 +189,12 @@ fun PlaylistScreen(
     var showAudioInfoDialog by remember { mutableStateOf(false) }
     var itemForAudioInfo by remember { mutableStateOf<HistoryEntity?>(null) }
 
+    var itemToLinkRj by remember { mutableStateOf<HistoryEntity?>(null) }
+    var rjLinkInput by remember { mutableStateOf("") }
+    var isLinkingRj by remember { mutableStateOf(false) }
+
     var showDeleteDialog by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<HistoryEntity?>(null) }
-
-    val listState = rememberLazyListState()
-    val gridState = rememberLazyStaggeredGridState()
-
-    LaunchedEffect(currentPage) {
-        if (currentPage > 0) {
-            listState.scrollToItem(0)
-            gridState.scrollToItem(0)
-        }
-    }
 
     // Drag-and-drop state for List mode
     var draggedRjid by remember { mutableStateOf<String?>(null) }
@@ -780,6 +791,17 @@ fun PlaylistScreen(
                         showAudioInfoDialog = true
                     }
                 }
+                val onLinkRjClick = remember {
+                    { item: HistoryEntity ->
+                        val candidate = item.linkedRjId?.takeIf { it.isNotBlank() }
+                            ?: StorageSyncManager.RJ_REGEX.find(item.rjid)?.value
+                            ?: StorageSyncManager.RJ_REGEX.find(item.title)?.value
+                            ?: StorageSyncManager.RJ_REGEX.find(File(item.localFilePath).name)?.value
+                            ?: ""
+                        rjLinkInput = candidate
+                        itemToLinkRj = item
+                    }
+                }
                 val onDeleteClick = remember {
                     { item: HistoryEntity ->
                         itemToDelete = item
@@ -818,7 +840,8 @@ fun PlaylistScreen(
                                         onAudioInfo = { onAudioInfoClick(item) },
                                         onDelete = { onDeleteClick(item) },
                                         onAddToPlaylist = { workForPlaylist = item },
-                                        onViewDetail = { onViewWorkDetail(item.linkedRjId ?: item.rjid) }
+                                        onViewDetail = { onViewWorkDetail(item.linkedRjId ?: item.rjid) },
+                                        onLinkRj = { onLinkRjClick(item) }
                                     )
                                 }
 
@@ -858,7 +881,8 @@ fun PlaylistScreen(
                                         onAudioInfo = { onAudioInfoClick(item) },
                                         onDelete = { onDeleteClick(item) },
                                         onAddToPlaylist = { workForPlaylist = item },
-                                        onViewDetail = { onViewWorkDetail(item.linkedRjId ?: item.rjid) }
+                                        onViewDetail = { onViewWorkDetail(item.linkedRjId ?: item.rjid) },
+                                        onLinkRj = { onLinkRjClick(item) }
                                     )
                                 }
 
@@ -1053,6 +1077,82 @@ fun PlaylistScreen(
                     itemForAudioInfo = null
                 }) {
                     Text(stringResource(R.string.action_close))
+                }
+            }
+        )
+    }
+
+    // Dialog: Link DLsite RJ Code
+    if (itemToLinkRj != null) {
+        val target = itemToLinkRj!!
+        AlertDialog(
+            onDismissRequest = {
+                if (!isLinkingRj) {
+                    itemToLinkRj = null
+                }
+            },
+            title = { Text(stringResource(R.string.player_link_rj_dialog_title)) },
+            text = {
+                Column {
+                    Text(
+                        stringResource(R.string.player_link_rj_dialog_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = rjLinkInput,
+                        onValueChange = { rjLinkInput = it },
+                        label = { Text(stringResource(R.string.player_link_rj_input_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLinkingRj
+                    )
+                    if (isLinkingRj) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Menghubungkan ke DLsite...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (rjLinkInput.isNotBlank() && !isLinkingRj) {
+                            isLinkingRj = true
+                            viewModel.linkRjCode(target.rjid, rjLinkInput) { success, rjOrMsg ->
+                                isLinkingRj = false
+                                if (success) {
+                                    itemToLinkRj = null
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.player_link_rj_success_toast, rjOrMsg),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        rjOrMsg ?: context.getString(R.string.player_link_rj_error_toast, rjLinkInput),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isLinkingRj && rjLinkInput.isNotBlank()
+                ) {
+                    Text(stringResource(R.string.player_link_rj_btn_link))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { itemToLinkRj = null },
+                    enabled = !isLinkingRj
+                ) {
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -1981,6 +2081,7 @@ fun LocalWorkPinterestCard(
     onDelete: () -> Unit,
     onAddToPlaylist: () -> Unit = {},
     onViewDetail: (() -> Unit)? = null,
+    onLinkRj: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -2311,6 +2412,19 @@ fun LocalWorkPinterestCard(
                                 }
                             )
 
+                            if (onLinkRj != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.player_menu_link_rj)) },
+                                    onClick = {
+                                        isMenuExpanded = false
+                                        onLinkRj()
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Link, contentDescription = null)
+                                    }
+                                )
+                            }
+
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.player_menu_play_now)) },
                                 onClick = {
@@ -2368,7 +2482,8 @@ fun LocalWorkListViewItem(
     onAudioInfo: () -> Unit,
     onDelete: () -> Unit,
     onAddToPlaylist: () -> Unit = {},
-    onViewDetail: (() -> Unit)? = null
+    onViewDetail: (() -> Unit)? = null,
+    onLinkRj: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var isMenuExpanded by remember { mutableStateOf(false) }
@@ -2701,6 +2816,19 @@ fun LocalWorkListViewItem(
                                 Icon(Icons.Default.AudioFile, contentDescription = null)
                             }
                         )
+
+                        if (onLinkRj != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.player_menu_link_rj)) },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onLinkRj()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Link, contentDescription = null)
+                                }
+                            )
+                        }
 
                         HorizontalDivider()
 
