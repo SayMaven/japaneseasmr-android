@@ -111,6 +111,7 @@ fun PlayerScreen(
     val translatedTitle by viewModel.translatedTitle.collectAsState()
     val translatedChapters by viewModel.translatedChapters.collectAsState()
     val isOnlineStreaming by viewModel.isOnlineStreaming.collectAsState()
+    val isVirtualAlbum by viewModel.isVirtualAlbum.collectAsState()
     val currentStreamTrackTitle by viewModel.currentStreamTrackTitle.collectAsState()
     val currentDisplayBadge by viewModel.currentDisplayBadge.collectAsState()
     val privacyEnabled by viewModel.privacyEnabled.collectAsState()
@@ -267,8 +268,8 @@ fun PlayerScreen(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    // Track Title Subtext during online stream
-                    if (isOnlineStreaming && !currentStreamTrackTitle.isNullOrBlank() && !shouldMask) {
+                    // Track Title Subtext during online stream or multi-track virtual album
+                    if ((isOnlineStreaming || isVirtualAlbum) && !currentStreamTrackTitle.isNullOrBlank() && !shouldMask) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = currentStreamTrackTitle!!,

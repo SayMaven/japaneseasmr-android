@@ -322,7 +322,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val isAutoResumeActive: Boolean = sp.getBoolean("setting_auto_resume", true)
 
     // Playback States (Synchronously restored from cache on launch if auto-resume is ON)
-    private val _currentRjId = MutableStateFlow<String?>(if (isAutoResumeActive) sp.getString("cached_rjid", null) else null)
+    private val _currentRjId = MutableStateFlow<String?>(
+        if (isAutoResumeActive) {
+            val cached = sp.getString("cached_rjid", null)
+            if (cached != null && (cached.startsWith("/") || cached.contains("/"))) null else cached
+        } else null
+    )
     val currentRjId = _currentRjId.asStateFlow()
 
     enum class PlaybackMode { OFFLINE_SINGLE, OFFLINE_ALBUM, ONLINE_STREAM }
@@ -338,7 +343,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (isStream) return@combine "STREAM | $rj"
         val entity = list.firstOrNull { it.rjid == rj }
         if (entity == null) {
-            if (rj.startsWith("LOCAL_")) "IMPORT" else rj
+            when {
+                rj.startsWith("LOCAL_") -> "IMPORT"
+                rj.contains('/') || rj.startsWith("http") -> "IMPORT"
+                else -> rj
+            }
         } else {
             val isLocal = entity.sourceType != SourceType.DL_SITE.name || entity.rjid.startsWith("LOCAL_")
             when {
@@ -501,8 +510,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (idx in chapters.indices) chapters[idx] else null
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    var isCurrentVirtualAlbum = false
-        private set
+    private val _isVirtualAlbum = MutableStateFlow(false)
+    val isVirtualAlbum = _isVirtualAlbum.asStateFlow()
+
+    var isCurrentVirtualAlbum: Boolean
+        get() = _isVirtualAlbum.value
+        set(value) {
+            _isVirtualAlbum.value = value
+        }
     var currentAlbumHistory: HistoryEntity? = null
         private set
 
@@ -992,17 +1007,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _shuffleMode.value = p.shuffleModeEnabled
 
             p.currentMediaItem?.let { item ->
+                val rawMediaId = item.mediaId
+                val cleanMediaId = if (rawMediaId.startsWith("/") || rawMediaId.contains("/")) null else rawMediaId
                 val prevRj = _currentRjId.value
-                _currentRjId.value = item.mediaId
-                if (prevRj != item.mediaId) {
-                    loadChaptersForCurrentTrack(item.mediaId)
+                if (!cleanMediaId.isNullOrBlank()) {
+                    _currentRjId.value = cleanMediaId
+                    if (prevRj != cleanMediaId) {
+                        loadChaptersForCurrentTrack(cleanMediaId)
+                    }
                 }
                 item.mediaMetadata.let { meta ->
-                    _currentTitle.value = meta.title?.toString() ?: _currentTitle.value
+                    if (!isCurrentVirtualAlbum && _playbackMode.value != PlaybackMode.ONLINE_STREAM) {
+                        _currentTitle.value = meta.title?.toString() ?: _currentTitle.value
+                    }
                     _currentArtist.value = meta.artist?.toString() ?: _currentArtist.value
                     val cover = meta.artworkUri?.toString() ?: _currentCoverUrl.value
                     _currentCoverUrl.value = cover
                     preloadCoverArtInMemory(cover)
+                }
+                if (isCurrentVirtualAlbum) {
+                    _currentStreamTrackTitle.value = item.mediaMetadata.title?.toString()
                 }
             }
 
@@ -1065,6 +1089,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _currentArtist.value = history.cv
                     _currentCoverUrl.value = finalCover
                     preloadCoverArtInMemory(finalCover)
+
+                    val isFolder = history.sourceType == SourceType.LOCAL_FOLDER.name || File(history.localFilePath).isDirectory
+                    if (isFolder) {
+                        isCurrentVirtualAlbum = true
+                        currentAlbumHistory = history
+                        _playbackMode.value = PlaybackMode.OFFLINE_ALBUM
+                    } else {
+                        isCurrentVirtualAlbum = false
+                        currentAlbumHistory = null
+                        _playbackMode.value = PlaybackMode.OFFLINE_SINGLE
+                    }
 
                     if (_currentPosition.value == 0L && lastPos > 0L) {
                         _currentPosition.value = lastPos
@@ -1159,7 +1194,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     MediaItem.Builder()
                         .setUri(Uri.fromFile(tr))
                         .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(tr)).build())
-                        .setMediaId(tr.absolutePath)
+                        .setMediaId(targetPair.first.rjid)
                         .setMediaMetadata(meta)
                         .build()
                 }
@@ -1232,17 +1267,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (mediaItem != null) {
                     when (_playbackMode.value) {
                         PlaybackMode.OFFLINE_ALBUM -> {
-                            val album = currentAlbumHistory
+                            val album = currentAlbumHistory ?: _currentRjId.value?.let { rj -> _playlist.value.firstOrNull { it.rjid == rj } }
                             val curIdx = p.currentMediaItemIndex
                             val curChapter = _currentChapters.value.getOrNull(curIdx)
                             val trackTitle = curChapter?.title ?: mediaItem.mediaMetadata.title?.toString() ?: ""
+                            _currentStreamTrackTitle.value = trackTitle
                             val isLocalAlbum = album?.sourceType != SourceType.DL_SITE.name || album?.rjid?.startsWith("LOCAL_") == true
                             val albumTag = when {
                                 isLocalAlbum && !album?.linkedRjId.isNullOrBlank() -> "IMPORT • ${album?.linkedRjId}"
                                 isLocalAlbum -> "IMPORT"
                                 else -> album?.rjid ?: ""
                             }
-                            _currentTitle.value = if (album != null) "[$albumTag] ${album.title} - $trackTitle" else trackTitle
+                            _currentTitle.value = if (album != null) "[$albumTag] ${album.title}" else _currentTitle.value
+                            if (album != null && _currentRjId.value != album.rjid) {
+                                _currentRjId.value = album.rjid
+                            }
                             val baseMs = curChapter?.startMs ?: 0L
                             _currentPosition.value = (baseMs + p.currentPosition).coerceAtLeast(0L)
                             val totalDur = _currentChapters.value.lastOrNull()?.endMs ?: 0L
@@ -1272,13 +1311,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         PlaybackMode.OFFLINE_SINGLE -> {
                             val rawId = mediaItem.mediaId
                             val cleanId = when {
-                                rawId.contains('_') -> rawId.substringBefore('_')
                                 rawId.startsWith("http") || rawId.contains('/') -> _currentRjId.value ?: ""
                                 else -> rawId
                             }
                             val prevRj = _currentRjId.value
-                            _currentRjId.value = cleanId
-                            if (prevRj != cleanId && !cleanId.startsWith("http") && !cleanId.contains('/')) {
+                            if (cleanId.isNotBlank()) {
+                                _currentRjId.value = cleanId
+                            }
+                            if (prevRj != cleanId && cleanId.isNotBlank() && !cleanId.startsWith("http") && !cleanId.contains('/')) {
                                 loadChaptersForCurrentTrack(cleanId)
                                 if (_isTranslationActive.value) {
                                     loadOrFetchTranslations(cleanId)
@@ -1470,6 +1510,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val isFolder = history.sourceType == SourceType.LOCAL_FOLDER.name || targetFile.isDirectory
 
             if (isFolder) {
+                _playbackMode.value = PlaybackMode.OFFLINE_ALBUM
                 isCurrentVirtualAlbum = true
                 currentAlbumHistory = history
                 val folder = targetFile
@@ -1516,7 +1557,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     MediaItem.Builder()
                         .setUri(Uri.fromFile(tr))
                         .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(Uri.fromFile(tr)).build())
-                        .setMediaId(tr.absolutePath)
+                        .setMediaId(history.rjid)
                         .setMediaMetadata(metaBuilder.build())
                         .build()
                 }
@@ -1536,6 +1577,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val initialTrackIdx = if (startPositionMs > 0L && cachedChapters != null) {
                     cachedChapters.indexOfLast { startPositionMs >= it.startMs }.coerceIn(0, (tracks.size - 1).coerceAtLeast(0))
                 } else 0
+                _currentStreamTrackTitle.value = initialChapters.getOrNull(initialTrackIdx)?.title ?: tracks.getOrNull(initialTrackIdx)?.nameWithoutExtension
                 val initialOffset = if (startPositionMs > 0L && cachedChapters != null) {
                     (startPositionMs - (cachedChapters.getOrNull(initialTrackIdx)?.startMs ?: 0L)).coerceAtLeast(0L)
                 } else 0L
@@ -1917,8 +1959,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
             return
         }
-        if (p != null && p.currentPosition > 3000) {
-            p.seekTo(0)
+        val pos = if (isCurrentVirtualAlbum) _currentPosition.value else (p?.currentPosition ?: 0L)
+        if (p != null && pos > 3000) {
+            seekTo(0L)
         } else {
             playAdjacentWork(forward = false)
         }
@@ -1928,8 +1971,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun playAdjacentWork(forward: Boolean) {
         val list = filteredPlaylist.value.ifEmpty { _playlist.value }
         if (list.isEmpty()) return
-        val curId = _currentRjId.value
-        val curIdx = list.indexOfFirst { it.rjid == curId }
+        val curId = _currentRjId.value ?: currentAlbumHistory?.rjid
+        var curIdx = list.indexOfFirst { it.rjid == curId }
+        if (curIdx == -1 && currentAlbumHistory != null) {
+            curIdx = list.indexOfFirst { it.rjid == currentAlbumHistory?.rjid || it.localFilePath == currentAlbumHistory?.localFilePath }
+        }
+        if (curIdx == -1 && !curId.isNullOrBlank()) {
+            curIdx = list.indexOfFirst { it.localFilePath == curId || it.linkedRjId == curId }
+        }
         if (curIdx != -1) {
             val targetIdx = if (_shuffleMode.value) {
                 if (list.size > 1) {
