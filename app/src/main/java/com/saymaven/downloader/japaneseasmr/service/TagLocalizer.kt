@@ -1446,6 +1446,33 @@ object TagLocalizer {
         return nameToEnglish[lower] ?: cleanName
     }
 
+    val englishToJapanese: Map<String, String> by lazy {
+        val map = mutableMapOf<String, String>()
+        for ((jp, en) in nameToEnglish) {
+            val enKey = en.trim().lowercase()
+            if (!map.containsKey(enKey)) {
+                map[enKey] = jp
+            }
+        }
+        map
+    }
+
+    fun getJapaneseName(name: String): String? {
+        val lower = name.trim().lowercase()
+        if (nameToEnglish.containsKey(lower)) return name
+        return englishToJapanese[lower]
+    }
+
+    fun getLocalizedDisplayName(context: android.content.Context, tagId: Int? = null, rawName: String): String {
+        val locale = context.resources.configuration.locales.get(0) ?: java.util.Locale.getDefault()
+        val isJapanese = locale.language.equals("ja", ignoreCase = true)
+        return if (isJapanese) {
+            getJapaneseName(rawName) ?: rawName
+        } else {
+            localize(tagId, rawName)
+        }
+    }
+
     /**
      * Returns all known unique tag names.
      */

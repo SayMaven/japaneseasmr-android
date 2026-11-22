@@ -133,6 +133,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         "id"
     )
 
+    val autoTranslateLyrics = preferencesManager.autoTranslateLyricsFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        preferencesManager.getInitialAutoTranslateLyrics()
+    )
+
+    val autoTranslateDetail = preferencesManager.autoTranslateDetailFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        preferencesManager.getInitialAutoTranslateDetail()
+    )
+
+    val autoTranslateLists = preferencesManager.autoTranslateListsFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        preferencesManager.getInitialAutoTranslateLists()
+    )
+
     val appLanguage = preferencesManager.appLanguageFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
@@ -239,6 +257,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setTranslationLanguage(lang: String) {
         viewModelScope.launch {
             preferencesManager.setTranslationLanguage(lang)
+        }
+    }
+
+    fun setAutoTranslateLyrics(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setAutoTranslateLyrics(enabled)
+        }
+    }
+
+    fun setAutoTranslateDetail(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setAutoTranslateDetail(enabled)
+        }
+    }
+
+    fun setAutoTranslateLists(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setAutoTranslateLists(enabled)
         }
     }
 
@@ -458,6 +494,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val floatingLyricsOpacity = preferencesManager.floatingLyricsOpacityFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.90f)
     val floatingLyricsCornerRadius = preferencesManager.floatingLyricsCornerRadiusFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16f)
     val floatingLyricsShowTranslation = preferencesManager.floatingLyricsShowTranslationFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val floatingLyricsDisplayMode = preferencesManager.floatingLyricsDisplayModeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "BOTH")
     val floatingLyricsLocked = preferencesManager.floatingLyricsLockedFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun setFloatingLyricsEnabled(enabled: Boolean) = viewModelScope.launch { preferencesManager.setFloatingLyricsEnabled(enabled) }
@@ -465,6 +502,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setFloatingLyricsOpacity(opacity: Float) = viewModelScope.launch { preferencesManager.setFloatingLyricsOpacity(opacity) }
     fun setFloatingLyricsCornerRadius(radius: Float) = viewModelScope.launch { preferencesManager.setFloatingLyricsCornerRadius(radius) }
     fun setFloatingLyricsShowTranslation(show: Boolean) = viewModelScope.launch { preferencesManager.setFloatingLyricsShowTranslation(show) }
+    fun setFloatingLyricsDisplayMode(mode: String) = viewModelScope.launch { preferencesManager.setFloatingLyricsDisplayMode(mode) }
     fun setFloatingLyricsLocked(locked: Boolean) = viewModelScope.launch { preferencesManager.setFloatingLyricsLocked(locked) }
 }
 

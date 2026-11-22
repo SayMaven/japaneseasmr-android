@@ -117,6 +117,8 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
     val showDetailTranslateBtn = prefs.detailShowTranslateButtonFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
     val showDetailSubtitle = prefs.detailShowSubtitleTagFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
     val showDetailAgeRating = prefs.detailShowAgeRatingFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val audioFormatPriority = prefs.audioFormatPriorityFlow.stateIn(viewModelScope, SharingStarted.Lazily, "mp3_se,mp3,flac,wav,opus,m4a,aac")
+    val autoTranslateDetail = prefs.autoTranslateDetailFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     // Pagination
     private val _currentPage = MutableStateFlow(1)
@@ -160,6 +162,14 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
 
     init {
         loadPage(1)
+        viewModelScope.launch {
+            prefs.autoTranslateListsFlow.collect { autoActive ->
+                if (autoActive && !_isTranslationActive.value) {
+                    _isTranslationActive.value = true
+                    translateCurrentWorks(getApplication())
+                }
+            }
+        }
     }
 
     fun setTab(tab: BrowseTabType) {
@@ -262,6 +272,9 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
                 _errorMessage.value = null
                 _totalCount.value = pageData.totalCount
                 _totalPages.value = pageData.totalPages.coerceAtLeast(1)
+                if (_isTranslationActive.value) {
+                    translateCurrentWorks(getApplication())
+                }
             }.onFailure { error ->
                 _errorMessage.value = error.localizedMessage ?: "Failed to load works"
             }
@@ -286,7 +299,7 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
 
             // Load file tree and flat audio tracks concurrently
             val treeResult = AsmrOneApiService.getWorkFileTree(workId)
-            val tracksResult = AsmrOneApiService.getWorkTracks(workId)
+            val tracksResult = AsmrOneApiService.getWorkTracks(workId, audioFormatPriority.value)
 
             treeResult.onSuccess { tree ->
                 _fileTree.value = tree
@@ -309,7 +322,7 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    fun translateCurrentWorks(context: Context) {
+    fun translateCurrentWorks(context: Context = getApplication()) {
         translationJob?.cancel()
         translationJob = viewModelScope.launch {
             val targetLang = TranslationService.getActiveTargetLanguage(context)

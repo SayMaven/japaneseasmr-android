@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
@@ -38,6 +39,7 @@ import com.saymaven.downloader.japaneseasmr.ui.components.FloatingVolumeHud
 import com.saymaven.downloader.japaneseasmr.ui.components.FloatingLyricsBar
 import com.saymaven.downloader.japaneseasmr.ui.components.MiniPlayer
 import com.saymaven.downloader.japaneseasmr.ui.components.NavTab
+import com.saymaven.downloader.japaneseasmr.util.NetworkMonitor
 import com.saymaven.downloader.japaneseasmr.ui.screens.history.HistoryScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.history.HistoryViewModel
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlayerScreen
@@ -337,13 +339,48 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     ) { innerPadding ->
-                        // Mempertahankan semua tab di memori dengan GPU RenderNode switching
-                        // Menghilangkan 100% delay perpindahan tab (0.0ms instant tab switching)
-                        Box(
+                        val isOnline by remember { NetworkMonitor.getInstance(this@MainActivity).isOnline }.collectAsState()
+
+                        Column(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(innerPadding)
                         ) {
+                            AnimatedVisibility(visible = !isOnline) {
+                                androidx.compose.material3.Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        androidx.compose.material3.Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Filled.WifiOff,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        androidx.compose.material3.Text(
+                                            text = androidx.compose.ui.res.stringResource(com.saymaven.downloader.japaneseasmr.R.string.network_offline_banner),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Mempertahankan semua tab di memori dengan GPU RenderNode switching
+                            // Menghilangkan 100% delay perpindahan tab (0.0ms instant tab switching)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .weight(1f)
+                            ) {
                             // Tab 0: Home / Daftar Putar Koleksi (HiBy Music Style)
                             Box(
                                 modifier = Modifier
@@ -470,6 +507,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                }
 
                     // Expanded Full Player Layer (HiBy Music Style slide-up drawer)
                     AnimatedVisibility(

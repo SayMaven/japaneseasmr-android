@@ -60,6 +60,7 @@ fun AsmrOneBrowseScreen(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val isOnline by remember { com.saymaven.downloader.japaneseasmr.util.NetworkMonitor.getInstance(context).isOnline }.collectAsState()
 
     val works by viewModel.works.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -123,6 +124,19 @@ fun AsmrOneBrowseScreen(
         initialFirstVisibleItemIndex = viewModel.scrollIndex,
         initialFirstVisibleItemScrollOffset = viewModel.scrollOffset
     )
+
+    LaunchedEffect(currentPage) {
+        if (currentPage > 0) {
+            gridState.scrollToItem(0)
+            listState.scrollToItem(0)
+        }
+    }
+
+    LaunchedEffect(isOnline) {
+        if (isOnline && works.isEmpty()) {
+            viewModel.loadPage(viewModel.currentPage.value)
+        }
+    }
 
     DisposableEffect(gridState, isListView) {
         onDispose {
@@ -433,6 +447,41 @@ fun AsmrOneBrowseScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()
+                    }
+                }
+                !isOnline && works.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WifiOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(56.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(R.string.network_offline_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = stringResource(R.string.network_offline_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { viewModel.loadPage(1) }) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(stringResource(R.string.browse_action_retry))
+                        }
                     }
                 }
                 errorMessage != null && works.isEmpty() -> {
@@ -794,27 +843,26 @@ fun AsmrOneWorkCard(
                     }
                 }
 
-                // Top-Right Badge: Age Rating (R18 / ALL)
+                // Top-Right Badge: Age Rating (R18 / SAFE / R-15)
                 if (showCardAgeRating) {
-                    val ageBgColor = if (work.ageRating.contains("18")) {
-                        Color(0xFFD32F2F).copy(alpha = 0.88f)
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = ageBgColor,
-                        modifier = Modifier
-                            .padding(6.dp)
-                            .align(Alignment.TopEnd)
-                    ) {
-                        Text(
-                            text = work.ageRating,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                        )
+                    val normalizedRating = com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper.normalize(work.ageRating)
+                    if (normalizedRating != "-") {
+                        val ageBgColor = com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper.getBadgeColor(normalizedRating)
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = ageBgColor,
+                            modifier = Modifier
+                                .padding(6.dp)
+                                .align(Alignment.TopEnd)
+                        ) {
+                            Text(
+                                text = normalizedRating,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 

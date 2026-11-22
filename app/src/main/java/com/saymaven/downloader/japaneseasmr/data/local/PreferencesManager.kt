@@ -31,6 +31,9 @@ class PreferencesManager(private val context: Context) {
         val KEY_TRANSLATION_LANGUAGE = stringPreferencesKey("translation_language")
         val KEY_IS_TRANSLATION_ACTIVE = booleanPreferencesKey("is_translation_active")
         val KEY_TRANSLATION_ENGINE_VERSION = intPreferencesKey("translation_engine_version")
+        val KEY_AUTO_TRANSLATE_LYRICS = booleanPreferencesKey("auto_translate_lyrics")
+        val KEY_AUTO_TRANSLATE_DETAIL = booleanPreferencesKey("auto_translate_detail")
+        val KEY_AUTO_TRANSLATE_LISTS = booleanPreferencesKey("auto_translate_lists")
 
         // Audio Player Settings
         val KEY_EXCLUSIVE_USB_DAC = booleanPreferencesKey("exclusive_usb_dac")
@@ -115,6 +118,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_FLOATING_LYRICS_OPACITY = floatPreferencesKey("floating_lyrics_opacity")
         val KEY_FLOATING_LYRICS_CORNER_RADIUS = floatPreferencesKey("floating_lyrics_corner_radius")
         val KEY_FLOATING_LYRICS_SHOW_TRANSLATION = booleanPreferencesKey("floating_lyrics_show_translation")
+        val KEY_FLOATING_LYRICS_DISPLAY_MODE = stringPreferencesKey("floating_lyrics_display_mode")
         val KEY_FLOATING_LYRICS_LOCKED = booleanPreferencesKey("floating_lyrics_locked")
 
         fun getFastCachedUsbVolume(context: Context): Float {
@@ -553,13 +557,30 @@ class PreferencesManager(private val context: Context) {
     val floatingLyricsOpacityFlow: Flow<Float> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_OPACITY] ?: 0.90f }
     val floatingLyricsCornerRadiusFlow: Flow<Float> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_CORNER_RADIUS] ?: 16f }
     val floatingLyricsShowTranslationFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] ?: true }
+    val floatingLyricsDisplayModeFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[KEY_FLOATING_LYRICS_DISPLAY_MODE]
+            ?: if (prefs[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] == false) "ORIGINAL_ONLY" else "BOTH"
+    }.distinctUntilChanged()
     val floatingLyricsLockedFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_LOCKED] ?: false }
 
     suspend fun setFloatingLyricsEnabled(enabled: Boolean) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_ENABLED] = enabled }
     suspend fun setFloatingLyricsFontSize(size: Float) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_FONT_SIZE] = size.coerceIn(10f, 24f) }
-    suspend fun setFloatingLyricsOpacity(opacity: Float) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_OPACITY] = opacity.coerceIn(0.25f, 1.0f) }
+    suspend fun setFloatingLyricsOpacity(opacity: Float) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_OPACITY] = opacity.coerceIn(0.0f, 1.0f) }
     suspend fun setFloatingLyricsCornerRadius(radius: Float) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_CORNER_RADIUS] = radius.coerceIn(0f, 24f) }
-    suspend fun setFloatingLyricsShowTranslation(show: Boolean) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] = show }
+    suspend fun setFloatingLyricsShowTranslation(show: Boolean) = context.dataStore.edit {
+        it[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] = show
+        it[KEY_FLOATING_LYRICS_DISPLAY_MODE] = if (show) "BOTH" else "ORIGINAL_ONLY"
+    }
+    suspend fun setFloatingLyricsDisplayMode(mode: String) {
+        val normalized = when (mode) {
+            "TRANSLATION_ONLY", "ORIGINAL_ONLY", "BOTH" -> mode
+            else -> "BOTH"
+        }
+        context.dataStore.edit {
+            it[KEY_FLOATING_LYRICS_DISPLAY_MODE] = normalized
+            it[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] = (normalized != "ORIGINAL_ONLY")
+        }
+    }
     suspend fun setFloatingLyricsLocked(locked: Boolean) = context.dataStore.edit { it[KEY_FLOATING_LYRICS_LOCKED] = locked }
 
     suspend fun setThemeMode(mode: ThemeMode) {
@@ -661,6 +682,43 @@ class PreferencesManager(private val context: Context) {
     suspend fun setTranslationEngineVersion(version: Int) {
         context.dataStore.edit { preferences ->
             preferences[KEY_TRANSLATION_ENGINE_VERSION] = version
+        }
+    }
+
+    val autoTranslateLyricsFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_AUTO_TRANSLATE_LYRICS] ?: true
+    }.distinctUntilChanged()
+
+    val autoTranslateDetailFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_AUTO_TRANSLATE_DETAIL] ?: false
+    }.distinctUntilChanged()
+
+    val autoTranslateListsFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_AUTO_TRANSLATE_LISTS] ?: false
+    }.distinctUntilChanged()
+
+    fun getInitialAutoTranslateLyrics(): Boolean = fastSp.getBoolean("cached_auto_translate_lyrics", true)
+    fun getInitialAutoTranslateDetail(): Boolean = fastSp.getBoolean("cached_auto_translate_detail", false)
+    fun getInitialAutoTranslateLists(): Boolean = fastSp.getBoolean("cached_auto_translate_lists", false)
+
+    suspend fun setAutoTranslateLyrics(enabled: Boolean) {
+        fastSp.edit().putBoolean("cached_auto_translate_lyrics", enabled).apply()
+        context.dataStore.edit { preferences ->
+            preferences[KEY_AUTO_TRANSLATE_LYRICS] = enabled
+        }
+    }
+
+    suspend fun setAutoTranslateDetail(enabled: Boolean) {
+        fastSp.edit().putBoolean("cached_auto_translate_detail", enabled).apply()
+        context.dataStore.edit { preferences ->
+            preferences[KEY_AUTO_TRANSLATE_DETAIL] = enabled
+        }
+    }
+
+    suspend fun setAutoTranslateLists(enabled: Boolean) {
+        fastSp.edit().putBoolean("cached_auto_translate_lists", enabled).apply()
+        context.dataStore.edit { preferences ->
+            preferences[KEY_AUTO_TRANSLATE_LISTS] = enabled
         }
     }
 

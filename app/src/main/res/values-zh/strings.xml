@@ -520,7 +520,7 @@
     <string name="settings_audio_gain">音频增益</string>
     <string name="settings_audio_gain_desc">放大耳语声音 (%1$s dB)</string>
     <string name="settings_audio_format_priority">音频格式优先级</string>
-    <string name="settings_audio_format_priority_desc">在线播放和下载时的首选音频格式</string>
+    <string name="settings_audio_format_priority_desc">在线播放与预览格式优先级（最高可用格式文件夹自动展开并优先播放）</string>
     <string name="settings_preload_next">预加载下一首</string>
     <string name="settings_preload_next_desc">提前缓存实现无缝播放</string>
     <string name="settings_blocked_items">屏蔽设置</string>
@@ -548,6 +548,11 @@
     <string name="settings_floating_lyrics_enable_desc">在应用内迷你播放器上方显示悬浮歌词</string>
     <string name="settings_floating_lyrics_show_trans">显示翻译</string>
     <string name="settings_floating_lyrics_show_trans_desc">在原歌词下方显示翻译文本</string>
+    <string name="settings_floating_lyrics_display_mode">歌词显示模式</string>
+    <string name="settings_floating_lyrics_display_mode_desc">选择同时显示、仅显示翻译或仅显示原文</string>
+    <string name="settings_floating_lyrics_mode_both">同时显示</string>
+    <string name="settings_floating_lyrics_mode_translation">仅翻译</string>
+    <string name="settings_floating_lyrics_mode_original">仅原文</string>
     <string name="settings_floating_lyrics_lock">锁定位置</string>
     <string name="settings_floating_lyrics_lock_desc">防止误触拖动歌词栏</string>
     <string name="settings_floating_lyrics_font_size">字体大小: %1$d sp</string>
@@ -578,4 +583,26 @@
     <string name="settings_display_translate_btn_desc">在文件树标题栏显示批量翻译按钮</string>
     <string name="settings_display_recommendations">相关推荐</string>
     <string name="settings_display_recommendations_desc">显示相关作品推荐</string>
+
+    <!-- Network Offline & Auto-Translate & Settings Screens -->
+    <string name="network_offline_banner">离线模式 - 仅显示本地作品</string>
+    <string name="network_offline_title">无网络连接</string>
+    <string name="network_offline_desc">请检查网络连接或打开本地收藏离线收听。</string>
+    <string name="settings_auto_translate_lyrics">自动翻译歌词</string>
+    <string name="settings_auto_translate_lyrics_desc">播放音频时自动翻译歌词和字幕</string>
+    <string name="settings_auto_translate_detail">自动翻译详情页</string>
+    <string name="settings_auto_translate_detail_desc">自动翻译作品详情页的标题和文件树</string>
+    <string name="settings_auto_translate_lists">自动翻译列表标题</string>
+    <string name="settings_auto_translate_lists_desc">自动翻译探索和本地收藏的作品标题</string>
+    <string name="settings_lang_and_trans_title">语言与翻译</string>
+    <string name="settings_lang_and_trans_desc">应用语言、目标翻译语言和自动翻译设置</string>
+    <string name="settings_audio_format_and_playback">音频格式与播放</string>
+    <string name="settings_audio_format_and_playback_desc">格式优先级、默认播放速度、增益、预加载与DAC</string>
+    <string name="settings_appearance_theme_title">主题与调色板</string>
+    <string name="settings_appearance_theme_desc">深色/浅色模式、动态颜色及36种调色板</string>
+    <string name="settings_download_storage_title">下载设置</string>
+    <string name="settings_download_storage_desc">下载目录、并发线程、文件命名与CUE设置</string>
+    <string name="settings_cat_auto_translate">自动翻译</string>
+    <string name="settings_speed_title">默认播放速度</string>
+    <string name="settings_speed_desc">开始播放音频时的默认速度</string>
 </resources>

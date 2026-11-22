@@ -226,22 +226,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    val folderItemsMap: StateFlow<Map<String, List<HistoryEntity>>> = combine(_playlist, _downloadDir) { list, rawDirStr ->
+    val folderItemsMap: StateFlow<Map<String, List<HistoryEntity>>> = combine(_playlist, _downloadDir, prefs.importedDirsFlow) { list, rawDirStr, rawImportedDirs ->
         val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), rawDirStr) ?: rawDirStr
         val downloadDir = if (!resolvedPath.isNullOrBlank()) File(resolvedPath) else DownloadService.getDefaultDownloadDirectory()
+        val importedFiles = rawImportedDirs.mapNotNull { uriStr ->
+            val phys = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), uriStr) ?: uriStr
+            if (phys.isNotBlank()) File(phys) else null
+        }
         list.groupBy { item ->
-            AudioStorageHelper.getRelativeFolderName(downloadDir, File(item.localFilePath))
+            AudioStorageHelper.getRelativeFolderName(downloadDir, File(item.localFilePath), importedFiles)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    val filteredPlaylist = combine(_playlist, _selectedFolder, _downloadDir, _sortState) { list, folder, rawDirStr, sort ->
+    val filteredPlaylist = combine(_playlist, _selectedFolder, _downloadDir, prefs.importedDirsFlow, _sortState) { list, folder, rawDirStr, rawImportedDirs, sort ->
         val folderFiltered = if (folder == "Semua") {
             list
         } else {
             val resolvedPath = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), rawDirStr) ?: rawDirStr
             val downloadDir = if (!resolvedPath.isNullOrBlank()) File(resolvedPath) else DownloadService.getDefaultDownloadDirectory()
+            val importedFiles = rawImportedDirs.mapNotNull { uriStr ->
+                val phys = AudioStorageHelper.resolvePhysicalPathFromUri(getApplication(), uriStr) ?: uriStr
+                if (phys.isNotBlank()) File(phys) else null
+            }
             list.filter { item ->
-                val itemFolder = AudioStorageHelper.getRelativeFolderName(downloadDir, File(item.localFilePath))
+                val itemFolder = AudioStorageHelper.getRelativeFolderName(downloadDir, File(item.localFilePath), importedFiles)
                 itemFolder.equals(folder, ignoreCase = true)
             }
         }
@@ -382,6 +390,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val floatingLyricsOpacity = prefs.floatingLyricsOpacityFlow.stateIn(viewModelScope, SharingStarted.Lazily, 0.90f)
     val floatingLyricsCornerRadius = prefs.floatingLyricsCornerRadiusFlow.stateIn(viewModelScope, SharingStarted.Lazily, 16f)
     val floatingLyricsShowTranslation = prefs.floatingLyricsShowTranslationFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
+    val floatingLyricsDisplayMode = prefs.floatingLyricsDisplayModeFlow.stateIn(viewModelScope, SharingStarted.Lazily, "BOTH")
     val floatingLyricsLocked = prefs.floatingLyricsLockedFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     private var lyricsJob: Job? = null
@@ -761,6 +770,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _isTranslationActive.value = active
                 if (active && !_currentRjId.value.isNullOrBlank()) {
                     loadOrFetchTranslations(_currentRjId.value)
+                }
+            }
+        }
+        viewModelScope.launch {
+            prefs.autoTranslateListsFlow.distinctUntilChanged().collect { autoActive ->
+                if (autoActive && !_isTranslationActive.value) {
+                    _isTranslationActive.value = true
+                    prefs.setTranslationActive(true)
                 }
             }
         }
@@ -1717,8 +1734,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             // Resume online stream from asmr.one when no local history exists
                             val workId = rj.filter { it.isDigit() }.toIntOrNull() ?: 0
                             if (workId > 0) {
+                                val priority = prefs.audioFormatPriorityFlow.first()
                                 val tracks = withContext(Dispatchers.IO) {
-                                    AsmrOneApiService.getWorkTracks(workId).getOrNull() ?: emptyList()
+                                    AsmrOneApiService.getWorkTracks(workId, priority).getOrNull() ?: emptyList()
                                 }
                                 if (tracks.isNotEmpty()) {
                                     val cleanTitle = _currentTitle.value
@@ -2488,7 +2506,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             } else {
                 val workId = item.rjid.filter { it.isDigit() }.toIntOrNull() ?: 0
-                val tracksRes = com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService.getWorkTracks(workId)
+                val priority = prefs.audioFormatPriorityFlow.first()
+                val tracksRes = com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService.getWorkTracks(workId, priority)
                 val tracks = tracksRes.getOrNull() ?: emptyList()
                 if (tracks.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
@@ -2569,6 +2588,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        translateLyricsDirectly()
+    }
+
+    private fun translateLyricsDirectly() {
+        val current = _currentLyrics.value
+        if (current.isEmpty()) return
+
         if (current.any { !it.translatedText.isNullOrBlank() }) {
             _isLyricsTranslated.value = true
             return
@@ -2597,6 +2623,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
             _isLyricsTranslated.value = true
             _isTranslatingLyrics.value = false
+        }
+    }
+
+    private suspend fun autoTranslateLyricsIfEnabled() {
+        val autoTranslate = prefs.autoTranslateLyricsFlow.first()
+        if (autoTranslate && _currentLyrics.value.isNotEmpty() && !_isLyricsTranslated.value) {
+            translateLyricsDirectly()
         }
     }
 
@@ -2702,6 +2735,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                     _currentLyrics.value = mergedLyrics
                                     _isLyricsTranslated.value = false
                                     _activeLyricIndex.value = -1
+                                    autoTranslateLyricsIfEnabled()
                                     return@launch
                                 }
                             }
@@ -2734,6 +2768,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _currentLyrics.value = parsed
             _isLyricsTranslated.value = false
             _activeLyricIndex.value = -1
+            autoTranslateLyricsIfEnabled()
         }
     }
 

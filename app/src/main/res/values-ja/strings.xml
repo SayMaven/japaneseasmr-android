@@ -520,7 +520,7 @@
     <string name="settings_audio_gain">オーディオゲイン</string>
     <string name="settings_audio_gain_desc">囁き声の音量を増幅 (%1$s dB)</string>
     <string name="settings_audio_format_priority">音声形式の優先順位</string>
-    <string name="settings_audio_format_priority_desc">ストリーミング・ダウンロード時の優先形式</string>
+    <string name="settings_audio_format_priority_desc">ストリーミング・プレビュー時の形式優先度（上位形式フォルダが自動展開され優先再生）</string>
     <string name="settings_preload_next">次のトラックを事前読込</string>
     <string name="settings_preload_next_desc">途切れのない再生のために事前バッファ</string>
     <string name="settings_blocked_items">ブロック設定</string>
@@ -548,6 +548,11 @@
     <string name="settings_floating_lyrics_enable_desc">アプリ内のミニプレーヤー上に歌詞バーを表示</string>
     <string name="settings_floating_lyrics_show_trans">翻訳を表示</string>
     <string name="settings_floating_lyrics_show_trans_desc">元の歌詞の下に翻訳テキストを表示</string>
+    <string name="settings_floating_lyrics_display_mode">歌詞の表示モード</string>
+    <string name="settings_floating_lyrics_display_mode_desc">両方表示、翻訳のみ、または原文のみを選択</string>
+    <string name="settings_floating_lyrics_mode_both">両方</string>
+    <string name="settings_floating_lyrics_mode_translation">翻訳のみ</string>
+    <string name="settings_floating_lyrics_mode_original">原文のみ</string>
     <string name="settings_floating_lyrics_lock">位置をロック</string>
     <string name="settings_floating_lyrics_lock_desc">誤ってドラッグされるのを防止</string>
     <string name="settings_floating_lyrics_font_size">文字サイズ: %1$d sp</string>
@@ -578,4 +583,26 @@
     <string name="settings_display_translate_btn_desc">ファイルツリーに一括翻訳ボタンを表示</string>
     <string name="settings_display_recommendations">関連作品</string>
     <string name="settings_display_recommendations_desc">おすすめ作品を表示</string>
+
+    <!-- Network Offline & Auto-Translate & Settings Screens -->
+    <string name="network_offline_banner">オフラインモード - ローカル作品を表示中</string>
+    <string name="network_offline_title">インターネット接続がありません</string>
+    <string name="network_offline_desc">インターネット接続を確認するか、ローカルコレクションを開いてオフラインで再生してください。</string>
+    <string name="settings_auto_translate_lyrics">歌詞の自動翻訳</string>
+    <string name="settings_auto_translate_lyrics_desc">音声再生時に歌詞・字幕を自動的に翻訳します</string>
+    <string name="settings_auto_translate_detail">詳細ページの自動翻訳</string>
+    <string name="settings_auto_translate_detail_desc">詳細ページのタイトルおよびファイル一覧を自動的に翻訳します</string>
+    <string name="settings_auto_translate_lists">リストタイトルの自動翻訳</string>
+    <string name="settings_auto_translate_lists_desc">ASMR探索およびローカルコレクションのタイトルを自動翻訳します</string>
+    <string name="settings_lang_and_trans_title">言語と翻訳</string>
+    <string name="settings_lang_and_trans_desc">アプリ言語、翻訳先言語、および自動翻訳設定</string>
+    <string name="settings_audio_format_and_playback">オーディオ形式と再生</string>
+    <string name="settings_audio_format_and_playback_desc">形式優先度、デフォルト再生速度、ゲイン、プリロード、DAC</string>
+    <string name="settings_appearance_theme_title">テーマとカラーパレット</string>
+    <string name="settings_appearance_theme_desc">ダーク/ライトモード、ダイナミックカラー、36種類のパレット</string>
+    <string name="settings_download_storage_title">ダウンロード設定</string>
+    <string name="settings_download_storage_desc">ダウンロード先、並列スレッド、ファイル名設定、CUEシート</string>
+    <string name="settings_cat_auto_translate">自動翻訳</string>
+    <string name="settings_speed_title">デフォルト再生速度</string>
+    <string name="settings_speed_desc">音声再生開始時のデフォルト速度</string>
 </resources>

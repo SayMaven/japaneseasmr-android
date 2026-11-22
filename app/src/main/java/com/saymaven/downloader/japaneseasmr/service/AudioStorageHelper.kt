@@ -366,26 +366,46 @@ object AudioStorageHelper {
     }
 
     /**
-     * Mendapatkan nama folder tempat file audio berada ("Utama" untuk root atau nama subfolder).
+     * Mendapatkan nama folder tempat file audio berada ("Utama" untuk root atau nama subfolder/folder impor).
      */
-    fun getRelativeFolderName(downloadDir: File?, audioFile: File): String {
-        if (downloadDir == null || !downloadDir.exists()) return "Utama"
+    fun getRelativeFolderName(downloadDir: File?, audioFile: File, importedDirs: List<File> = emptyList()): String {
         return try {
-            val parent = audioFile.parentFile ?: return "Utama"
-            val dlCanon = downloadDir.canonicalPath
-            val parentCanon = parent.canonicalPath
-            when {
-                parentCanon.equals(dlCanon, ignoreCase = true) -> "Utama"
-                parentCanon.startsWith(dlCanon + File.separator, ignoreCase = true) -> {
-                    val rel = parentCanon.substring(dlCanon.length + 1)
-                        .replace('\\', '/')
-                        .substringBefore('/')
-                    if (rel.isBlank()) "Utama" else rel
+            val targetCanon = audioFile.canonicalPath
+
+            // 1. Cek apakah audioFile berada di salah satu direktori impor
+            for (imp in importedDirs) {
+                if (!imp.exists()) continue
+                val impCanon = imp.canonicalPath
+                if (targetCanon.equals(impCanon, ignoreCase = true) ||
+                    targetCanon.startsWith(impCanon + File.separator, ignoreCase = true)
+                ) {
+                    val name = imp.name
+                    return if (name.isBlank()) "Utama" else name
                 }
-                else -> {
-                    val fallback = parent.name
-                    if (fallback.isBlank()) "Utama" else fallback
+            }
+
+            // 2. Cek apakah audioFile berada di direktori unduhan utama
+            if (downloadDir != null && downloadDir.exists()) {
+                val dlCanon = downloadDir.canonicalPath
+                val parent = audioFile.parentFile ?: return "Utama"
+                val parentCanon = parent.canonicalPath
+                when {
+                    parentCanon.equals(dlCanon, ignoreCase = true) -> "Utama"
+                    parentCanon.startsWith(dlCanon + File.separator, ignoreCase = true) -> {
+                        val rel = parentCanon.substring(dlCanon.length + 1)
+                            .replace('\\', '/')
+                            .substringBefore('/')
+                        if (rel.isBlank()) "Utama" else rel
+                    }
+                    else -> {
+                        val fallback = parent.name
+                        if (fallback.isBlank()) "Utama" else fallback
+                    }
                 }
+            } else {
+                val parent = audioFile.parentFile ?: return "Utama"
+                val fallback = parent.name
+                if (fallback.isBlank()) "Utama" else fallback
             }
         } catch (e: Exception) {
             "Utama"

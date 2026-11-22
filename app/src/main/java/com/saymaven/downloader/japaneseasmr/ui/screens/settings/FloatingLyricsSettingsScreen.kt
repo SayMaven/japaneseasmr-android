@@ -12,7 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,8 +36,12 @@ fun FloatingLyricsSettingsScreen(
     val fontSize by viewModel.floatingLyricsFontSize.collectAsState()
     val opacity by viewModel.floatingLyricsOpacity.collectAsState()
     val cornerRadius by viewModel.floatingLyricsCornerRadius.collectAsState()
-    val showTranslation by viewModel.floatingLyricsShowTranslation.collectAsState()
+    val displayMode by viewModel.floatingLyricsDisplayMode.collectAsState()
     val isLocked by viewModel.floatingLyricsLocked.collectAsState()
+
+    var draftFontSize by remember(fontSize) { mutableFloatStateOf(fontSize) }
+    var draftOpacity by remember(opacity) { mutableFloatStateOf(opacity) }
+    var draftCornerRadius by remember(cornerRadius) { mutableFloatStateOf(cornerRadius) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -56,11 +64,14 @@ fun FloatingLyricsSettingsScreen(
                 },
                 actions = {
                     IconButton(onClick = {
+                        draftFontSize = 14f
+                        draftOpacity = 0.90f
+                        draftCornerRadius = 16f
                         viewModel.setFloatingLyricsEnabled(false)
                         viewModel.setFloatingLyricsFontSize(14f)
                         viewModel.setFloatingLyricsOpacity(0.90f)
                         viewModel.setFloatingLyricsCornerRadius(16f)
-                        viewModel.setFloatingLyricsShowTranslation(true)
+                        viewModel.setFloatingLyricsDisplayMode("BOTH")
                         viewModel.setFloatingLyricsLocked(false)
                     }) {
                         Icon(Icons.Default.Restore, contentDescription = stringResource(R.string.settings_restore_defaults))
@@ -88,31 +99,83 @@ fun FloatingLyricsSettingsScreen(
                 fontWeight = FontWeight.Bold
             )
 
+            val previewTextColor = if (draftOpacity < 0.35f) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            }
+            val previewTextShadow = if (draftOpacity < 0.35f) {
+                Shadow(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    offset = Offset(0f, 1.5f),
+                    blurRadius = 6f
+                )
+            } else {
+                null
+            }
+            val previewSurfaceColor = if (draftOpacity <= 0.01f) {
+                Color.Transparent
+            } else {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = draftOpacity)
+            }
+
             Surface(
-                shape = RoundedCornerShape(cornerRadius.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = opacity),
-                shadowElevation = 4.dp,
+                shape = RoundedCornerShape(draftCornerRadius.dp),
+                color = previewSurfaceColor,
+                shadowElevation = if (draftOpacity >= 0.85f) 4.dp else 0.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = stringResource(R.string.settings_floating_lyrics_sample_orig),
-                        fontSize = fontSize.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        textAlign = TextAlign.Center
-                    )
-                    if (showTranslation) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = stringResource(R.string.settings_floating_lyrics_sample_trans),
-                            fontSize = (fontSize - 1.5f).coerceAtLeast(10f).sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
-                            textAlign = TextAlign.Center
-                        )
+                    when (displayMode) {
+                        "TRANSLATION_ONLY" -> {
+                            Text(
+                                text = stringResource(R.string.settings_floating_lyrics_sample_trans),
+                                style = TextStyle(
+                                    fontSize = draftFontSize.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = previewTextColor,
+                                    shadow = previewTextShadow
+                                ),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        "ORIGINAL_ONLY" -> {
+                            Text(
+                                text = stringResource(R.string.settings_floating_lyrics_sample_orig),
+                                style = TextStyle(
+                                    fontSize = draftFontSize.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = previewTextColor,
+                                    shadow = previewTextShadow
+                                ),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        else -> {
+                            Text(
+                                text = stringResource(R.string.settings_floating_lyrics_sample_orig),
+                                style = TextStyle(
+                                    fontSize = draftFontSize.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = previewTextColor,
+                                    shadow = previewTextShadow
+                                ),
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = stringResource(R.string.settings_floating_lyrics_sample_trans),
+                                style = TextStyle(
+                                    fontSize = (draftFontSize - 1.5f).coerceAtLeast(10f).sp,
+                                    color = previewTextColor.copy(alpha = 0.85f),
+                                    shadow = previewTextShadow
+                                ),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
@@ -131,13 +194,40 @@ fun FloatingLyricsSettingsScreen(
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.settings_floating_lyrics_show_trans), fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text(stringResource(R.string.settings_floating_lyrics_show_trans_desc), style = MaterialTheme.typography.bodySmall) },
-                        trailingContent = {
-                            Switch(checked = showTranslation, onCheckedChange = { viewModel.setFloatingLyricsShowTranslation(it) })
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_floating_lyrics_display_mode),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_floating_lyrics_display_mode_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val modeOptions = listOf(
+                                "BOTH" to stringResource(R.string.settings_floating_lyrics_mode_both),
+                                "TRANSLATION_ONLY" to stringResource(R.string.settings_floating_lyrics_mode_translation),
+                                "ORIGINAL_ONLY" to stringResource(R.string.settings_floating_lyrics_mode_original)
+                            )
+                            modeOptions.forEach { (modeKey, modeLabel) ->
+                                FilterChip(
+                                    selected = displayMode == modeKey,
+                                    onClick = { viewModel.setFloatingLyricsDisplayMode(modeKey) },
+                                    label = { Text(modeLabel, style = MaterialTheme.typography.labelMedium) }
+                                )
+                            }
                         }
-                    )
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     ListItem(
@@ -159,35 +249,38 @@ fun FloatingLyricsSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = stringResource(R.string.settings_floating_lyrics_font_size, fontSize.toInt()),
+                        text = stringResource(R.string.settings_floating_lyrics_font_size, draftFontSize.toInt()),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Slider(
-                        value = fontSize,
-                        onValueChange = { viewModel.setFloatingLyricsFontSize(it) },
+                        value = draftFontSize,
+                        onValueChange = { draftFontSize = it },
+                        onValueChangeFinished = { viewModel.setFloatingLyricsFontSize(draftFontSize) },
                         valueRange = 10f..24f
                     )
 
                     Text(
-                        text = stringResource(R.string.settings_floating_lyrics_opacity, String.format(Locale.US, "%d%%", (opacity * 100).toInt())),
+                        text = stringResource(R.string.settings_floating_lyrics_opacity, String.format(Locale.US, "%d%%", (draftOpacity * 100).toInt())),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Slider(
-                        value = opacity,
-                        onValueChange = { viewModel.setFloatingLyricsOpacity(it) },
-                        valueRange = 0.25f..1.0f
+                        value = draftOpacity,
+                        onValueChange = { draftOpacity = it },
+                        onValueChangeFinished = { viewModel.setFloatingLyricsOpacity(draftOpacity) },
+                        valueRange = 0.0f..1.0f
                     )
 
                     Text(
-                        text = stringResource(R.string.settings_floating_lyrics_corner, cornerRadius.toInt()),
+                        text = stringResource(R.string.settings_floating_lyrics_corner, draftCornerRadius.toInt()),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Slider(
-                        value = cornerRadius,
-                        onValueChange = { viewModel.setFloatingLyricsCornerRadius(it) },
+                        value = draftCornerRadius,
+                        onValueChange = { draftCornerRadius = it },
+                        onValueChangeFinished = { viewModel.setFloatingLyricsCornerRadius(draftCornerRadius) },
                         valueRange = 0f..24f
                     )
                 }

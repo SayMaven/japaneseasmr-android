@@ -36,6 +36,7 @@ import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.model.AsmrOneWork
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneFileNode
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneTrack
+import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.service.TranslationService
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlayerViewModel
 import kotlinx.coroutines.launch
@@ -63,6 +64,9 @@ fun AsmrOneWorkDetailScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val prefs = remember { PreferencesManager(context) }
+    val autoTranslateDetail by prefs.autoTranslateDetailFlow.collectAsState(initial = prefs.getInitialAutoTranslateDetail())
+    val formatPriority by prefs.audioFormatPriorityFlow.collectAsState(initial = "mp3_se,mp3,flac,wav,opus,m4a,aac")
 
     var isTitleTranslated by remember { mutableStateOf(false) }
     var translatedTitleText by remember { mutableStateOf<String?>(null) }
@@ -76,9 +80,45 @@ fun AsmrOneWorkDetailScreen(
     var translatedNodeTitles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isTranslatingFileTree by remember { mutableStateOf(false) }
 
-    // Smart default expansion: Only MP3 folder with SE あり is auto-expanded
-    val autoExpandedFolders = remember(fileTree) {
-        findAutoExpandedFolders(fileTree)
+    // Smart default expansion based on user format priority
+    val autoExpandedFolders = remember(fileTree, formatPriority) {
+        findAutoExpandedFolders(fileTree, formatPriority)
+    }
+
+    LaunchedEffect(work.title, autoTranslateDetail) {
+        if (autoTranslateDetail && !isTitleTranslated && translatedTitleText == null && work.title.isNotBlank()) {
+            coroutineScope.launch {
+                isTranslating = true
+                val targetLang = TranslationService.getActiveTargetLanguage(context)
+                val translated = TranslationService.translateText(work.title, targetLang)
+                if (translated.isNotBlank()) {
+                    translatedTitleText = translated
+                    isTitleTranslated = true
+                }
+                isTranslating = false
+            }
+        }
+    }
+
+    LaunchedEffect(fileTree, autoTranslateDetail) {
+        if (autoTranslateDetail && !isFileTreeTranslated && translatedNodeTitles.isEmpty() && fileTree.isNotEmpty()) {
+            coroutineScope.launch {
+                isTranslatingFileTree = true
+                val targetLang = TranslationService.getActiveTargetLanguage(context)
+                val titlesToTranslate = mutableSetOf<String>()
+                fun collectTitles(nodes: List<AsmrOneFileNode>) {
+                    for (n in nodes) {
+                        if (n.title.isNotBlank()) titlesToTranslate.add(n.title)
+                        if (n.children.isNotEmpty()) collectTitles(n.children)
+                    }
+                }
+                collectTitles(fileTree)
+                val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLang)
+                translatedNodeTitles = map
+                isFileTreeTranslated = true
+                isTranslatingFileTree = false
+            }
+        }
     }
 
     BackHandler {
@@ -241,18 +281,34 @@ fun AsmrOneWorkDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (showAgeRating) {
-                        val isR18 = work.nsfw || work.ageRating.contains("18", ignoreCase = true)
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (isR18) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Text(
-                                text = if (isR18) "R-18" else "ALL",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isR18) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
+                        val normalizedRating = com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper.normalize(
+                            if (work.nsfw) "R18" else work.ageRating
+                        )
+                        if (normalizedRating != "-") {
+                            val isR18 = normalizedRating == com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper.RATING_R18
+                            val isR15 = normalizedRating == com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper.RATING_R15
+                            val chipBg = when {
+                                isR18 -> MaterialTheme.colorScheme.errorContainer
+                                isR15 -> MaterialTheme.colorScheme.tertiaryContainer
+                                else -> MaterialTheme.colorScheme.primaryContainer
+                            }
+                            val chipTextColor = when {
+                                isR18 -> MaterialTheme.colorScheme.onErrorContainer
+                                isR15 -> MaterialTheme.colorScheme.onTertiaryContainer
+                                else -> MaterialTheme.colorScheme.onPrimaryContainer
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = chipBg
+                            ) {
+                                Text(
+                                    text = normalizedRating,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = chipTextColor,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                     }
 
@@ -574,10 +630,9 @@ fun AsmrOneWorkDetailScreen(
 
 /**
  * Finds paths of folders that should be auto-expanded by default.
- * Specifically prioritizes MP3 folder with SE あり (SE ari).
- * All other folders (WAV, FLAC, M4A, SE なし, etc.) remain collapsed.
+ * Prioritizes format and SE settings based on user-configured audio format priority.
  */
-private fun findAutoExpandedFolders(tree: List<AsmrOneFileNode>): Set<String> {
+private fun findAutoExpandedFolders(tree: List<AsmrOneFileNode>, formatPriority: String = "mp3_se,mp3,flac,wav,opus,m4a,aac"): Set<String> {
     val expanded = mutableSetOf<String>()
 
     data class FolderCandidate(val path: List<String>, val node: AsmrOneFileNode)
@@ -594,14 +649,41 @@ private fun findAutoExpandedFolders(tree: List<AsmrOneFileNode>): Set<String> {
     }
     collect(tree, emptyList())
 
+    val priorities = formatPriority.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+
     fun folderScore(path: List<String>): Int {
         val full = path.joinToString("/").lowercase()
         var s = 0
-        if (full.contains("mp3")) s += 100
-        if (full.contains("seあり") || full.contains("se有り") || full.contains("se_ari") || full.contains("se ari") || full.contains("効果音あり")) s += 80
-        if (full.contains("本編")) s += 50
-        if (full.contains("wav") || full.contains("flac")) s -= 50
-        if (full.contains("seなし") || full.contains("se無し") || full.contains("se_nashi") || full.contains("se nashi") || full.contains("効果音なし") || full.contains("効果音無")) s -= 120
+
+        priorities.forEachIndexed { index, format ->
+            val weight = (priorities.size - index) * 40
+            when (format) {
+                "mp3_se" -> {
+                    if (full.contains("mp3") && (full.contains("seあり") || full.contains("se有り") || full.contains("se_ari") || full.contains("se ari") || full.contains("効果音あり"))) {
+                        s += weight + 30
+                    }
+                }
+                "mp3" -> {
+                    if (full.contains("mp3")) s += weight
+                }
+                "wav" -> {
+                    if (full.contains("wav")) s += weight
+                }
+                "flac" -> {
+                    if (full.contains("flac")) s += weight
+                }
+                "opus" -> {
+                    if (full.contains("opus")) s += weight
+                }
+                "m4a", "aac" -> {
+                    if (full.contains("m4a") || full.contains("aac")) s += weight
+                }
+            }
+        }
+
+        if (full.contains("本編") || full.contains("main")) s += 30
+        if (full.contains("seなし") || full.contains("se無し") || full.contains("se_nashi") || full.contains("se nashi") || full.contains("効果音なし") || full.contains("効果音無") || full.contains("nose")) s -= 60
+        if (full.contains("おまけ") || full.contains("特典") || full.contains("bonus") || full.contains("free talk") || full.contains("フリートーク")) s -= 40
         return s
     }
 

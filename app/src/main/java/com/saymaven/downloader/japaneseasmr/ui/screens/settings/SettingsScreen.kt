@@ -32,15 +32,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.stringResource
-import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.BuildConfig
+import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.data.model.UpdateInfo
+import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import com.saymaven.downloader.japaneseasmr.service.UpdateManager
 import kotlinx.coroutines.launch
@@ -48,15 +49,20 @@ import java.io.File
 
 enum class SettingsSubScreen {
     MAIN,
+    LANGUAGE_AND_TRANSLATION,
+    APPEARANCE_THEME,
+    DOWNLOAD_STORAGE,
+    AUDIO_FORMAT,
+    FLOATING_LYRICS,
+    PRIVACY_MODE,
+    BLOCKED_ITEMS,
+    LLM_SETTINGS,
     UI_SETTINGS,
     PLAYER_BUTTONS,
     WORK_CARD,
     WORK_DETAIL,
-    PRIVACY_MODE,
-    BLOCKED_ITEMS,
-    AUDIO_FORMAT,
-    LLM_SETTINGS,
-    FLOATING_LYRICS
+    CHANGELOG,
+    USER_GUIDE
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,6 +75,39 @@ fun SettingsScreen(
     var subScreen by remember { mutableStateOf(SettingsSubScreen.MAIN) }
 
     when (subScreen) {
+        SettingsSubScreen.LANGUAGE_AND_TRANSLATION -> {
+            LanguageAndTranslationSettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.MAIN }
+            )
+            return
+        }
+        SettingsSubScreen.APPEARANCE_THEME -> {
+            AppearanceThemeSettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.MAIN }
+            )
+            return
+        }
+        SettingsSubScreen.DOWNLOAD_STORAGE -> {
+            DownloadStorageSettingsScreen(
+                viewModel = viewModel,
+                onBack = { subScreen = SettingsSubScreen.MAIN }
+            )
+            return
+        }
+        SettingsSubScreen.CHANGELOG -> {
+            ChangelogSettingsScreen(
+                onBack = { subScreen = SettingsSubScreen.MAIN }
+            )
+            return
+        }
+        SettingsSubScreen.USER_GUIDE -> {
+            UserGuideSettingsScreen(
+                onBack = { subScreen = SettingsSubScreen.MAIN }
+            )
+            return
+        }
         SettingsSubScreen.UI_SETTINGS -> {
             UiSettingsScreen(
                 viewModel = viewModel,
@@ -138,25 +177,6 @@ fun SettingsScreen(
         SettingsSubScreen.MAIN -> { /* proceed with normal main settings list */ }
     }
 
-    val themeMode by viewModel.themeMode.collectAsState()
-    val dynamicColor by viewModel.dynamicColor.collectAsState()
-    val colorPalette by viewModel.colorPalette.collectAsState()
-    val downloadDir by viewModel.downloadDir.collectAsState()
-    val parallelConn by viewModel.parallelConnections.collectAsState()
-    val autoClipboard by viewModel.autoClipboard.collectAsState()
-    val useDetailedFilename by viewModel.useDetailedFilename.collectAsState()
-    val createCueSheet by viewModel.createCueSheet.collectAsState()
-
-    // Audio Player States
-    val exclusiveUsbDac by viewModel.exclusiveUsbDac.collectAsState()
-    val audioFocus by viewModel.audioFocus.collectAsState()
-    val pauseOnUnplug by viewModel.pauseOnUnplug.collectAsState()
-    val skipSilence by viewModel.skipSilence.collectAsState()
-    val keepScreenOn by viewModel.keepScreenOn.collectAsState()
-    val autoResume by viewModel.autoResume.collectAsState()
-    val defaultSpeed by viewModel.defaultSpeed.collectAsState()
-    val translationLanguage by viewModel.translationLanguage.collectAsState()
-    val appLanguage by viewModel.appLanguage.collectAsState()
     val updateUiState by viewModel.updateUiState.collectAsState()
     val targetDebugChannel by viewModel.targetDebugChannel.collectAsState()
 
@@ -164,15 +184,6 @@ fun SettingsScreen(
     val importPreview by viewModel.importPreview.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     var folderToRemove by remember { mutableStateOf<String?>(null) }
-
-    var showLanguageDialog by remember { mutableStateOf(false) }
-    var showThemeDialog by remember { mutableStateOf(false) }
-    var showThreadDialog by remember { mutableStateOf(false) }
-    var showSpeedDialog by remember { mutableStateOf(false) }
-    var draftSpeed by remember(defaultSpeed) { mutableFloatStateOf(defaultSpeed) }
-    var showTranslationLangDialog by remember { mutableStateOf(false) }
-    var showChangelogDialog by remember { mutableStateOf(false) }
-    var showGuideDialog by remember { mutableStateOf(false) }
     var showManageStorageDialog by remember { mutableStateOf(false) }
     var pendingFolderPickerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
@@ -182,21 +193,6 @@ fun SettingsScreen(
             showManageStorageDialog = true
         } else {
             action()
-        }
-    }
-
-    val dirPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                context.contentResolver.takePersistableUriPermission(uri, takeFlags)
-            } catch (e: Exception) {
-            }
-            val resolved = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, uri.toString()) ?: uri.toString()
-            viewModel.setDownloadDir(resolved)
-            Toast.makeText(context, context.getString(R.string.settings_folder_toast_changed), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -248,24 +244,15 @@ fun SettingsScreen(
         SettingsCategoryHeader(title = stringResource(R.string.settings_cat_general), icon = Icons.Default.Language)
 
         Card(
-            onClick = { showLanguageDialog = true },
+            onClick = { subScreen = SettingsSubScreen.LANGUAGE_AND_TRANSLATION },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
             ListItem(
-                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                headlineContent = { Text(stringResource(R.string.settings_lang_title), fontWeight = FontWeight.SemiBold) },
-                supportingContent = {
-                    val langLabel = when (appLanguage) {
-                        "en" -> "English"
-                        "in" -> "Bahasa Indonesia"
-                        "ja" -> "日本語"
-                        "zh" -> "简体中文"
-                        else -> stringResource(R.string.settings_lang_system)
-                    }
-                    Text(langLabel, style = MaterialTheme.typography.bodySmall)
-                },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_lang_and_trans_title), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_lang_and_trans_desc), style = MaterialTheme.typography.bodySmall) },
                 leadingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 trailingContent = {
                     Icon(
@@ -284,7 +271,7 @@ fun SettingsScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
             ListItem(
-                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = { Text(stringResource(R.string.settings_blocked_items), fontWeight = FontWeight.SemiBold) },
                 supportingContent = { Text(stringResource(R.string.settings_blocked_items_desc), style = MaterialTheme.typography.bodySmall) },
                 leadingContent = { Icon(Icons.Default.Block, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -305,7 +292,7 @@ fun SettingsScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
             ListItem(
-                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = { Text(stringResource(R.string.settings_llm_config), fontWeight = FontWeight.SemiBold) },
                 supportingContent = { Text(stringResource(R.string.settings_llm_config_desc), style = MaterialTheme.typography.bodySmall) },
                 leadingContent = { Icon(Icons.Default.Psychology, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -323,245 +310,90 @@ fun SettingsScreen(
         SettingsCategoryHeader(title = stringResource(R.string.settings_cat_player), icon = Icons.AutoMirrored.Filled.VolumeUp)
 
         Card(
+            onClick = { subScreen = SettingsSubScreen.AUDIO_FORMAT },
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
-            Column {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_dac_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_dac_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.Usb, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Switch(
-                            checked = exclusiveUsbDac,
-                            onCheckedChange = { viewModel.setExclusiveUsbDac(it) }
-                        )
-                    }
-                )
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_audio_format_and_playback), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_audio_format_and_playback_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.AudioFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+        }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        Card(
+            onClick = { subScreen = SettingsSubScreen.FLOATING_LYRICS },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+        ) {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_floating_lyrics), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_floating_lyrics_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.Subtitles, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+        }
 
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_audio_focus_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_audio_focus_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.Hearing, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Switch(
-                            checked = audioFocus,
-                            onCheckedChange = { viewModel.setAudioFocus(it) }
-                        )
-                    }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_pause_unplug_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_pause_unplug_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Switch(
-                            checked = pauseOnUnplug,
-                            onCheckedChange = { viewModel.setPauseOnUnplug(it) }
-                        )
-                    }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_skip_silence_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_skip_silence_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Switch(
-                            checked = skipSilence,
-                            onCheckedChange = { viewModel.setSkipSilence(it) }
-                        )
-                    }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_keep_screen_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_keep_screen_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.StayCurrentPortrait, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Switch(
-                            checked = keepScreenOn,
-                            onCheckedChange = { viewModel.setKeepScreenOn(it) }
-                        )
-                    }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_auto_resume_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_auto_resume_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.Restore, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Switch(
-                            checked = autoResume,
-                            onCheckedChange = { viewModel.setAutoResume(it) }
-                        )
-                    }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_default_speed_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = {
-                        val label = when (defaultSpeed) {
-                            1.0f -> stringResource(R.string.settings_speed_normal)
-                            0.25f -> stringResource(R.string.settings_speed_min)
-                            2.0f -> stringResource(R.string.settings_speed_max)
-                            else -> String.format(java.util.Locale.US, "%.2fx", defaultSpeed)
-                        }
-                        Text(label, style = MaterialTheme.typography.bodySmall)
-                    },
-                    leadingContent = { Icon(Icons.Default.Speed, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier.clickable {
-                        draftSpeed = defaultSpeed
-                        showSpeedDialog = true
-                    }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_target_lang_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = {
-                        val langLabel = when (translationLanguage) {
-                            "auto" -> stringResource(R.string.settings_trans_lang_auto)
-                            "id" -> stringResource(R.string.settings_trans_lang_in)
-                            "en" -> stringResource(R.string.settings_trans_lang_en)
-                            "ja" -> stringResource(R.string.settings_trans_lang_ja)
-                            "zh-CN", "zh" -> stringResource(R.string.settings_trans_lang_zh)
-                            else -> stringResource(R.string.settings_trans_lang_auto)
-                        }
-                        Text(langLabel, style = MaterialTheme.typography.bodySmall)
-                    },
-                    leadingContent = { Icon(Icons.Default.Translate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier.clickable { showTranslationLangDialog = true }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_cat_privacy), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_privacy_enable_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.Security, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    modifier = Modifier.clickable { subScreen = SettingsSubScreen.PRIVACY_MODE }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_audio_format_priority), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_audio_format_priority_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.AudioFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    modifier = Modifier.clickable { subScreen = SettingsSubScreen.AUDIO_FORMAT }
-                )
-            }
+        Card(
+            onClick = { subScreen = SettingsSubScreen.PRIVACY_MODE },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+        ) {
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_cat_privacy), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_privacy_enable_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.Security, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
         }
 
         // ================= 2. PENGATURAN UNDUHAN =================
         SettingsCategoryHeader(title = stringResource(R.string.settings_cat_download), icon = Icons.Default.Download)
 
         Card(
+            onClick = { subScreen = SettingsSubScreen.DOWNLOAD_STORAGE },
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
-            Column {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_download_dir_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = {
-                        val physicalPath = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, downloadDir)
-                            ?: DownloadService.getDefaultDownloadDirectory().absolutePath
-                        val cleanDisplayPath = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.formatPathForDisplay(physicalPath)
-                        Text(
-                            cleanDisplayPath,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    leadingContent = { Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        FilledTonalButton(onClick = { checkStoragePermissionAndLaunch { dirPickerLauncher.launch(null) } }) {
-                            Text(stringResource(R.string.action_change))
-                        }
-                    }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_threads_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_threads_desc, parallelConn), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier.clickable { showThreadDialog = true }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_clipboard_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_clipboard_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Switch(
-                            checked = autoClipboard,
-                            onCheckedChange = { viewModel.setAutoClipboard(it) }
-                        )
-                    }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_detailed_filename_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_detailed_filename_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Switch(
-                            checked = useDetailedFilename,
-                            onCheckedChange = { viewModel.setUseDetailedFilename(it) }
-                        )
-                    }
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_cue_sheet_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text(stringResource(R.string.settings_cue_sheet_detailed_desc), style = MaterialTheme.typography.bodySmall) },
-                    leadingContent = { Icon(Icons.Default.LibraryMusic, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = {
-                        Switch(
-                            checked = createCueSheet,
-                            onCheckedChange = { viewModel.setCreateCueSheet(it) }
-                        )
-                    }
-                )
-            }
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_download_storage_title), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_download_storage_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
         }
 
         // ================= 2.1 FOLDER AUDIO & IMPOR =================
@@ -599,8 +431,8 @@ fun SettingsScreen(
                 } else {
                     importedDirs.forEach { dirStr ->
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        val physical = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, dirStr) ?: dirStr
-                        val displayPath = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.formatPathForDisplay(physical)
+                        val physical = AudioStorageHelper.resolvePhysicalPathFromUri(context, dirStr) ?: dirStr
+                        val displayPath = AudioStorageHelper.formatPathForDisplay(physical)
                         val isSdCard = physical.contains("SD Card", ignoreCase = true) || (physical.startsWith("/storage/") && !physical.contains("emulated"))
 
                         ListItem(
@@ -651,97 +483,20 @@ fun SettingsScreen(
             }
         }
 
-        // ================= 3. TAMPILAN & TEMA (DENGAN 36 COLOR PALETTE PREVIEWS) =================
+        // ================= 3. TAMPILAN & ANTARMUKA =================
         SettingsCategoryHeader(title = stringResource(R.string.settings_cat_appearance), icon = Icons.Default.Palette)
 
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-        ) {
-            Column {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_theme_mode_title), fontWeight = FontWeight.SemiBold) },
-                    supportingContent = {
-                        Text(
-                            when (themeMode) {
-                                ThemeMode.DARK -> stringResource(R.string.settings_theme_mode_dark)
-                                ThemeMode.LIGHT -> stringResource(R.string.settings_theme_mode_light)
-                                ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_mode_system)
-                            },
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    },
-                    leadingContent = { Icon(Icons.Default.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier.clickable { showThemeDialog = true }
-                )
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.settings_dynamic_color_title), fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text(stringResource(R.string.settings_dynamic_color_desc), style = MaterialTheme.typography.bodySmall) },
-                        leadingContent = { Icon(Icons.Default.ColorLens, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        trailingContent = {
-                            Switch(
-                                checked = dynamicColor,
-                                onCheckedChange = { viewModel.setDynamicColor(it) }
-                            )
-                        }
-                    )
-                }
-
-                if (!dynamicColor || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.settings_palette_title),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = colorPalette.title,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Horizontal Palettes Preview Carousel with Exact 4-Palettes = 1 Dot indicator
-                        ColorPaletteCarousel(
-                            selectedPalette = colorPalette,
-                            onSelectPalette = { viewModel.setColorPalette(it) }
-                        )
-                    }
-                }
-            }
-        }
-
-        Card(
-            onClick = { subScreen = SettingsSubScreen.UI_SETTINGS },
+            onClick = { subScreen = SettingsSubScreen.APPEARANCE_THEME },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
             ListItem(
-                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                headlineContent = { Text(stringResource(R.string.settings_cat_ui), fontWeight = FontWeight.SemiBold) },
-                supportingContent = { Text(stringResource(R.string.settings_ui_desc), style = MaterialTheme.typography.bodySmall) },
-                leadingContent = { Icon(Icons.Default.DashboardCustomize, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_appearance_theme_title), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_appearance_theme_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 trailingContent = {
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
@@ -752,19 +507,17 @@ fun SettingsScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
         Card(
-            onClick = { subScreen = SettingsSubScreen.FLOATING_LYRICS },
+            onClick = { subScreen = SettingsSubScreen.UI_SETTINGS },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
         ) {
             ListItem(
-                colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                headlineContent = { Text(stringResource(R.string.settings_floating_lyrics), fontWeight = FontWeight.SemiBold) },
-                supportingContent = { Text(stringResource(R.string.settings_floating_lyrics_desc), style = MaterialTheme.typography.bodySmall) },
-                leadingContent = { Icon(Icons.Default.Subtitles, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.settings_cat_ui), fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(stringResource(R.string.settings_ui_desc), style = MaterialTheme.typography.bodySmall) },
+                leadingContent = { Icon(Icons.Default.DashboardCustomize, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 trailingContent = {
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
@@ -863,7 +616,14 @@ fun SettingsScreen(
                     headlineContent = { Text(stringResource(R.string.settings_changelog_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = { Text(stringResource(R.string.settings_changelog_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.Default.HistoryEdu, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier.clickable { showChangelogDialog = true }
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.clickable { subScreen = SettingsSubScreen.CHANGELOG }
                 )
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -872,7 +632,14 @@ fun SettingsScreen(
                     headlineContent = { Text(stringResource(R.string.settings_user_guide_title), fontWeight = FontWeight.SemiBold) },
                     supportingContent = { Text(stringResource(R.string.settings_user_guide_desc), style = MaterialTheme.typography.bodySmall) },
                     leadingContent = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier.clickable { showGuideDialog = true }
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.clickable { subScreen = SettingsSubScreen.USER_GUIDE }
                 )
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -902,7 +669,7 @@ fun SettingsScreen(
         }
     }
 
-    // Dialogs
+    // Confirmation & Action Dialogs
     when (val state = updateUiState) {
         is UpdateUiState.NoUpdateAvailable -> {
             AlertDialog(
@@ -1037,7 +804,7 @@ fun SettingsScreen(
         is UpdateUiState.Downloading -> {
             val downState = state
             AlertDialog(
-                onDismissRequest = { /* Jangan tutup sembarangan saat mengunduh */ },
+                onDismissRequest = { /* Do not dismiss while downloading */ },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -1125,465 +892,6 @@ fun SettingsScreen(
         }
         else -> Unit
     }
-    if (showThemeDialog) {
-        AlertDialog(
-            onDismissRequest = { showThemeDialog = false },
-            title = { Text(stringResource(R.string.settings_dialog_theme_title)) },
-            text = {
-                Column {
-                    ThemeMode.values().forEach { mode ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setThemeMode(mode)
-                                    showThemeDialog = false
-                                }
-                                .padding(vertical = 8.dp)
-                        ) {
-                            RadioButton(selected = themeMode == mode, onClick = null)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                when (mode) {
-                                    ThemeMode.DARK -> stringResource(R.string.settings_theme_mode_dark)
-                                    ThemeMode.LIGHT -> stringResource(R.string.settings_theme_mode_light)
-                                    ThemeMode.SYSTEM -> stringResource(R.string.settings_theme_mode_system)
-                                }
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showThemeDialog = false }) { Text(stringResource(R.string.action_close)) }
-            }
-        )
-    }
-
-    if (showSpeedDialog) {
-        AlertDialog(
-            onDismissRequest = { showSpeedDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Speed,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(stringResource(R.string.settings_speed_dialog_title))
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Hero Speed Card
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = String.format(java.util.Locale.US, "%.2fx", draftSpeed),
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            val statusText = when {
-                                draftSpeed == 1.0f -> stringResource(R.string.settings_speed_normal)
-                                draftSpeed < 1.0f -> stringResource(R.string.settings_speed_min)
-                                else -> stringResource(R.string.settings_speed_max)
-                            }
-                            Text(
-                                text = statusText,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // Smooth Slider murni tanpa titik-titik (steps = 0)
-                    Slider(
-                        value = draftSpeed,
-                        onValueChange = { draftSpeed = (kotlin.math.round(it * 20f) / 20f).coerceIn(0.25f, 2.0f) },
-                        valueRange = 0.25f..2.0f,
-                        steps = 0,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(stringResource(R.string.settings_speed_min), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(stringResource(R.string.settings_speed_normal), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(stringResource(R.string.settings_speed_max), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    Text(
-                        text = stringResource(R.string.player_timer_quick_choice),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.Start)
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // 2 Baris Tombol Preset Proporsional (100% Pas & Terlihat)
-                    val presetsRow1 = listOf(0.5f, 0.75f, 1.0f)
-                    val presetsRow2 = listOf(1.25f, 1.5f, 2.0f)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        presetsRow1.forEach { preset ->
-                            val isSelected = (draftSpeed == preset)
-                            Surface(
-                                onClick = { draftSpeed = preset },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(38.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = "${preset}x",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        presetsRow2.forEach { preset ->
-                            val isSelected = (draftSpeed == preset)
-                            Surface(
-                                onClick = { draftSpeed = preset },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(38.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = "${preset}x",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.setDefaultSpeed(draftSpeed)
-                    showSpeedDialog = false
-                }) {
-                    Text(stringResource(R.string.action_save))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSpeedDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
-
-    if (showTranslationLangDialog) {
-        val langOptions = listOf(
-            "auto" to stringResource(R.string.settings_trans_lang_auto),
-            "id" to stringResource(R.string.settings_trans_lang_in),
-            "en" to stringResource(R.string.settings_trans_lang_en),
-            "ja" to stringResource(R.string.settings_trans_lang_ja),
-            "zh-CN" to stringResource(R.string.settings_trans_lang_zh)
-        )
-        AlertDialog(
-            onDismissRequest = { showTranslationLangDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Translate,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(stringResource(R.string.settings_dialog_trans_lang_title))
-                }
-            },
-            text = {
-                Column {
-                    Text(
-                        text = stringResource(R.string.settings_target_lang_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    langOptions.forEach { (code, label) ->
-                        val isSelected = (translationLanguage == code)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setTranslationLanguage(code)
-                                    showTranslationLangDialog = false
-                                }
-                                .padding(vertical = 10.dp)
-                        ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = {
-                                    viewModel.setTranslationLanguage(code)
-                                    showTranslationLangDialog = false
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showTranslationLangDialog = false }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            }
-        )
-    }
-
-    if (showThreadDialog) {
-        val options = listOf(
-            4 to stringResource(R.string.settings_threads_opt_4),
-            8 to stringResource(R.string.settings_threads_opt_8),
-            16 to stringResource(R.string.settings_threads_opt_16),
-            24 to stringResource(R.string.settings_threads_opt_24),
-            32 to stringResource(R.string.settings_threads_opt_32)
-        )
-        AlertDialog(
-            onDismissRequest = { showThreadDialog = false },
-            title = { Text(stringResource(R.string.settings_threads_dialog_title)) },
-            text = {
-                Column {
-                    Text(
-                        text = stringResource(R.string.settings_threads_desc, parallelConn),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    options.forEach { (opt, label) ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setParallelConnections(opt)
-                                    showThreadDialog = false
-                                }
-                                .padding(vertical = 8.dp)
-                        ) {
-                            RadioButton(selected = parallelConn == opt, onClick = null)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (opt == 16) FontWeight.Bold else FontWeight.Normal,
-                                color = if (opt == 16) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showThreadDialog = false }) { Text(stringResource(R.string.action_close)) }
-            }
-        )
-    }
-
-    if (showLanguageDialog) {
-        val languages = listOf(
-            "system" to stringResource(R.string.settings_lang_system),
-            "en" to stringResource(R.string.settings_lang_en),
-            "in" to stringResource(R.string.settings_lang_in),
-            "ja" to stringResource(R.string.settings_lang_ja),
-            "zh" to stringResource(R.string.settings_lang_zh)
-        )
-        AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text(stringResource(R.string.settings_lang_title)) },
-            text = {
-                Column {
-                    languages.forEach { (code, label) ->
-                        val isSelected = (appLanguage == code)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setAppLanguage(code)
-                                    showLanguageDialog = false
-                                }
-                                .padding(vertical = 10.dp, horizontal = 4.dp)
-                        ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = null
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showLanguageDialog = false }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            }
-        )
-    }
-
-    if (showChangelogDialog) {
-        AlertDialog(
-            onDismissRequest = { showChangelogDialog = false },
-            title = { Text(stringResource(R.string.settings_changelog_title)) },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text(stringResource(R.string.settings_changelog_v143_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_changelog_v143_item1), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v143_item2), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v143_item3), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v143_item4), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(stringResource(R.string.settings_changelog_v142_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_changelog_v142_item1), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v142_item2), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v142_item3), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v142_item4), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(stringResource(R.string.settings_changelog_v141_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_changelog_v141_item1), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v141_item2), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v141_item3), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v141_item4), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v141_item5), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(stringResource(R.string.settings_changelog_v140_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_changelog_v140_item1), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v140_item2), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v140_item3), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v140_item4), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v140_item5), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v140_item6), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v140_item7), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(stringResource(R.string.settings_changelog_v132_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_changelog_v132_item1), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v132_item2), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v132_item3), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v132_item4), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v132_item5), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(stringResource(R.string.settings_changelog_v131_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_changelog_v131_item1), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v131_item2), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v131_item3), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v131_item4), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(stringResource(R.string.settings_changelog_v130_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_changelog_v130_item1), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v130_item2), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v130_item3), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v130_item4), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v130_item5), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v130_item6), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v130_item7), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(stringResource(R.string.settings_changelog_v121_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_changelog_v121_item1), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v121_item2), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v121_item3), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v121_item4), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(stringResource(R.string.settings_changelog_v120_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_changelog_v120_item1), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v120_item2), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v120_item3), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.settings_changelog_v120_item4), style = MaterialTheme.typography.bodySmall)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showChangelogDialog = false }) { Text(stringResource(R.string.action_close)) }
-            }
-        )
-    }
-
-    if (showGuideDialog) {
-        AlertDialog(
-            onDismissRequest = { showGuideDialog = false },
-            title = { Text(stringResource(R.string.settings_user_guide_title)) },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text(stringResource(R.string.settings_guide_step1_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_guide_step1_desc), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(stringResource(R.string.settings_guide_step2_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_guide_step2_desc), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(stringResource(R.string.settings_guide_step3_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_guide_step3_desc), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(stringResource(R.string.settings_guide_step4_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_guide_step4_desc), style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(stringResource(R.string.settings_guide_step5_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.settings_guide_step5_desc), style = MaterialTheme.typography.bodySmall)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showGuideDialog = false }) { Text(stringResource(R.string.action_close)) }
-            }
-        )
-    }
 
     if (showManageStorageDialog) {
         AlertDialog(
@@ -1631,8 +939,8 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text(preview.folderName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    val resolved = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, preview.folderPathOrUri) ?: preview.folderPathOrUri
-                    val disp = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.formatPathForDisplay(resolved)
+                    val resolved = AudioStorageHelper.resolvePhysicalPathFromUri(context, preview.folderPathOrUri) ?: preview.folderPathOrUri
+                    val disp = AudioStorageHelper.formatPathForDisplay(resolved)
                     Text(disp, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -1687,8 +995,8 @@ fun SettingsScreen(
             onDismissRequest = { folderToRemove = null },
             title = { Text(stringResource(R.string.settings_import_delete_confirm)) },
             text = {
-                val resolved = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.resolvePhysicalPathFromUri(context, dir) ?: dir
-                val disp = com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper.formatPathForDisplay(resolved)
+                val resolved = AudioStorageHelper.resolvePhysicalPathFromUri(context, dir) ?: dir
+                val disp = AudioStorageHelper.formatPathForDisplay(resolved)
                 Text(disp, style = MaterialTheme.typography.bodyMedium)
             },
             confirmButton = {
@@ -1735,10 +1043,8 @@ fun ColorPaletteCarousel(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // 1 Page Indicator = Setiap 4 Palet Warna (36 Palet = 9 Titik Indikator)
     val totalPages = remember(palettes.size) { (palettes.size + 3) / 4 }
 
-    // Hitung dot index secara dinamis: bergeser setiap 4 warna dilewati
     val activePageIndex by remember {
         derivedStateOf {
             val firstIdx = listState.firstVisibleItemIndex
@@ -1775,23 +1081,19 @@ fun ColorPaletteCarousel(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        // 3-Segment Preview Circle (Top Half: Primary, Bottom Left: Secondary, Bottom Right: Tertiary)
                         Canvas(modifier = Modifier.size(50.dp)) {
-                            // Top Half (Primary)
                             drawArc(
                                 color = palette.primary,
                                 startAngle = 180f,
                                 sweepAngle = 180f,
                                 useCenter = true
                             )
-                            // Bottom Left Quadrant (Secondary)
                             drawArc(
                                 color = palette.secondary,
                                 startAngle = 90f,
                                 sweepAngle = 90f,
                                 useCenter = true
                             )
-                            // Bottom Right Quadrant (Tertiary)
                             drawArc(
                                 color = palette.tertiary,
                                 startAngle = 0f,
@@ -1806,7 +1108,6 @@ fun ColorPaletteCarousel(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Indikator Titik: 1 Titik per 4 Warna (Total 9 Titik untuk 36 Palet)
         Row(
             modifier = Modifier
                 .fillMaxWidth()

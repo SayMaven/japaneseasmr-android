@@ -514,7 +514,7 @@
     <string name="settings_audio_gain">Penguat Audio</string>
     <string name="settings_audio_gain_desc">Perkuat volume bisikan (%1$s dB)</string>
     <string name="settings_audio_format_priority">Prioritas Format Audio</string>
-    <string name="settings_audio_format_priority_desc">Format prioritas stream dan unduhan</string>
+    <string name="settings_audio_format_priority_desc">Prioritas streaming dan pratinjau (format teratas yang tersedia otomatis dibuka dan diputar)</string>
     <string name="settings_preload_next">Preload Trek Berikutnya</string>
     <string name="settings_preload_next_desc">Buffer lebih awal agar bebas jeda</string>
     <string name="settings_blocked_items">Filter Pemblokiran</string>
@@ -542,6 +542,11 @@
     <string name="settings_floating_lyrics_enable_desc">Tampilkan lirik mengambang di atas mini player dalam aplikasi</string>
     <string name="settings_floating_lyrics_show_trans">Tampilkan Terjemahan</string>
     <string name="settings_floating_lyrics_show_trans_desc">Tampilkan teks terjemahan di bawah lirik asli</string>
+    <string name="settings_floating_lyrics_display_mode">Mode Tampilan Lirik</string>
+    <string name="settings_floating_lyrics_display_mode_desc">Pilih untuk menampilkan keduanya, terjemahan saja, atau lirik asli saja</string>
+    <string name="settings_floating_lyrics_mode_both">Keduanya</string>
+    <string name="settings_floating_lyrics_mode_translation">Terjemahan</string>
+    <string name="settings_floating_lyrics_mode_original">Lirik Asli</string>
     <string name="settings_floating_lyrics_lock">Kunci Posisi</string>
     <string name="settings_floating_lyrics_lock_desc">Cegah pergeseran panel lirik secara tidak sengaja</string>
     <string name="settings_floating_lyrics_font_size">Ukuran Teks: %1$d sp</string>
@@ -572,4 +577,26 @@
     <string name="settings_display_translate_btn_desc">Tampilkan tombol terjemah cepat pada daftar berkas</string>
     <string name="settings_display_recommendations">Rekomendasi</string>
     <string name="settings_display_recommendations_desc">Tampilkan daftar rekomendasi karya terkait</string>
+
+    <!-- Network Offline & Auto-Translate & Settings Screens -->
+    <string name="network_offline_banner">Mode Offline - Menampilkan karya lokal</string>
+    <string name="network_offline_title">Tidak Ada Sambungan Internet</string>
+    <string name="network_offline_desc">Silakan periksa koneksi internet Anda atau buka Koleksi Lokal untuk mendengarkan audio offline.</string>
+    <string name="settings_auto_translate_lyrics">Terjemahkan Lirik Otomatis</string>
+    <string name="settings_auto_translate_lyrics_desc">Secara otomatis menerjemahkan lirik/subtitle saat audio diputar</string>
+    <string name="settings_auto_translate_detail">Terjemahkan Halaman Detail Otomatis</string>
+    <string name="settings_auto_translate_detail_desc">Secara otomatis menerjemahkan judul dan daftar file di halaman detail</string>
+    <string name="settings_auto_translate_lists">Terjemahkan Judul Daftar Otomatis</string>
+    <string name="settings_auto_translate_lists_desc">Secara otomatis menerjemahkan judul karya pada Jelajah ASMR dan Koleksi Lokal</string>
+    <string name="settings_lang_and_trans_title">Bahasa &amp; Terjemahan</string>
+    <string name="settings_lang_and_trans_desc">Bahasa aplikasi, target terjemahan, dan terjemahan otomatis</string>
+    <string name="settings_audio_format_and_playback">Format &amp; Pemutaran Audio</string>
+    <string name="settings_audio_format_and_playback_desc">Prioritas format, kecepatan default, audio gain, preload, dan DAC</string>
+    <string name="settings_appearance_theme_title">Tema &amp; Palet Warna</string>
+    <string name="settings_appearance_theme_desc">Mode gelap/terang, warna dinamis, dan 36 palet warna</string>
+    <string name="settings_download_storage_title">Pengaturan Unduhan</string>
+    <string name="settings_download_storage_desc">Direktori unduhan, thread paralel, penamaan berkas, dan CUE</string>
+    <string name="settings_cat_auto_translate">Terjemahan Otomatis</string>
+    <string name="settings_speed_title">Kecepatan Putar Default</string>
+    <string name="settings_speed_desc">Kecepatan putar default saat memulai trek audio</string>
 </resources>

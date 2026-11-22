@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistAddCheck
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.*
@@ -57,11 +59,13 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.PlaylistItemEntity
 import com.saymaven.downloader.japaneseasmr.data.local.entity.UserPlaylistEntity
 import com.saymaven.downloader.japaneseasmr.service.TagLocalizer
 import com.saymaven.downloader.japaneseasmr.ui.components.PaginationBar
+import com.saymaven.downloader.japaneseasmr.ui.components.PlaylistSelectionSheet
 import com.saymaven.downloader.japaneseasmr.ui.components.SortOptionItem
 import com.saymaven.downloader.japaneseasmr.ui.components.SortOptionsSheet
 import com.saymaven.downloader.japaneseasmr.ui.components.TagFilterSheet
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlayerViewModel
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.PlaylistSortType
+import com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper
 import kotlinx.coroutines.delay
 import java.io.File
 
@@ -88,6 +92,8 @@ fun PlaylistScreen(
     val homeViewMode by viewModel.homeViewMode.collectAsState()
     val isGridMode = (homeViewMode == "grid")
     val userPlaylists by viewModel.userPlaylists.collectAsState()
+    val allSavedRjids by viewModel.allSavedRjids.collectAsState()
+    var workForPlaylist by remember { mutableStateOf<HistoryEntity?>(null) }
 
     var selectedCategoryTab by rememberSaveable { mutableStateOf(0) } // 0: All, 1: Folder, 2: Playlist
     var openedFolderInTab by rememberSaveable { mutableStateOf<String?>(null) }
@@ -115,8 +121,17 @@ fun PlaylistScreen(
 
     val displayedPlaylist = remember(filteredPlaylist, selectedTagFilter) {
         if (selectedTagFilter == null) filteredPlaylist
-        else filteredPlaylist.filter { item ->
-            item.genre.split(",").any { it.trim().equals(selectedTagFilter, ignoreCase = true) }
+        else {
+            val filterEn = TagLocalizer.localize(null, selectedTagFilter!!)
+            val filterJp = TagLocalizer.getJapaneseName(selectedTagFilter!!)
+            filteredPlaylist.filter { item ->
+                item.genre.split(",").any { g ->
+                    val gTrim = g.trim()
+                    gTrim.equals(selectedTagFilter, ignoreCase = true) ||
+                    (filterJp != null && gTrim.equals(filterJp, ignoreCase = true)) ||
+                    TagLocalizer.localize(null, gTrim).equals(filterEn, ignoreCase = true)
+                }
+            }
         }
     }
 
@@ -155,6 +170,14 @@ fun PlaylistScreen(
     var itemToDelete by remember { mutableStateOf<HistoryEntity?>(null) }
 
     val listState = rememberLazyListState()
+    val gridState = rememberLazyStaggeredGridState()
+
+    LaunchedEffect(currentPage) {
+        if (currentPage > 0) {
+            listState.scrollToItem(0)
+            gridState.scrollToItem(0)
+        }
+    }
 
     // Drag-and-drop state for List mode
     var draggedRjid by remember { mutableStateOf<String?>(null) }
@@ -284,7 +307,7 @@ fun PlaylistScreen(
                 InputChip(
                     selected = true,
                     onClick = { selectedTagFilter = null },
-                    label = { Text(TagLocalizer.localize(null, selectedTagFilter!!)) },
+                    label = { Text(TagLocalizer.getLocalizedDisplayName(context, null, selectedTagFilter!!)) },
                     trailingIcon = {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -724,6 +747,7 @@ fun PlaylistScreen(
                         if (isGridMode) {
                             // Pinterest Staggered Grid Layout (2 Columns)
                             LazyVerticalStaggeredGrid(
+                                state = gridState,
                                 columns = StaggeredGridCells.Fixed(2),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalItemSpacing = 8.dp,
@@ -738,11 +762,13 @@ fun PlaylistScreen(
                                         displayTitle = displayTitle,
                                         isCurrentTrack = isCurrentTrack,
                                         isPlaying = (isCurrentTrack && isPlaying),
+                                        isInPlaylist = allSavedRjids.contains(item.rjid),
                                         onClick = { onItemClickAction(item) },
                                         onMoveFolder = { onMoveFolderClick(item) },
                                         onCopyRj = { onCopyRjClick(item) },
                                         onAudioInfo = { onAudioInfoClick(item) },
-                                        onDelete = { onDeleteClick(item) }
+                                        onDelete = { onDeleteClick(item) },
+                                        onAddToPlaylist = { workForPlaylist = item }
                                     )
                                 }
 
@@ -775,11 +801,13 @@ fun PlaylistScreen(
                                         displayTitle = displayTitle,
                                         isCurrentTrack = isCurrentTrack,
                                         isPlaying = (isCurrentTrack && isPlaying),
+                                        isInPlaylist = allSavedRjids.contains(item.rjid),
                                         onClick = onItemClickAction,
                                         onMoveFolder = { onMoveFolderClick(item) },
                                         onCopyRj = { onCopyRjClick(item) },
                                         onAudioInfo = { onAudioInfoClick(item) },
-                                        onDelete = { onDeleteClick(item) }
+                                        onDelete = { onDeleteClick(item) },
+                                        onAddToPlaylist = { workForPlaylist = item }
                                     )
                                 }
 
@@ -894,6 +922,20 @@ fun PlaylistScreen(
                     Text(stringResource(R.string.action_cancel))
                 }
             }
+        )
+    }
+
+    // Sheet: Save Local Work to Playlist
+    if (workForPlaylist != null) {
+        val work = workForPlaylist!!
+        PlaylistSelectionSheet(
+            workRjid = work.rjid,
+            workTitle = work.title,
+            coverUrl = work.coverUrl ?: "",
+            circle = work.circle,
+            cv = work.cv,
+            playerViewModel = viewModel,
+            onDismiss = { workForPlaylist = null }
         )
     }
 
@@ -1829,17 +1871,27 @@ fun LocalWorkPinterestCard(
     displayTitle: String = item.title,
     isCurrentTrack: Boolean,
     isPlaying: Boolean,
+    isInPlaylist: Boolean = false,
     onClick: () -> Unit,
     onMoveFolder: () -> Unit,
     onCopyRj: () -> Unit,
     onAudioInfo: () -> Unit,
     onDelete: () -> Unit,
+    onAddToPlaylist: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var isMenuExpanded by remember { mutableStateOf(false) }
     val cardShape = RoundedCornerShape(10.dp)
     val detectedFormat = remember(item.localFilePath) { detectAudioFormat(item.localFilePath) }
+    val hasSubtitle = remember(item.localFilePath, item.chaptersJson) {
+        (!item.chaptersJson.isNullOrBlank() && (item.chaptersJson.contains(".vtt") || item.chaptersJson.contains(".lrc") || item.chaptersJson.contains(".srt"))) ||
+        try {
+            val f = java.io.File(item.localFilePath)
+            val d = if (f.isDirectory) f else f.parentFile
+            d?.walkTopDown()?.maxDepth(2)?.any { it.isFile && it.extension.lowercase() in setOf("vtt", "lrc", "srt") } == true
+        } catch (_: Exception) { false }
+    }
 
     Card(
         modifier = modifier
@@ -1890,44 +1942,86 @@ fun LocalWorkPinterestCard(
                     }
                 }
 
-                // Top-Left Badge: RJ Code
+                // Top-Left Badge: RJ Code & In-Playlist Indicator
                 val isLocal = item.sourceType != "DL_SITE" || item.rjid.startsWith("LOCAL_")
                 val displayTag = when {
                     isLocal && !item.linkedRjId.isNullOrBlank() -> item.linkedRjId!!
                     isLocal -> "IMPORT"
                     else -> item.rjid
                 }
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                Row(
                     modifier = Modifier
                         .padding(6.dp)
-                        .align(Alignment.TopStart)
+                        .align(Alignment.TopStart),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = displayTag,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    ) {
+                        Text(
+                            text = displayTag,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                    if (isInPlaylist) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistAddCheck,
+                                contentDescription = "In Playlist",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(2.dp)
+                                    .size(15.dp)
+                            )
+                        }
+                    }
                 }
 
-                // Top-Right Badge: Audio Format
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                    modifier = Modifier
-                        .padding(6.dp)
-                        .align(Alignment.TopEnd)
-                ) {
-                    Text(
-                        text = detectedFormat.split(" ").firstOrNull() ?: "AUDIO",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                    )
+                // Top-Right Badge: Age Rating (SAFE / R-15 / R18)
+                val normalizedRating = AgeRatingHelper.normalize(item.ageRating)
+                if (normalizedRating != "-") {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = AgeRatingHelper.getBadgeColor(normalizedRating),
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .align(Alignment.TopEnd)
+                    ) {
+                        Text(
+                            text = normalizedRating,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Bottom-Left Badge: Subtitle
+                if (hasSubtitle) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFF2E7D32).copy(alpha = 0.88f),
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .align(Alignment.BottomStart)
+                    ) {
+                        Text(
+                            text = "SUB",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
                 }
 
                 // Bottom-Right Badge: File Size
@@ -2058,6 +2152,17 @@ fun LocalWorkPinterestCard(
                             onDismissRequest = { isMenuExpanded = false }
                         ) {
                             DropdownMenuItem(
+                                text = { Text(stringResource(R.string.browse_action_add_to_playlist)) },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onAddToPlaylist()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.PlaylistAdd, contentDescription = null)
+                                }
+                            )
+
+                            DropdownMenuItem(
                                 text = { Text(stringResource(R.string.player_folder_move_title)) },
                                 onClick = {
                                     isMenuExpanded = false
@@ -2140,15 +2245,25 @@ fun LocalWorkListViewItem(
     displayTitle: String = item.title,
     isCurrentTrack: Boolean,
     isPlaying: Boolean,
+    isInPlaylist: Boolean = false,
     onClick: (HistoryEntity) -> Unit,
     onMoveFolder: () -> Unit,
     onCopyRj: () -> Unit,
     onAudioInfo: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onAddToPlaylist: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var isMenuExpanded by remember { mutableStateOf(false) }
     val cardShape = RoundedCornerShape(12.dp)
+    val hasSubtitle = remember(item.localFilePath, item.chaptersJson) {
+        (!item.chaptersJson.isNullOrBlank() && (item.chaptersJson.contains(".vtt") || item.chaptersJson.contains(".lrc") || item.chaptersJson.contains(".srt"))) ||
+        try {
+            val f = java.io.File(item.localFilePath)
+            val d = if (f.isDirectory) f else f.parentFile
+            d?.walkTopDown()?.maxDepth(2)?.any { it.isFile && it.extension.lowercase() in setOf("vtt", "lrc", "srt") } == true
+        } catch (_: Exception) { false }
+    }
 
     Card(
         modifier = modifier
@@ -2171,7 +2286,7 @@ fun LocalWorkListViewItem(
                 .padding(10.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // Left: Square Cover art (90dp x 90dp) with RJ code overlay badge at top-left
+            // Left: Square Cover art (90dp x 90dp) with badges
             Box(
                 modifier = Modifier
                     .size(90.dp)
@@ -2204,25 +2319,80 @@ fun LocalWorkListViewItem(
                     }
                 }
 
-                // Top-Left Badge: RJ Code
+                // Top-Left Badge: RJ Code & In-Playlist
                 val isLocal = item.sourceType != "DL_SITE" || item.rjid.startsWith("LOCAL_")
                 val displayTag = when {
                     isLocal && !item.linkedRjId.isNullOrBlank() -> item.linkedRjId!!
                     isLocal -> "IMPORT"
                     else -> item.rjid
                 }
-                Surface(
-                    shape = RoundedCornerShape(bottomEnd = 6.dp),
-                    color = Color.Black.copy(alpha = 0.75f),
-                    modifier = Modifier.align(Alignment.TopStart)
+                Row(
+                    modifier = Modifier.align(Alignment.TopStart),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = displayTag,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(bottomEnd = 6.dp),
+                        color = Color.Black.copy(alpha = 0.75f)
+                    ) {
+                        Text(
+                            text = displayTag,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                    if (isInPlaylist) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color.Black.copy(alpha = 0.75f),
+                            modifier = Modifier.padding(start = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistAddCheck,
+                                contentDescription = "In Playlist",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(2.dp)
+                                    .size(13.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Top-Right Badge: Age Rating (SAFE / R-15 / R18)
+                val normalizedRating = AgeRatingHelper.normalize(item.ageRating)
+                if (normalizedRating != "-") {
+                    Surface(
+                        shape = RoundedCornerShape(bottomStart = 6.dp),
+                        color = AgeRatingHelper.getBadgeColor(normalizedRating),
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        Text(
+                            text = normalizedRating,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Bottom-Left Badge: Subtitle
+                if (hasSubtitle) {
+                    Surface(
+                        shape = RoundedCornerShape(topEnd = 6.dp),
+                        color = Color(0xFF2E7D32).copy(alpha = 0.88f),
+                        modifier = Modifier.align(Alignment.BottomStart)
+                    ) {
+                        Text(
+                            text = "SUB",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
 
@@ -2259,7 +2429,7 @@ fun LocalWorkListViewItem(
                     }
                     if (item.downloadDate.isNotBlank()) {
                         Text(
-                            text = item.downloadDate.take(10),
+                            text = item.downloadDate,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
@@ -2355,6 +2525,17 @@ fun LocalWorkListViewItem(
                         expanded = isMenuExpanded,
                         onDismissRequest = { isMenuExpanded = false }
                     ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.browse_action_add_to_playlist)) },
+                            onClick = {
+                                isMenuExpanded = false
+                                onAddToPlaylist()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.PlaylistAdd, contentDescription = null)
+                            }
+                        )
+
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.player_action_move_folder)) },
                             onClick = {

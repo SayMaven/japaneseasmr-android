@@ -302,7 +302,8 @@ object DLsiteScraper {
                     val ageText = ageRow.text()
                     ageRating = when {
                         ageText.contains("18") || ageText.contains("R-18") || ageText.contains("R18") -> "R18"
-                        ageText.contains("全年齢") || ageText.contains("All") -> "All-Ages"
+                        ageText.contains("15") || ageText.contains("R-15") || ageText.contains("R15") -> "R-15"
+                        ageText.contains("全年齢") || ageText.contains("All") || ageText.contains("Safe") -> "SAFE"
                         else -> ageText.take(15).trim()
                     }
                 }

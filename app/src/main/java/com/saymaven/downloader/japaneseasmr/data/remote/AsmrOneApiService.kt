@@ -113,15 +113,15 @@ object AsmrOneApiService {
         val hasSubtitle = obj.optBoolean("has_subtitle", false) ||
                 obj.optString("lyric_status", "").isNotEmpty()
 
-        // Age rating (R18, ALL, R15)
+        // Age rating (R18, SAFE, R-15)
         val ageRaw = obj.optString("age", "").ifBlank {
             obj.optString("age_category_string", "")
         }
         val ageRating = when {
-            ageRaw.contains("18", ignoreCase = true) -> "R-18"
+            ageRaw.contains("18", ignoreCase = true) -> "R18"
             ageRaw.contains("15", ignoreCase = true) -> "R-15"
-            ageRaw.contains("general", ignoreCase = true) || ageRaw.contains("all", ignoreCase = true) -> "ALL"
-            else -> ageRaw.ifBlank { "ALL" }.uppercase()
+            ageRaw.contains("general", ignoreCase = true) || ageRaw.contains("all", ignoreCase = true) -> "SAFE"
+            else -> ageRaw.ifBlank { "SAFE" }.uppercase()
         }
 
         val nsfw = obj.optBoolean("nsfw", false)
@@ -411,7 +411,7 @@ object AsmrOneApiService {
      * Selects the best single folder/group (e.g. MP3 SEあり or root audio tracks) instead of
      * flattening duplicate format folders (WAV + MP3 + SEあり + SEなし) together.
      */
-    suspend fun getWorkTracks(workId: Int): Result<List<AsmrOneTrack>> = withContext(Dispatchers.IO) {
+    suspend fun getWorkTracks(workId: Int, formatPriority: String = "mp3_se,mp3,flac,wav,opus,m4a,aac"): Result<List<AsmrOneTrack>> = withContext(Dispatchers.IO) {
         try {
             val endpoint = "/api/tracks/$workId"
             val responseBody = executeRequest(endpoint)
@@ -419,7 +419,7 @@ object AsmrOneApiService {
 
             val array = JSONArray(responseBody)
             val tree = parseFileNodes(array, DEFAULT_HOST)
-            val primaryTracks = selectPrimaryAudioTracks(tree)
+            val primaryTracks = selectPrimaryAudioTracks(tree, formatPriority)
             if (primaryTracks.isNotEmpty()) {
                 return@withContext Result.success(primaryTracks)
             }
@@ -432,7 +432,7 @@ object AsmrOneApiService {
         }
     }
 
-    private fun selectPrimaryAudioTracks(tree: List<AsmrOneFileNode>): List<AsmrOneTrack> {
+    private fun selectPrimaryAudioTracks(tree: List<AsmrOneFileNode>, formatPriority: String = "mp3_se,mp3,flac,wav,opus,m4a,aac"): List<AsmrOneTrack> {
         data class GroupCandidate(val path: String, val audios: List<AsmrOneFileNode>)
         val candidates = mutableListOf<GroupCandidate>()
 
@@ -457,18 +457,43 @@ object AsmrOneApiService {
 
         if (candidates.isEmpty()) return emptyList()
 
+        val priorities = formatPriority.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+
         fun scoreCandidate(c: GroupCandidate): Int {
             val lowerPath = c.path.lowercase()
             val sampleExt = c.audios.firstOrNull()?.title?.substringAfterLast('.', "")?.lowercase() ?: ""
             var score = 0
-            if (lowerPath.contains("mp3") || sampleExt == "mp3") score += 100
-            else if (sampleExt in listOf("m4a", "aac", "ogg", "opus")) score += 60
-            else if (lowerPath.contains("wav") || lowerPath.contains("flac") || sampleExt in listOf("wav", "flac")) score -= 40
 
-            if (lowerPath.contains("seあり") || lowerPath.contains("se有り") || lowerPath.contains("se_ari") || lowerPath.contains("se ari") || lowerPath.contains("効果音あり")) score += 80
-            if (lowerPath.contains("本編") || lowerPath.contains("main")) score += 50
-            if (lowerPath.contains("seなし") || lowerPath.contains("se無し") || lowerPath.contains("se_nashi") || lowerPath.contains("se nashi") || lowerPath.contains("効果音なし") || lowerPath.contains("効果音無") || lowerPath.contains("nose")) score -= 120
-            if (lowerPath.contains("おまけ") || lowerPath.contains("特典") || lowerPath.contains("bonus") || lowerPath.contains("free talk") || lowerPath.contains("フリートーク")) score -= 70
+            priorities.forEachIndexed { index, format ->
+                val weight = (priorities.size - index) * 40
+                when (format) {
+                    "mp3_se" -> {
+                        if ((lowerPath.contains("mp3") || sampleExt == "mp3") &&
+                            (lowerPath.contains("seあり") || lowerPath.contains("se有り") || lowerPath.contains("se_ari") || lowerPath.contains("se ari") || lowerPath.contains("効果音あり"))) {
+                            score += weight + 30
+                        }
+                    }
+                    "mp3" -> {
+                        if (lowerPath.contains("mp3") || sampleExt == "mp3") score += weight
+                    }
+                    "wav" -> {
+                        if (lowerPath.contains("wav") || sampleExt == "wav") score += weight
+                    }
+                    "flac" -> {
+                        if (lowerPath.contains("flac") || sampleExt == "flac") score += weight
+                    }
+                    "opus" -> {
+                        if (lowerPath.contains("opus") || sampleExt == "opus" || sampleExt == "ogg") score += weight
+                    }
+                    "m4a", "aac" -> {
+                        if (lowerPath.contains("m4a") || lowerPath.contains("aac") || sampleExt in listOf("m4a", "aac")) score += weight
+                    }
+                }
+            }
+
+            if (lowerPath.contains("本編") || lowerPath.contains("main")) score += 30
+            if (lowerPath.contains("seなし") || lowerPath.contains("se無し") || lowerPath.contains("se_nashi") || lowerPath.contains("se nashi") || lowerPath.contains("効果音なし") || lowerPath.contains("効果音無") || lowerPath.contains("nose")) score -= 60
+            if (lowerPath.contains("おまけ") || lowerPath.contains("特典") || lowerPath.contains("bonus") || lowerPath.contains("free talk") || lowerPath.contains("フリートーク")) score -= 40
 
             return score
         }

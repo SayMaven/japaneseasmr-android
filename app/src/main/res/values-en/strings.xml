@@ -514,7 +514,7 @@
     <string name="settings_audio_gain">Audio Gain</string>
     <string name="settings_audio_gain_desc">Boost whisper volume (%1$s dB)</string>
     <string name="settings_audio_format_priority">Audio Format Priority</string>
-    <string name="settings_audio_format_priority_desc">Preferred stream and download format</string>
+    <string name="settings_audio_format_priority_desc">Streaming and preview priority (highest available format auto-expands and plays first)</string>
     <string name="settings_preload_next">Preload Next Track</string>
     <string name="settings_preload_next_desc">Buffer ahead for gapless playback</string>
     <string name="settings_blocked_items">Blocked Items</string>
@@ -542,6 +542,11 @@
     <string name="settings_floating_lyrics_enable_desc">Show floating lyrics above the mini player inside the app</string>
     <string name="settings_floating_lyrics_show_trans">Show Translation</string>
     <string name="settings_floating_lyrics_show_trans_desc">Display translated text below original lyrics</string>
+    <string name="settings_floating_lyrics_display_mode">Lyrics Display Mode</string>
+    <string name="settings_floating_lyrics_display_mode_desc">Choose to show both, translation only, or original lyrics only</string>
+    <string name="settings_floating_lyrics_mode_both">Both</string>
+    <string name="settings_floating_lyrics_mode_translation">Translation</string>
+    <string name="settings_floating_lyrics_mode_original">Original</string>
     <string name="settings_floating_lyrics_lock">Lock Position</string>
     <string name="settings_floating_lyrics_lock_desc">Prevent accidental dragging of the floating lyrics bar</string>
     <string name="settings_floating_lyrics_font_size">Font Size: %1$d sp</string>
@@ -572,4 +577,26 @@
     <string name="settings_display_translate_btn_desc">Show fast batch translation button in file tree</string>
     <string name="settings_display_recommendations">Recommendations</string>
     <string name="settings_display_recommendations_desc">Show related work recommendations</string>
+
+    <!-- Network Offline & Auto-Translate & Settings Screens -->
+    <string name="network_offline_banner">Offline Mode - Showing local works</string>
+    <string name="network_offline_title">No Internet Connection</string>
+    <string name="network_offline_desc">Please check your internet connection or open Local Collection to listen offline.</string>
+    <string name="settings_auto_translate_lyrics">Auto-Translate Lyrics</string>
+    <string name="settings_auto_translate_lyrics_desc">Automatically translate lyrics/subtitles when playing audio</string>
+    <string name="settings_auto_translate_detail">Auto-Translate Detail Page</string>
+    <string name="settings_auto_translate_detail_desc">Automatically translate title and file tree on detail page</string>
+    <string name="settings_auto_translate_lists">Auto-Translate List Titles</string>
+    <string name="settings_auto_translate_lists_desc">Automatically translate work titles in Browse and Local Collection</string>
+    <string name="settings_lang_and_trans_title">Language &amp; Translation</string>
+    <string name="settings_lang_and_trans_desc">App language, translation target, and auto-translation</string>
+    <string name="settings_audio_format_and_playback">Audio Format &amp; Playback</string>
+    <string name="settings_audio_format_and_playback_desc">Format priority, default speed, audio gain, preload, and DAC</string>
+    <string name="settings_appearance_theme_title">Theme &amp; Color Palette</string>
+    <string name="settings_appearance_theme_desc">Dark/light mode, dynamic color, and 36 color palettes</string>
+    <string name="settings_download_storage_title">Download Settings</string>
+    <string name="settings_download_storage_desc">Download directory, parallel threads, file naming, and CUE</string>
+    <string name="settings_cat_auto_translate">Auto-Translation</string>
+    <string name="settings_speed_title">Default Playback Speed</string>
+    <string name="settings_speed_desc">Default speed when starting audio playback</string>
 </resources>

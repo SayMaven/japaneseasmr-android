@@ -112,11 +112,13 @@ fun QueueScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Text(
-                        text = if (queue.isNotEmpty()) stringResource(R.string.queue_items_count, queue.size) else stringResource(R.string.queue_ready_to_download),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (queue.isNotEmpty()) {
+                        Text(
+                            text = stringResource(R.string.queue_items_count, queue.size),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 IconButton(

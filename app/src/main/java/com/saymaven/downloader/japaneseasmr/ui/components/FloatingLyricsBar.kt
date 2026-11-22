@@ -14,7 +14,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,7 +42,7 @@ fun FloatingLyricsBar(
     val fontSize by viewModel.floatingLyricsFontSize.collectAsState()
     val opacity by viewModel.floatingLyricsOpacity.collectAsState()
     val cornerRadius by viewModel.floatingLyricsCornerRadius.collectAsState()
-    val showTranslation by viewModel.floatingLyricsShowTranslation.collectAsState()
+    val displayMode by viewModel.floatingLyricsDisplayMode.collectAsState()
     val isLocked by viewModel.floatingLyricsLocked.collectAsState()
     val isTranslated by viewModel.isLyricsTranslated.collectAsState()
 
@@ -54,6 +58,26 @@ fun FloatingLyricsBar(
         modifier = modifier
     ) {
         if (activeLine != null) {
+            val primaryTextColor = if (opacity < 0.35f) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            }
+            val textShadow = if (opacity < 0.35f) {
+                Shadow(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    offset = Offset(0f, 1.5f),
+                    blurRadius = 6f
+                )
+            } else {
+                null
+            }
+            val surfaceColor = if (opacity <= 0.01f) {
+                Color.Transparent
+            } else {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = opacity)
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -72,8 +96,8 @@ fun FloatingLyricsBar(
             ) {
                 Surface(
                     shape = RoundedCornerShape(cornerRadius.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = opacity),
-                    shadowElevation = 6.dp,
+                    color = surfaceColor,
+                    shadowElevation = if (opacity >= 0.85f) 4.dp else 0.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -86,26 +110,66 @@ fun FloatingLyricsBar(
                             modifier = Modifier.weight(1f),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = activeLine.text,
-                                fontSize = fontSize.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
                             val tr = activeLine.translatedText
-                            if (showTranslation && isTranslated && !tr.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = tr,
-                                    fontSize = (fontSize - 1.5f).coerceAtLeast(10f).sp,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            val hasTranslation = isTranslated && !tr.isNullOrBlank()
+
+                            when (displayMode) {
+                                "TRANSLATION_ONLY" -> {
+                                    Text(
+                                        text = if (hasTranslation) tr!! else activeLine.text,
+                                        style = TextStyle(
+                                            fontSize = fontSize.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = primaryTextColor,
+                                            shadow = textShadow
+                                        ),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                "ORIGINAL_ONLY" -> {
+                                    Text(
+                                        text = activeLine.text,
+                                        style = TextStyle(
+                                            fontSize = fontSize.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = primaryTextColor,
+                                            shadow = textShadow
+                                        ),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                else -> {
+                                    Text(
+                                        text = activeLine.text,
+                                        style = TextStyle(
+                                            fontSize = fontSize.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = primaryTextColor,
+                                            shadow = textShadow
+                                        ),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (hasTranslation) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = tr!!,
+                                            style = TextStyle(
+                                                fontSize = (fontSize - 1.5f).coerceAtLeast(10f).sp,
+                                                color = primaryTextColor.copy(alpha = 0.85f),
+                                                shadow = textShadow
+                                            ),
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -118,7 +182,7 @@ fun FloatingLyricsBar(
                             Icon(
                                 imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                                tint = primaryTextColor.copy(alpha = 0.75f),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -130,7 +194,7 @@ fun FloatingLyricsBar(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                                tint = primaryTextColor.copy(alpha = 0.75f),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
