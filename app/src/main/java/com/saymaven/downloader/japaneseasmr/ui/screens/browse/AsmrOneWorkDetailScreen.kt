@@ -87,37 +87,33 @@ fun AsmrOneWorkDetailScreen(
 
     LaunchedEffect(work.title, autoTranslateDetail) {
         if (autoTranslateDetail && !isTitleTranslated && translatedTitleText == null && work.title.isNotBlank()) {
-            coroutineScope.launch {
-                isTranslating = true
-                val targetLang = TranslationService.getActiveTargetLanguage(context)
-                val translated = TranslationService.translateText(work.title, targetLang)
-                if (translated.isNotBlank()) {
-                    translatedTitleText = translated
-                    isTitleTranslated = true
-                }
-                isTranslating = false
+            isTranslating = true
+            val targetLang = TranslationService.getActiveTargetLanguage(context)
+            val translated = TranslationService.translateText(work.title, targetLang)
+            if (translated.isNotBlank()) {
+                translatedTitleText = translated
+                isTitleTranslated = true
             }
+            isTranslating = false
         }
     }
 
     LaunchedEffect(fileTree, autoTranslateDetail) {
         if (autoTranslateDetail && !isFileTreeTranslated && translatedNodeTitles.isEmpty() && fileTree.isNotEmpty()) {
-            coroutineScope.launch {
-                isTranslatingFileTree = true
-                val targetLang = TranslationService.getActiveTargetLanguage(context)
-                val titlesToTranslate = mutableSetOf<String>()
-                fun collectTitles(nodes: List<AsmrOneFileNode>) {
-                    for (n in nodes) {
-                        if (n.title.isNotBlank()) titlesToTranslate.add(n.title)
-                        if (n.children.isNotEmpty()) collectTitles(n.children)
-                    }
+            isTranslatingFileTree = true
+            val targetLang = TranslationService.getActiveTargetLanguage(context)
+            val titlesToTranslate = mutableSetOf<String>()
+            fun collectTitles(nodes: List<AsmrOneFileNode>) {
+                for (n in nodes) {
+                    if (n.title.isNotBlank()) titlesToTranslate.add(n.title)
+                    if (n.children.isNotEmpty()) collectTitles(n.children)
                 }
-                collectTitles(fileTree)
-                val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLang)
-                translatedNodeTitles = map
-                isFileTreeTranslated = true
-                isTranslatingFileTree = false
             }
+            collectTitles(fileTree)
+            val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLang)
+            translatedNodeTitles = map
+            isFileTreeTranslated = true
+            isTranslatingFileTree = false
         }
     }
 

@@ -32,6 +32,8 @@ class PreferencesManager(private val context: Context) {
         val KEY_TRANSLATION_LANGUAGE = stringPreferencesKey("translation_language")
         val KEY_IS_TRANSLATION_ACTIVE = booleanPreferencesKey("is_translation_active")
         val KEY_TRANSLATION_ENGINE_VERSION = intPreferencesKey("translation_engine_version")
+        val KEY_TRANSLATION_PROVIDER = stringPreferencesKey("translation_provider")
+        val KEY_AUTO_SAVE_TRANSLATED_LYRICS = booleanPreferencesKey("auto_save_translated_lyrics")
         val KEY_AUTO_TRANSLATE_LYRICS = booleanPreferencesKey("auto_translate_lyrics")
         val KEY_AUTO_TRANSLATE_DETAIL = booleanPreferencesKey("auto_translate_detail")
         val KEY_AUTO_TRANSLATE_LISTS = booleanPreferencesKey("auto_translate_lists")
@@ -113,6 +115,8 @@ class PreferencesManager(private val context: Context) {
         val KEY_LLM_API_KEY = stringPreferencesKey("llm_api_key")
         val KEY_LLM_MODEL = stringPreferencesKey("llm_model")
         val KEY_LLM_PROMPT = stringPreferencesKey("llm_prompt")
+        val KEY_LLM_CONCURRENCY = intPreferencesKey("llm_concurrency")
+        const val DEFAULT_LLM_PROMPT = "You are a professional translator. Translate the following text into id. Output ONLY the translated text without any explanations, notes, or markdown code blocks."
 
         // Floating Lyrics (In-App above MiniPlayer)
         val KEY_FLOATING_LYRICS_ENABLED = booleanPreferencesKey("floating_lyrics_enabled")
@@ -154,6 +158,15 @@ class PreferencesManager(private val context: Context) {
                 sp.getString("cached_trans_language", "auto") ?: "auto"
             } catch (e: Exception) {
                 "auto"
+            }
+        }
+
+        fun getFastCachedTranslationProvider(context: Context): String {
+            return try {
+                val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+                sp.getString("cached_trans_provider", "google") ?: "google"
+            } catch (e: Exception) {
+                "google"
             }
         }
     }
@@ -549,19 +562,40 @@ class PreferencesManager(private val context: Context) {
 
     suspend fun setPlayerButtonOrder(order: String) = context.dataStore.edit { it[KEY_PLAYER_BUTTON_ORDER] = order }
 
+    // Translation Provider & Lyrics Persistence
+    val translationProviderFlow: Flow<String> = context.dataStore.data.map { it[KEY_TRANSLATION_PROVIDER] ?: "google" }
+    suspend fun setTranslationProvider(provider: String) {
+        try {
+            fastSp.edit().putString("cached_trans_provider", provider).apply()
+        } catch (_: Exception) {}
+        context.dataStore.edit { it[KEY_TRANSLATION_PROVIDER] = provider }
+    }
+
+    val autoSaveTranslatedLyricsFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_SAVE_TRANSLATED_LYRICS] ?: true }
+    suspend fun setAutoSaveTranslatedLyrics(autoSave: Boolean) = context.dataStore.edit { it[KEY_AUTO_SAVE_TRANSLATED_LYRICS] = autoSave }
+
     // LLM Settings
     val llmApiUrlFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_API_URL] ?: "" }
     val llmApiKeyFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_API_KEY] ?: "" }
-    val llmModelFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_MODEL] ?: "gpt-4o-mini" }
-    val llmPromptFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_PROMPT] ?: "" }
+    val llmModelFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_MODEL] ?: "claude-haiku-5-5" }
+    val llmPromptFlow: Flow<String> = context.dataStore.data.map {
+        val p = it[KEY_LLM_PROMPT]
+        if (p.isNullOrBlank()) DEFAULT_LLM_PROMPT else p
+    }
+    val llmConcurrencyFlow: Flow<Int> = context.dataStore.data.map { (it[KEY_LLM_CONCURRENCY] ?: 2).coerceIn(1, 5) }
 
-    suspend fun setLlmConfig(url: String, key: String, model: String, prompt: String) {
+    suspend fun setLlmConfig(url: String, key: String, model: String, prompt: String, concurrency: Int = 2) {
         context.dataStore.edit {
             it[KEY_LLM_API_URL] = url
             it[KEY_LLM_API_KEY] = key
             it[KEY_LLM_MODEL] = model
             it[KEY_LLM_PROMPT] = prompt
+            it[KEY_LLM_CONCURRENCY] = concurrency.coerceIn(1, 5)
         }
+    }
+
+    suspend fun setLlmConcurrency(concurrency: Int) = context.dataStore.edit {
+        it[KEY_LLM_CONCURRENCY] = concurrency.coerceIn(1, 5)
     }
 
     // Floating Lyrics Settings

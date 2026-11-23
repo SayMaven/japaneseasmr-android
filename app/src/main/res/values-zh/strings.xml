@@ -543,6 +543,17 @@
     <string name="settings_llm_api_key">API密钥</string>
     <string name="settings_llm_model">模型名称</string>
     <string name="settings_llm_prompt">系统提示词</string>
+    <string name="settings_auto_save_translated_lyrics">自动保存翻译歌词</string>
+    <string name="settings_auto_save_translated_lyrics_desc">将翻译保存到字幕库，否则仅临时显示</string>
+    <string name="settings_clear_translation_cache">清除翻译缓存</string>
+    <string name="settings_clear_translation_cache_desc">删除已保存的翻译，以便由当前选择的服务商重新翻译</string>
+    <string name="settings_clear_translation_cache_dialog_title">清除全部翻译缓存？</string>
+    <string name="settings_clear_translation_cache_dialog_msg">这将删除数据库中所有已保存的翻译。文本和歌词将由当前服务商重新翻译。</string>
+    <string name="settings_clear_translation_cache_cleared">翻译缓存已成功清除</string>
+    <string name="settings_translation_provider">翻译服务商</string>
+    <string name="settings_translation_provider_desc">选择翻译引擎服务商</string>
+    <string name="settings_llm_concurrency">并发数量</string>
+    <string name="settings_llm_concurrency_desc">并行翻译请求数（1-5）</string>
     <string name="settings_floating_lyrics">悬浮歌词</string>
     <string name="settings_floating_lyrics_desc">在迷你播放器上方显示同步歌词条</string>
     <string name="settings_floating_lyrics_preview">预览</string>

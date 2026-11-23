@@ -537,6 +537,17 @@
     <string name="settings_llm_api_key">API Key</string>
     <string name="settings_llm_model">Model Name</string>
     <string name="settings_llm_prompt">System Prompt</string>
+    <string name="settings_auto_save_translated_lyrics">Automatically save translated lyrics</string>
+    <string name="settings_auto_save_translated_lyrics_desc">Save translation to the subtitle library, otherwise show them temporarily</string>
+    <string name="settings_clear_translation_cache">Clear Translation Cache</string>
+    <string name="settings_clear_translation_cache_desc">Delete all stored translations so texts are re-translated by the selected provider</string>
+    <string name="settings_clear_translation_cache_dialog_title">Clear All Translation Cache?</string>
+    <string name="settings_clear_translation_cache_dialog_msg">This will remove all saved translations from the database. Text and lyrics will be fetched anew using your current provider.</string>
+    <string name="settings_clear_translation_cache_cleared">Translation cache cleared successfully</string>
+    <string name="settings_translation_provider">Translation Provider</string>
+    <string name="settings_translation_provider_desc">Select translation engine provider</string>
+    <string name="settings_llm_concurrency">Concurrency Number</string>
+    <string name="settings_llm_concurrency_desc">Parallel translation requests (1-5)</string>
     <string name="settings_floating_lyrics">Floating Lyrics</string>
     <string name="settings_floating_lyrics_desc">Display synchronized lyrics bar above mini player</string>
     <string name="settings_floating_lyrics_preview">Preview</string>

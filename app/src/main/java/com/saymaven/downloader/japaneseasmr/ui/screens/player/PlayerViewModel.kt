@@ -749,12 +749,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _playlistTranslatedTitles.value = merged
         }
 
-        // Jika terjemahan daftar aktif, otomatis terjemahkan karya yang belum memiliki terjemahan
-        if (_isTranslationActive.value) {
-            val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-            translatePlaylistTitles(targetLang)
-        }
-
         // Otomatis lengkapi metadata karya lokal yang belum memiliki tag/usia
         autoEnrichIncompleteMetadata(sorted)
     }
@@ -911,10 +905,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             prefs.autoTranslateListsFlow.distinctUntilChanged().collect { autoActive ->
                 _isTranslationActive.value = autoActive
-                if (autoActive) {
-                    val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-                    translatePlaylistTitles(targetLang)
-                } else {
+                if (!autoActive) {
                     _playlistTranslatedTitles.value = emptyMap()
                 }
             }
@@ -926,10 +917,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     isFirstLang = false
                     return@collect
                 }
-                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
                 if (_isTranslationActive.value) {
                     _playlistTranslatedTitles.value = emptyMap()
-                    translatePlaylistTitles(targetLang)
                 }
                 if (!_currentRjId.value.isNullOrBlank()) {
                     loadOrFetchTranslations(_currentRjId.value, forceOnline = true)
@@ -2236,8 +2225,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _isTranslationActive.value = next
         viewModelScope.launch {
             if (next) {
-                val targetLang = TranslationService.getActiveTargetLanguage(context ?: getApplication())
-                translatePlaylistTitles(targetLang)
                 if (!_currentRjId.value.isNullOrBlank()) {
                     loadOrFetchTranslations(_currentRjId.value, forceOnline = _isOnlineStreaming.value)
                 }
@@ -2249,28 +2236,45 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun translatePlaylistTitles(targetLang: String = TranslationService.getActiveTargetLanguage(getApplication())) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val localItems = _playlist.value
-            val playlistItems = try { playlistDao.getAllPlaylistItemsDirect() } catch (_: Exception) { emptyList() }
+    private var pageTranslateJob: kotlinx.coroutines.Job? = null
 
-            val allRjAndTitles = mutableMapOf<String, String>()
-            localItems.forEach { allRjAndTitles[it.rjid] = it.title }
-            playlistItems.forEach { allRjAndTitles[it.rjid] = it.title }
+    fun translateCurrentPageTitles(items: List<com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity>) {
+        pageTranslateJob?.cancel()
+        pageTranslateJob = viewModelScope.launch(Dispatchers.IO) {
+            val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+            val provider = TranslationService.getActiveProvider(getApplication())
 
+            val needTranslation = items.filter { it.translatedTitle.isNullOrBlank() }
+            if (needTranslation.isEmpty()) {
+                val currentMap = _playlistTranslatedTitles.value.toMutableMap()
+                items.forEach { item ->
+                    if (!item.translatedTitle.isNullOrBlank()) {
+                        currentMap[item.rjid] = item.translatedTitle
+                    }
+                }
+                _playlistTranslatedTitles.value = currentMap
+                return@launch
+            }
+
+            val titles = needTranslation.map { it.title }
+            val batchResult = TranslationService.translateBatch(titles, targetLang, provider)
             val currentMap = _playlistTranslatedTitles.value.toMutableMap()
-            allRjAndTitles.forEach { (rjid, title) ->
-                val translated = TranslationService.translateText(title, targetLang)
-                if (translated.isNotBlank() && translated != title) {
-                    currentMap[rjid] = translated
-                    val dbHistory = historyDao.getHistoryById(rjid)
-                    if (dbHistory != null) {
-                        historyDao.updateTranslations(rjid, translated, dbHistory.translatedChaptersJson)
+
+            items.forEach { item ->
+                val tr = batchResult[item.title] ?: item.translatedTitle
+                if (!tr.isNullOrBlank()) {
+                    currentMap[item.rjid] = tr
+                    if (item.translatedTitle != tr) {
+                        historyDao.updateTranslations(item.rjid, tr, item.translatedChaptersJson)
                     }
                 }
             }
             _playlistTranslatedTitles.value = currentMap
         }
+    }
+
+    fun translatePlaylistTitles(targetLang: String = TranslationService.getActiveTargetLanguage(getApplication())) {
+        translateCurrentPageTitles(_playlist.value.take(40))
     }
 
     fun loadOrFetchTranslations(targetRjid: String? = _currentRjId.value, forceOnline: Boolean = false) {
@@ -2807,6 +2811,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val llmKey = prefs.llmApiKeyFlow.first()
             val llmModel = prefs.llmModelFlow.first()
             val llmPrompt = prefs.llmPromptFlow.first()
+            val concurrency = prefs.llmConcurrencyFlow.first()
+            val autoSave = prefs.autoSaveTranslatedLyricsFlow.first()
 
             val texts = current.map { it.text }
             val translatedMap = TranslationService.translateLyricsNaturally(
@@ -2815,7 +2821,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 llmUrl = llmUrl,
                 llmKey = llmKey,
                 llmModel = llmModel,
-                llmPrompt = llmPrompt
+                llmPrompt = llmPrompt,
+                concurrency = concurrency
             )
 
             _currentLyrics.value = current.map { line ->
@@ -2823,6 +2830,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
             _isLyricsTranslated.value = true
             _isTranslatingLyrics.value = false
+
+            if (autoSave && translatedMap.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val dao = AsmrDatabase.getDatabase(getApplication()).translationCacheDao()
+                        val entities = translatedMap.map { (src, tr) ->
+                            com.saymaven.downloader.japaneseasmr.data.local.entity.TranslationCacheEntity(
+                                sourceText = src,
+                                targetLang = targetLang,
+                                translatedText = tr
+                            )
+                        }
+                        dao.insertTranslations(entities)
+                    } catch (_: Exception) {}
+                }
+            }
         }
     }
 

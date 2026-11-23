@@ -537,6 +537,17 @@
     <string name="settings_llm_api_key">Kunci API</string>
     <string name="settings_llm_model">Nama Model</string>
     <string name="settings_llm_prompt">Prompt Sistem</string>
+    <string name="settings_auto_save_translated_lyrics">Simpan Lirik Terjemahan Otomatis</string>
+    <string name="settings_auto_save_translated_lyrics_desc">Simpan terjemahan ke pustaka subtitle, jika dinonaktifkan terjemahan hanya ditampilkan sementara</string>
+    <string name="settings_clear_translation_cache">Hapus Cache Terjemahan</string>
+    <string name="settings_clear_translation_cache_desc">Hapus seluruh riwayat terjemahan agar teks diterjemahkan ulang oleh provider terpilih</string>
+    <string name="settings_clear_translation_cache_dialog_title">Hapus Seluruh Cache Terjemahan?</string>
+    <string name="settings_clear_translation_cache_dialog_msg">Tindakan ini akan menghapus semua terjemahan tersimpan di database. Teks dan lirik akan diterjemahkan ulang oleh provider yang aktif saat ini.</string>
+    <string name="settings_clear_translation_cache_cleared">Cache terjemahan berhasil dibersihkan</string>
+    <string name="settings_translation_provider">Penyedia Terjemahan</string>
+    <string name="settings_translation_provider_desc">Pilih penyedia mesin terjemahan</string>
+    <string name="settings_llm_concurrency">Jumlah Konkurensi</string>
+    <string name="settings_llm_concurrency_desc">Permintaan terjemahan paralel (1-5)</string>
     <string name="settings_floating_lyrics">Lirik Mengambang</string>
     <string name="settings_floating_lyrics_desc">Tampilkan baris lirik sinkron di atas mini player</string>
     <string name="settings_floating_lyrics_preview">Pratinjau</string>

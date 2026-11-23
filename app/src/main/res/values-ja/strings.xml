@@ -543,6 +543,17 @@
     <string name="settings_llm_api_key">APIキー</string>
     <string name="settings_llm_model">モデル名</string>
     <string name="settings_llm_prompt">システムプロンプト</string>
+    <string name="settings_auto_save_translated_lyrics">翻訳歌詞を自動保存</string>
+    <string name="settings_auto_save_translated_lyrics_desc">翻訳を字幕ライブラリに保存します。無効の場合は一時的にのみ表示されます</string>
+    <string name="settings_clear_translation_cache">翻訳キャッシュを削除</string>
+    <string name="settings_clear_translation_cache_desc">保存された翻訳データを削除し、現在のプロバイダーで再翻訳します</string>
+    <string name="settings_clear_translation_cache_dialog_title">翻訳キャッシュを全削除しますか？</string>
+    <string name="settings_clear_translation_cache_dialog_msg">データベース内の全翻訳が削除されます。次回表示時に新プロバイダーで再取得されます。</string>
+    <string name="settings_clear_translation_cache_cleared">翻訳キャッシュを消去しました</string>
+    <string name="settings_translation_provider">翻訳プロバイダー</string>
+    <string name="settings_translation_provider_desc">翻訳エンジンプロバイダーを選択</string>
+    <string name="settings_llm_concurrency">並行リクエスト数</string>
+    <string name="settings_llm_concurrency_desc">並行翻訳リクエスト数（1-5）</string>
     <string name="settings_floating_lyrics">フローティング歌詞</string>
     <string name="settings_floating_lyrics_desc">ミニプレーヤーの上部に同期歌詞を表示</string>
     <string name="settings_floating_lyrics_preview">プレビュー</string>

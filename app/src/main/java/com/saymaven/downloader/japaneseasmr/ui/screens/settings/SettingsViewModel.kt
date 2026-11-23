@@ -11,6 +11,7 @@ import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.data.model.UpdateInfo
 import com.saymaven.downloader.japaneseasmr.service.ImportPreviewData
 import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
+import com.saymaven.downloader.japaneseasmr.service.TranslationService
 import com.saymaven.downloader.japaneseasmr.service.UpdateManager
 import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -490,14 +491,46 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun addBlockedCircle(circle: String) = viewModelScope.launch { preferencesManager.addBlockedCircle(circle) }
     fun removeBlockedCircle(circle: String) = viewModelScope.launch { preferencesManager.removeBlockedCircle(circle) }
 
+    // Translation Provider & Lyrics
+    val translationProvider = preferencesManager.translationProviderFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        "google"
+    )
+
+    fun setTranslationProvider(provider: String) = viewModelScope.launch {
+        preferencesManager.setTranslationProvider(provider)
+        TranslationService.clearMemoryCache()
+    }
+
+    fun clearAllTranslationCache(onComplete: (() -> Unit)? = null) = viewModelScope.launch {
+        TranslationService.clearAllCache()
+        onComplete?.invoke()
+    }
+
+    val autoSaveTranslatedLyrics = preferencesManager.autoSaveTranslatedLyricsFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        true
+    )
+
+    fun setAutoSaveTranslatedLyrics(autoSave: Boolean) = viewModelScope.launch {
+        preferencesManager.setAutoSaveTranslatedLyrics(autoSave)
+    }
+
     // LLM Config
     val llmApiUrl = preferencesManager.llmApiUrlFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
     val llmApiKey = preferencesManager.llmApiKeyFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-    val llmModel = preferencesManager.llmModelFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "gpt-4o-mini")
-    val llmPrompt = preferencesManager.llmPromptFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+    val llmModel = preferencesManager.llmModelFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "claude-haiku-5-5")
+    val llmPrompt = preferencesManager.llmPromptFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PreferencesManager.DEFAULT_LLM_PROMPT)
+    val llmConcurrency = preferencesManager.llmConcurrencyFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2)
 
-    fun setLlmConfig(url: String, key: String, model: String, prompt: String) = viewModelScope.launch {
-        preferencesManager.setLlmConfig(url, key, model, prompt)
+    fun setLlmConfig(url: String, key: String, model: String, prompt: String, concurrency: Int = 2) = viewModelScope.launch {
+        preferencesManager.setLlmConfig(url, key, model, prompt, concurrency)
+    }
+
+    fun setLlmConcurrency(concurrency: Int) = viewModelScope.launch {
+        preferencesManager.setLlmConcurrency(concurrency)
     }
 
     // Floating Lyrics

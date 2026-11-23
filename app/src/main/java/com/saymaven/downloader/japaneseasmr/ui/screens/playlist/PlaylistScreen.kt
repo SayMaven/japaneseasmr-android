@@ -186,6 +186,12 @@ fun PlaylistScreen(
         displayedPlaylist.drop(start).take(pageSize)
     }
 
+    LaunchedEffect(isTranslationActive, pagedPlaylist) {
+        if (isTranslationActive && pagedPlaylist.isNotEmpty()) {
+            viewModel.translateCurrentPageTitles(pagedPlaylist)
+        }
+    }
+
     // User Playlist Interaction States
     var selectedUserPlaylist by remember { mutableStateOf<UserPlaylistEntity?>(null) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -840,7 +846,7 @@ fun PlaylistScreen(
                             ) {
                                 items(pagedPlaylist, key = { it.rjid }) { item ->
                                     val isCurrentTrack = (item.rjid == currentRjId)
-                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
+                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.translatedTitle ?: item.title else item.title
                                     LocalWorkPinterestCard(
                                         item = item,
                                         displayTitle = displayTitle,
@@ -891,7 +897,7 @@ fun PlaylistScreen(
                             ) {
                                 items(pagedPlaylist, key = { it.rjid }) { item ->
                                     val isCurrentTrack = (item.rjid == currentRjId)
-                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title
+                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.translatedTitle ?: item.title else item.title
                                     LocalWorkListViewItem(
                                         modifier = Modifier.fillMaxWidth(),
                                         item = item,
