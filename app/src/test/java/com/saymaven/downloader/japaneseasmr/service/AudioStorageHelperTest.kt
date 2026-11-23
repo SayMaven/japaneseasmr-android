@@ -220,4 +220,22 @@ class AudioStorageHelperTest {
         // Remote DLsite URLs are NOT mismatched
         org.junit.Assert.assertFalse(AudioStorageHelper.isMismatchedFolderCover(audio1, "https://img.dlsite.jp/modpub/images2/work/doujin/RJ01080000/RJ01081584_img_main.jpg", "RJ01081584"))
     }
+
+    @Test
+    fun testGetAudioFilesRecursive_collectsPerTrackSubfoldersInOrder() {
+        val workRoot = tempFolder.newFolder("RJ01716841")
+        val sub1 = File(workRoot, "Track 01").apply { mkdir() }
+        val sub2 = File(workRoot, "Track 02").apply { mkdir() }
+        val sub10 = File(workRoot, "Track 10").apply { mkdir() }
+
+        File(sub1, "audio.mp3").writeText("audio 1")
+        File(sub2, "audio.mp3").writeText("audio 2")
+        File(sub10, "audio.mp3").writeText("audio 10")
+
+        val recursive = AudioStorageHelper.getAudioFilesRecursive(workRoot)
+        assertEquals(3, recursive.size)
+        assertEquals("Track 01", recursive[0].parentFile?.name)
+        assertEquals("Track 02", recursive[1].parentFile?.name)
+        assertEquals("Track 10", recursive[2].parentFile?.name)
+    }
 }

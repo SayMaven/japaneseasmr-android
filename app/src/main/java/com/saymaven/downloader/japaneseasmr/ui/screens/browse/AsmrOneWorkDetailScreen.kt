@@ -495,7 +495,8 @@ fun AsmrOneWorkDetailScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    if (!isFileTreeTranslated && translatedNodeTitles.isEmpty()) {
+                                    val hasValidTranslations = translatedNodeTitles.entries.any { (k, v) -> v.isNotBlank() && v != k }
+                                    if (!isFileTreeTranslated && !hasValidTranslations) {
                                         coroutineScope.launch {
                                             isTranslatingFileTree = true
                                             try {
@@ -743,7 +744,7 @@ fun FileTreeNodeItem(
     var isExpanded by remember(node.title, shouldExpandInitially) { mutableStateOf(shouldExpandInitially) }
 
     val displayNodeTitle = if (isTranslationActive) {
-        translatedTitles[node.title] ?: node.title
+        translatedTitles[node.title.trim()] ?: translatedTitles[node.title] ?: node.title
     } else {
         node.title
     }
@@ -837,7 +838,11 @@ fun FileTreeNodeItem(
 
                     IconButton(
                         onClick = {
-                            val streamTracks = if (!parentFolderTracks.isNullOrEmpty()) {
+                            val streamTracks = if (!parentFolderTracks.isNullOrEmpty() && parentFolderTracks.size > 1) {
+                                parentFolderTracks
+                            } else if (fallbackAudioTracks.size > 1) {
+                                fallbackAudioTracks
+                            } else if (!parentFolderTracks.isNullOrEmpty()) {
                                 parentFolderTracks
                             } else {
                                 fallbackAudioTracks.ifEmpty {

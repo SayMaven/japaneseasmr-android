@@ -176,6 +176,29 @@ object AudioStorageHelper {
     }
 
     /**
+     * Mengambil seluruh berkas audio secara rekursif di dalam folder beserta subfoldernya,
+     * diurutkan berdasarkan natural order pada path relatifnya.
+     */
+    fun getAudioFilesRecursive(folder: File, maxDepth: Int = 4): List<File> {
+        if (!folder.exists() || !folder.isDirectory) return emptyList()
+        return try {
+            val files = mutableListOf<File>()
+            folder.walkTopDown().maxDepth(maxDepth).forEach { f ->
+                if (f.isFile && f.length() > 0L && AUDIO_EXTENSIONS.contains(f.extension.lowercase())) {
+                    files.add(f)
+                }
+            }
+            files.sortedWith { f1, f2 ->
+                val p1 = try { f1.relativeTo(folder).path } catch (_: Exception) { f1.name }
+                val p2 = try { f2.relativeTo(folder).path } catch (_: Exception) { f2.name }
+                NATURAL_ORDER_COMPARATOR.compare(p1, p2)
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
      * Mengecek apakah sebuah folder adalah multi-track album (memiliki >= 2 file audio).
      */
     fun isMultiTrackFolder(folder: File): Boolean {
@@ -606,10 +629,12 @@ object AudioStorageHelper {
         val parent = audioFile.parentFile ?: return false
         val cleanRj = rjCode?.uppercase()?.trim()
 
-        // 1. Cover resmi tersimpan di direktori cache covers -> valid
+        // 1. Cover resmi atau custom cover tersimpan di direktori cache covers -> valid
         val canonical = try { cover.canonicalPath } catch (e: Exception) { cover.absolutePath }
-        if (canonical.contains("covers") && (cleanRj.isNullOrBlank() || cover.name.uppercase().contains(cleanRj))) {
-            return false
+        if (canonical.contains("covers")) {
+            if (cover.name.startsWith("custom_", ignoreCase = true) || cleanRj.isNullOrBlank() || cover.name.uppercase().contains(cleanRj)) {
+                return false
+            }
         }
 
         // 2. Companion cover persis dengan nama stem audio -> valid
@@ -646,6 +671,11 @@ object AudioStorageHelper {
 
         val coversDir = File(context.cacheDir, "covers")
         if (cleanRj.isNotBlank()) {
+            val customCover = File(coversDir, "custom_$cleanRj.jpg")
+            if (customCover.exists() && customCover.length() > 0) {
+                localCoverCache[cacheKey] = customCover
+                return customCover
+            }
             val cachedCover = File(coversDir, "$cleanRj.jpg")
             if (cachedCover.exists() && cachedCover.length() > 0) {
                 localCoverCache[cacheKey] = cachedCover

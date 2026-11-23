@@ -35,10 +35,6 @@ object IndonesianPostFilter {
         Regex("\\btusuk\\s+daging\\b", RegexOption.IGNORE_CASE) to "penis",
         Regex("\\bstik\\s+daging\\b", RegexOption.IGNORE_CASE) to "penis",
         Regex("\\btongkat\\s+daging\\b", RegexOption.IGNORE_CASE) to "penis",
-        Regex("\\bkokang\\b", RegexOption.IGNORE_CASE) to "penis",
-        Regex("\\bkucing\\b", RegexOption.IGNORE_CASE) to "kewanitaan",
-        Regex("\\bCat\\b") to "vagina",
-        Regex("\\bcat\\b") to "vagina",
         Regex("\\blubang\\s+kecil\\b", RegexOption.IGNORE_CASE) to "daerah kewanitaan",
 
         // Aktivitas Seksual & ASMR
@@ -59,7 +55,6 @@ object IndonesianPostFilter {
         Regex("\\bbantal\\s+berbicara\\b", RegexOption.IGNORE_CASE) to "obrolan ranjang (pillow talk)",
         Regex("\\bmenuduh\\s+secara\\s+lisan\\b", RegexOption.IGNORE_CASE) to "ejekan sensual",
         Regex("\\bdukungan\\s+bawang\\b", RegexOption.IGNORE_CASE) to "panduan masturbasi (onasapo)",
-        Regex("\\bbawang\\b", RegexOption.IGNORE_CASE) to "onasapo",
         Regex("\\bkontrol\\s+tepi\\b", RegexOption.IGNORE_CASE) to "edging (menahan puncak)",
         Regex("\\bejakulasi\\s+tepi\\b", RegexOption.IGNORE_CASE) to "edging (menahan puncak)",
         Regex("\\bair\\s+mani\\s+tebal\\b", RegexOption.IGNORE_CASE) to "sperma kental",
@@ -100,8 +95,7 @@ object IndonesianPostFilter {
         Regex("りのたびに|のたびに") to "setiap kali",
         Regex("\\bbertemukembali\\b", RegexOption.IGNORE_CASE) to "bertemu kembali",
         Regex("\\bSubmission\\b", RegexOption.IGNORE_CASE) to "tunduk pasrah",
-        Regex("\\bSeparation\\b", RegexOption.IGNORE_CASE) to "perpisahan",
-        Regex("[にをでからぎち](?:\\s+|$)") to " "
+        Regex("\\bSeparation\\b", RegexOption.IGNORE_CASE) to "perpisahan"
     )
 
     /**

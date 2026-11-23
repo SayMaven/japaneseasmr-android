@@ -88,11 +88,11 @@ object TranslationService {
                 }
             }
         }
-        // One-time purge of poisoned cache entries created during d4930d9/07cbd71
+        // One-time purge of poisoned/stiff cache entries
         try {
             val sp = context.applicationContext.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
-            if (sp.getInt("translation_cache_version", 0) < 2) {
-                sp.edit().putInt("translation_cache_version", 2).apply()
+            if (sp.getInt("translation_cache_version", 0) < 3) {
+                sp.edit().putInt("translation_cache_version", 3).apply()
                 memoryCache.clear()
                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                     try {
@@ -213,6 +213,20 @@ object TranslationService {
         RegexOption.IGNORE_CASE
     )
 
+    private val FILE_EXT_REGEX = Regex("^(.+?)(\\.[a-zA-Z0-9]{2,5})$")
+
+    private fun stripFilenameForTranslation(raw: String): Triple<String, String, String> {
+        val extMatch = FILE_EXT_REGEX.find(raw)
+        val noExt = extMatch?.groupValues?.get(1) ?: raw
+        val ext = extMatch?.groupValues?.get(2) ?: ""
+        val prefixMatch = CHAPTER_PREFIX_REGEX.find(noExt)
+        return if (prefixMatch != null && prefixMatch.groupValues[2].isNotBlank()) {
+            Triple(prefixMatch.groupValues[1], prefixMatch.groupValues[2].trim(), ext)
+        } else {
+            Triple("", noExt.trim(), ext)
+        }
+    }
+
     /**
      * Menerjemahkan satu teks dengan pipeline modular:
      * 1. Memory cache check (0ms).
@@ -250,15 +264,17 @@ object TranslationService {
             }
         }
 
-        // 1b. Cek kecocokan nomor bab/track prefix
-        val prefixMatch = CHAPTER_PREFIX_REGEX.find(trimmed)
-        if (prefixMatch != null) {
-            val prefix = prefixMatch.groupValues[1]
-            val body = prefixMatch.groupValues[2].trim()
-            JapaneseAsmrGlossary.GLOSSARY_ID[body]?.let {
-                val combined = "$prefix$it"
-                memoryCache[cacheKey] = combined
-                return@withContext combined
+        // 1b. Cek kecocokan nomor bab/track prefix & ekstensi file
+        val (filePrefix, coreBody, fileExt) = stripFilenameForTranslation(trimmed)
+        if (coreBody.isNotBlank() && (filePrefix.isNotEmpty() || fileExt.isNotEmpty())) {
+            JapaneseAsmrGlossary.GLOSSARY_ID[coreBody]?.let {
+                val res = if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) {
+                    "$filePrefix$it$fileExt"
+                } else trimmed
+                if (res != trimmed) {
+                    memoryCache[cacheKey] = res
+                    return@withContext res
+                }
             }
         }
 
@@ -338,7 +354,8 @@ object TranslationService {
     suspend fun translateBatch(
         texts: List<String>,
         targetLang: String = "",
-        provider: String = ""
+        provider: String = "",
+        isSubtitleMode: Boolean = false
     ): Map<String, String> = withContext(Dispatchers.IO) {
         val unique = texts.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (unique.isEmpty()) return@withContext emptyMap()
@@ -418,10 +435,12 @@ object TranslationService {
                                 // Pre-process chunk di Dispatchers.Default
                                 val preparedChunk = withContext(Dispatchers.Default) {
                                     chunk.map { item ->
+                                        val cleanBody = if (isSubtitleMode) item else stripFilenameForTranslation(item).second
                                         val pre = if (sourceLang == "ja") {
-                                            JapaneseAsmrGlossary.preProcessJapanese(item)
+                                            if (isSubtitleMode) JapaneseAsmrGlossary.preProcessForSubtitle(cleanBody)
+                                            else JapaneseAsmrGlossary.preProcessJapanese(cleanBody)
                                         } else {
-                                            ChineseAsmrGlossary.preProcessChinese(item)
+                                            ChineseAsmrGlossary.preProcessChinese(cleanBody)
                                         }
                                         // Escape tag kurung siku ganda yang mungkin ada di teks sumber
                                         pre.replace("[[", "⟦").replace("]]", "⟧").replace('\n', ' ').trim().ifEmpty { item }
@@ -460,9 +479,15 @@ object TranslationService {
                                     val rawParsed = parsedMap[i]
                                     if (!rawParsed.isNullOrBlank()) {
                                         val rawTr = rawParsed.replace("⟦", "[[").replace("⟧", "]]")
-                                        val finalTr = if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) {
+                                        val refinedBody = if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) {
                                             IndonesianPostFilter.refineIndonesian(rawTr)
                                         } else rawTr
+                                        val finalTr = if (isSubtitleMode) {
+                                            refinedBody
+                                        } else {
+                                            val (p, _, e) = stripFilenameForTranslation(src)
+                                            if (p.isNotEmpty() || e.isNotEmpty()) "$p$refinedBody$e" else refinedBody
+                                        }
 
                                         if (finalTr.isNotBlank() && !isPoisonedTranslation(src, finalTr, effectiveTargetLang)) {
                                             result[src] = finalTr
@@ -600,14 +625,14 @@ object TranslationService {
             if (allSucceeded && llmResult.isNotEmpty()) {
                 val missing = unique.filter { !llmResult.containsKey(it) }
                 if (missing.isNotEmpty()) {
-                    llmResult.putAll(translateBatch(missing, targetLang, provider))
+                    llmResult.putAll(translateBatch(missing, targetLang, provider, isSubtitleMode = true))
                 }
                 return@withContext llmResult
             }
         }
 
         // Auto-fallback ke Google Translate + Smart Glossary jika LLM kosong / gagal / ditolak NSFW
-        translateBatch(unique, targetLang, provider)
+        translateBatch(unique, targetLang, provider, isSubtitleMode = true)
     }
 
     private suspend fun translateViaLlmSingle(

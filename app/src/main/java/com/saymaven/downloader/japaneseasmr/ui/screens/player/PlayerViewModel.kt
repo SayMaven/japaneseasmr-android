@@ -1532,7 +1532,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 isCurrentVirtualAlbum = true
                 currentAlbumHistory = history
                 val folder = targetFile
-                val tracks = withContext(Dispatchers.IO) { AudioStorageHelper.getAudioFilesInFolder(folder) }
+                val tracks = withContext(Dispatchers.IO) {
+                    AudioStorageHelper.getAudioFilesInFolder(folder).ifEmpty {
+                        AudioStorageHelper.getAudioFilesRecursive(folder)
+                    }
+                }
                 if (tracks.isEmpty()) return@launch
 
                 val cleanRj = history.linkedRjId ?: history.rjid
@@ -2137,7 +2141,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 if (targetFile != null && targetFile.exists() && (history?.sourceType == SourceType.LOCAL_FOLDER.name || targetFile.isDirectory)) {
                     val folder = targetFile
-                    val tracks = withContext(Dispatchers.IO) { AudioStorageHelper.getAudioFilesInFolder(folder) }
+                    val tracks = withContext(Dispatchers.IO) {
+                    AudioStorageHelper.getAudioFilesInFolder(folder).ifEmpty {
+                        AudioStorageHelper.getAudioFilesRecursive(folder)
+                    }
+                }
                     if (tracks.isNotEmpty()) {
                         val freshChapters = AudioStorageHelper.extractVirtualAlbumChapters(tracks)
                         AudioStorageHelper.cacheVirtualChapters(targetRjid, freshChapters)
@@ -2433,14 +2441,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     .trim()
 
                 // 1. Cek cache DB jika tidak forceOnline dan bukan stream online (pastikan bukan teks asli/beracun)
-                if (!forceOnline && history != null && !TranslationService.isPoisonedTranslation(rawTitle, history.translatedTitle, targetLang)) {
-                    _translatedTitle.value = history.translatedTitle
-                    if (!history.translatedChaptersJson.isNullOrBlank()) {
-                        val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
-                        _translatedChapters.value = parsed
+                val hasValidTitle = history != null && !TranslationService.isPoisonedTranslation(rawTitle, history.translatedTitle, targetLang)
+                val currentChaps = _currentChapters.value
+                val parsedChaps = if (history != null && !history.translatedChaptersJson.isNullOrBlank()) {
+                    ChapterItem.fromJsonArray(history.translatedChaptersJson)
+                } else emptyList()
+                val hasValidChapters = currentChaps.isEmpty() || (
+                    parsedChaps.size == currentChaps.size &&
+                    !parsedChaps.indices.all { TranslationService.isPoisonedTranslation(currentChaps[it].title, parsedChaps[it].title, targetLang) }
+                )
+
+                if (!forceOnline && hasValidTitle && hasValidChapters) {
+                    _translatedTitle.value = history!!.translatedTitle
+                    if (parsedChaps.isNotEmpty()) {
+                        _translatedChapters.value = parsedChaps
                     }
                     lastTranslatedKey = currentKey
                     return@launch
+                }
+                if (hasValidTitle) {
+                    _translatedTitle.value = history!!.translatedTitle
                 }
 
                 _isTranslating.value = true
@@ -2449,20 +2469,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 kotlinx.coroutines.withTimeoutOrNull(25_000L) {
                     coroutineScope {
-                        val titleDeferred = async(Dispatchers.IO) {
+                        val titleDeferred = if (!forceOnline && hasValidTitle) null else async(Dispatchers.IO) {
                             TranslationService.translateText(rawTitle, targetLang, provider)
                         }
-                        val currentChaps = _currentChapters.value
-                        val chapsDeferred = if (currentChaps.isNotEmpty()) {
+                        val chapsDeferred = if (currentChaps.isNotEmpty() && (forceOnline || !hasValidChapters)) {
                             async(Dispatchers.IO) {
                                 translateChaptersBatch(currentChaps, targetLang, provider)
                             }
                         } else null
 
-                        val translatedTitleRes = titleDeferred.await()
+                        val translatedTitleRes = titleDeferred?.await() ?: history?.translatedTitle ?: rawTitle
                         _translatedTitle.value = translatedTitleRes
 
-                        val translatedChapsList = chapsDeferred?.await() ?: emptyList()
+                        val translatedChapsList = chapsDeferred?.await() ?: parsedChaps
                         if (translatedChapsList.isNotEmpty()) {
                             _translatedChapters.value = translatedChapsList
                         }
@@ -2756,20 +2775,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch(Dispatchers.IO) {
             val existing = historyDao.getHistoryById(targetRjid)
             if (existing != null) {
-                val updated = existing.copy(coverUrl = newCoverPath)
-                historyDao.insertHistory(updated)
-
+                var finalCoverPath = newCoverPath
                 try {
-                    val cleanRj = (existing.linkedRjId ?: existing.rjid).uppercase().trim()
+                    val uniqueKey = existing.rjid.uppercase().trim()
                     val coversDir = File(getApplication<Application>().cacheDir, "covers").apply { if (!exists()) mkdirs() }
-                    val targetCoverFile = File(coversDir, "$cleanRj.jpg")
+                    val targetCustomFile = File(coversDir, "custom_${uniqueKey}.jpg")
                     val src = File(newCoverPath)
-                    if (src.exists() && src.isFile && src.canonicalPath != targetCoverFile.canonicalPath) {
-                        src.copyTo(targetCoverFile, overwrite = true)
+                    if (src.exists() && src.isFile && src.canonicalPath != targetCustomFile.canonicalPath) {
+                        src.copyTo(targetCustomFile, overwrite = true)
                     }
-                    AudioStorageHelper.clearLocalCoverCacheFor(cleanRj)
+                    if (targetCustomFile.exists() && targetCustomFile.length() > 0) {
+                        finalCoverPath = targetCustomFile.absolutePath
+                    }
                     AudioStorageHelper.clearLocalCoverCacheFor(existing.rjid)
                 } catch (e: Exception) {}
+
+                val updated = existing.copy(coverUrl = finalCoverPath)
+                historyDao.insertHistory(updated)
 
                 val curList = _playlist.value.toMutableList()
                 val idx = curList.indexOfFirst { it.rjid == targetRjid }
@@ -2781,8 +2803,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 withContext(Dispatchers.Main) {
                     if (_currentRjId.value == targetRjid) {
-                        _currentCoverUrl.value = newCoverPath
-                        preloadCoverArtInMemory(newCoverPath)
+                        _currentCoverUrl.value = finalCoverPath
+                        preloadCoverArtInMemory(finalCoverPath)
                     }
                 }
             }

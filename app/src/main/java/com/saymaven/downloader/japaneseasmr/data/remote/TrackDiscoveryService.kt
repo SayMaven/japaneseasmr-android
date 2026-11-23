@@ -454,6 +454,69 @@ object TrackDiscoveryService {
             return score
         }
 
+        fun isFormatOrVariantFolder(title: String): Boolean {
+            val low = title.lowercase()
+            return low.contains("mp3") || low.contains("wav") || low.contains("flac") ||
+                low.contains("m4a") || low.contains("aac") || low.contains("opus") || low.contains("wma") ||
+                low.contains("seあり") || low.contains("se有り") || low.contains("seなし") || low.contains("se無し") ||
+                low.contains("se_ari") || low.contains("se_nashi") || low.contains("se ari") || low.contains("se nashi") ||
+                low.contains("効果音") || low.contains("nose") || low.contains("音声原本")
+        }
+
+        fun deduplicateTracks(rawTracks: List<TrackInfo>): List<TrackInfo> {
+            val seenBases = mutableMapOf<String, TrackInfo>()
+            val filtered = mutableListOf<TrackInfo>()
+
+            for (tr in rawTracks) {
+                val subPrefix = tr.relativeSubPath.lowercase()
+                val rawBase = "$subPrefix/${tr.name.lowercase().replace(Regex("_(?:se|nose)$"), "")}"
+                val existing = seenBases[rawBase]
+                if (existing == null) {
+                    seenBases[rawBase] = tr
+                    filtered.add(tr)
+                } else {
+                    val trIsPref = when {
+                        pref == "flac" || pref == "wav" -> tr.url.contains(".flac", ignoreCase = true) || tr.url.contains(".wav", ignoreCase = true)
+                        pref == "m4a" || pref == "aac" -> tr.url.contains(".m4a", ignoreCase = true) || tr.url.contains(".aac", ignoreCase = true)
+                        pref.startsWith("mp3") -> tr.url.contains(".mp3", ignoreCase = true)
+                        pref == "wma" -> tr.url.contains(".wma", ignoreCase = true)
+                        else -> tr.url.contains(".mp3", ignoreCase = true) || tr.url.contains(".m4a", ignoreCase = true)
+                    }
+                    val exIsPref = when {
+                        pref == "flac" || pref == "wav" -> existing.url.contains(".flac", ignoreCase = true) || existing.url.contains(".wav", ignoreCase = true)
+                        pref == "m4a" || pref == "aac" -> existing.url.contains(".m4a", ignoreCase = true) || existing.url.contains(".aac", ignoreCase = true)
+                        pref.startsWith("mp3") -> existing.url.contains(".mp3", ignoreCase = true)
+                        pref == "wma" -> existing.url.contains(".wma", ignoreCase = true)
+                        else -> existing.url.contains(".mp3", ignoreCase = true) || existing.url.contains(".m4a", ignoreCase = true)
+                    }
+                    if (trIsPref && !exIsPref) {
+                        filtered.remove(existing)
+                        seenBases[rawBase] = tr
+                        filtered.add(tr)
+                    }
+                }
+            }
+
+            return filtered.sortedWith { t1, t2 ->
+                val p1 = if (t1.relativeSubPath.isNotBlank()) "${t1.relativeSubPath}/${t1.name}" else t1.name
+                val p2 = if (t2.relativeSubPath.isNotBlank()) "${t2.relativeSubPath}/${t2.name}" else t2.name
+                naturalOrderComparator.compare(p1, p2)
+            }
+        }
+
+        // Jika seluruh top-level folder bukan varian format/SE (misal setiap trek di subfolder terpisah seperti RJ01716841),
+        // kumpulkan trek dari seluruh subfolder agar tidak ada trek yang tertinggal!
+        val variantFoldersCount = folders.count { isFormatOrVariantFolder(it.optString("title")) }
+        if (folders.size >= 2 && variantFoldersCount == 0) {
+            val combinedTracks = mutableListOf<TrackInfo>()
+            for (f in folders) {
+                combinedTracks.addAll(extractAudiosFromNode(f, f.optString("title", "").trim()))
+            }
+            if (combinedTracks.size >= 2) {
+                return deduplicateTracks(combinedTracks)
+            }
+        }
+
         folders.sortByDescending { folderScore(it.optString("title")) }
 
         for (bestFolder in folders) {
@@ -469,6 +532,16 @@ object TrackDiscoveryService {
                     }
                 }
                 if (subFolders.isEmpty()) break
+
+                // Jika subfolder bersaudara bukan varian format/SE, berarti setiap trek dipisah per subfolder
+                val subVariantCount = subFolders.count { isFormatOrVariantFolder(it.optString("title")) }
+                if (subFolders.size >= 2 && subVariantCount == 0) {
+                    val multiSubTracks = extractAudiosFromNode(targetNode, pathAccumulator)
+                    if (multiSubTracks.size >= 2) {
+                        return deduplicateTracks(multiSubTracks)
+                    }
+                }
+
                 subFolders.sortByDescending { folderScore(it.optString("title")) }
                 targetNode = subFolders[0]
                 val subTitle = targetNode.optString("title", "").trim()
@@ -479,40 +552,7 @@ object TrackDiscoveryService {
 
             val tracks = extractAudiosFromNode(targetNode, pathAccumulator)
             if (tracks.isNotEmpty()) {
-                // Deduplikasi format: jika ada format MP3 dan WAV untuk nama yang sama, pilih MP3
-                val seenBases = mutableMapOf<String, TrackInfo>()
-                val filtered = mutableListOf<TrackInfo>()
-
-                for (tr in tracks) {
-                    val rawBase = tr.name.lowercase().replace(Regex("_(?:se|nose)$"), "")
-                    val existing = seenBases[rawBase]
-                    if (existing == null) {
-                        seenBases[rawBase] = tr
-                        filtered.add(tr)
-                    } else {
-                        val trIsPref = when {
-                            pref == "flac" || pref == "wav" -> tr.url.contains(".flac", ignoreCase = true) || tr.url.contains(".wav", ignoreCase = true)
-                            pref == "m4a" || pref == "aac" -> tr.url.contains(".m4a", ignoreCase = true) || tr.url.contains(".aac", ignoreCase = true)
-                            pref.startsWith("mp3") -> tr.url.contains(".mp3", ignoreCase = true)
-                            pref == "wma" -> tr.url.contains(".wma", ignoreCase = true)
-                            else -> tr.url.contains(".mp3", ignoreCase = true) || tr.url.contains(".m4a", ignoreCase = true)
-                        }
-                        val exIsPref = when {
-                            pref == "flac" || pref == "wav" -> existing.url.contains(".flac", ignoreCase = true) || existing.url.contains(".wav", ignoreCase = true)
-                            pref == "m4a" || pref == "aac" -> existing.url.contains(".m4a", ignoreCase = true) || existing.url.contains(".aac", ignoreCase = true)
-                            pref.startsWith("mp3") -> existing.url.contains(".mp3", ignoreCase = true)
-                            pref == "wma" -> existing.url.contains(".wma", ignoreCase = true)
-                            else -> existing.url.contains(".mp3", ignoreCase = true) || existing.url.contains(".m4a", ignoreCase = true)
-                        }
-                        if (trIsPref && !exIsPref) {
-                            filtered.remove(existing)
-                            seenBases[rawBase] = tr
-                            filtered.add(tr)
-                        }
-                    }
-                }
-
-                return filtered.sortedWith { t1, t2 -> naturalOrderComparator.compare(t1.name, t2.name) }
+                return deduplicateTracks(tracks)
             }
         }
 

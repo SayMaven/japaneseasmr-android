@@ -235,8 +235,8 @@ object JapaneseAsmrGlossary {
     )
 
     /**
-     * Membersihkan fuseji dan menormalkan teks Jepang ke istilah yang dipahami Google/LLM
-     * dengan benar tanpa salah arti harfiah.
+     * Membersihkan fuseji dan menormalkan istilah khusus ASMR/DLsite pada judul
+     * tanpa merusak tata bahasa alami Jepang.
      */
     fun preProcessJapanese(text: String): String {
         var t = text
@@ -245,87 +245,54 @@ object JapaneseAsmrGlossary {
         }
         t = t.replace("○", "").replace("●", "").replace("×", "").replace("〇", "")
 
-        // Slang & Onomatopoeia normalizations
-        t = t.replace("シコシコ", "オナニーの刺激")
-        t = t.replace("しこしこ", "オナニーの刺激")
-        t = t.replace("ピュッピュッ", "射精の勢い")
-        t = t.replace("ぴゅっぴゅっ", "射精の勢い")
+        // Slang & Onomatopoeia normalizations (tanpa sisipan kurung kaku)
+        t = t.replace("シコシコ", "オナニー")
+        t = t.replace("しこしこ", "オナニー")
         t = t.replace("ジュポジュポ", "激しいフェラチオ")
         t = t.replace("じゅぽじゅぽ", "激しいフェラチオ")
-        t = t.replace("パンパン", "激しいピストン")
-        t = t.replace("ぱんぱん", "激しいピストン")
-        t = t.replace("ズチュズチュ", "濡れた激しいピストン")
-        t = t.replace("ぐちゅぐちゅ", "濡れた激しいピストン")
-        t = t.replace("グチュグチュ", "濡れた激しいピストン")
-        t = t.replace("ヌプヌプ", "濡れて滑らかな挿入")
-        t = t.replace("ぬちゅぬちゅ", "濡れて滑らかな挿入")
+        t = t.replace("ズチュズチュ", "激しいピストン")
+        t = t.replace("ぐちゅぐちゅ", "激しいピストン")
+        t = t.replace("グチュグチュ", "激しいピストン")
 
-        // Dialog Desahan (mencegah "aku pergi")
-        t = t.replace("いっちゃう", "イッてしまう（絶頂）")
-        t = t.replace("逝っちゃう", "イッてしまう（絶頂）")
-        t = t.replace("イッちゃう", "イッてしまう（絶頂）")
-        t = t.replace("イキそう", "絶頂しそう")
-        t = t.replace("いきそう", "絶頂しそう")
-        t = t.replace("イカせて", "絶頂させて")
-        t = t.replace("いかせて", "絶頂させて")
-        t = t.replace("おかしくなっちゃう", "快楽で頭がおかしくなりそう")
-        t = t.replace("壊れちゃう", "快楽で壊れそう")
-        t = t.replace("気持ち良すぎ", "とても気持ちいい")
-        t = t.replace("きもちよすぎ", "とても気持ちいい")
-        t = t.replace("きもちいい", "気持ちいい")
-        t = t.replace("きもちい", "気持ちいい")
-        t = t.replace("いっぱい出して", "精液をたくさん出して")
-        t = t.replace("中にいっぱい", "膣内にたくさん出して")
-        t = t.replace("抜いてあげる", "射精させてあげる")
-        t = t.replace("抜いてやる", "射精させてやる")
-
-        // Anatomi (mencegah glitch Cat/kucing atau ayam)
+        // Anatomi (mencegah glitch harfiah mesin penerjemah)
         t = t.replace("おちんぽ", "ペニス")
         t = t.replace("ちんぽ", "ペニス")
         t = t.replace("おちんちん", "ペニス")
         t = t.replace("ちんちん", "ペニス")
         t = t.replace("肉棒", "ペニス")
-        t = t.replace("おまんこ", "女性器の膣")
-        t = t.replace("まんこ", "女性器の膣")
-        t = t.replace("ザー汁", "濃厚な精液")
+        t = t.replace("おまんこ", "女性器")
+        t = t.replace("まんこ", "女性器")
+        t = t.replace("ザー汁", "精液")
 
-        // Trope DLsite
-        t = t.replace("駅弁", "抱き上げ立ちバック体位")
+        // Trope DLsite yang sering salah arti jika dibiarkan mentah
+        t = t.replace("駅弁", "立ちバック")
         t = t.replace("生ハメ", "生セックス")
         t = t.replace("生えっち", "生セックス")
-        t = t.replace("オナサポ", "マスターベーション補助")
-        t = t.replace("寸止め", "寸止めオーガズム")
-        t = t.replace("搾精", "精液搾取")
-        t = t.replace("素股", "太もも刺激")
-        t = t.replace("手マン", "指での刺激")
-        t = t.replace("筆下ろし", "童貞喪失")
-        t = t.replace("筆おろし", "童貞喪失")
-        t = t.replace("ピロートーク", "ベッドでの会話ピロートーク")
+        t = t.replace("オナサポ", "オナニーサポート")
+        t = t.replace("素股", "太もも摩擦")
+        t = t.replace("手マン", "指愛撫")
+        t = t.replace("筆下ろし", "初体験")
+        t = t.replace("筆おろし", "初体験")
         t = t.replace("わからせ調教", "懲らしめの調教")
         t = t.replace("理解らせ調教", "懲らしめの調教")
         t = t.replace("わからせ", "懲らしめ")
         t = t.replace("理解らせ", "懲らしめ")
-        t = t.replace("メス堕ち", "快楽への屈服")
-        t = t.replace("悪堕ち", "悪への堕落")
-
-        // Title Compounds & Normalizations
-        t = t.replace("土下座", "土下座謝罪")
-        t = t.replace("即ヌキ", "即時射精")
-        t = t.replace("ハーレムナース", "ハーレム看護師")
-        t = t.replace("ハーレム", "ハーレム")
-        t = t.replace("ナース", "看護師")
-        t = t.replace("パパ生活", "パパ活生活")
         t = t.replace("快楽fall", "快楽堕ち")
-        t = t.replace("ちマゾ", "重度マゾヒスト")
-        t = t.replace("チマゾ", "重度マゾヒスト")
+        t = t.replace("ちマゾ", "マゾヒスト")
+        t = t.replace("チマゾ", "マゾヒスト")
         t = t.replace("オナホ化", "オナホール化")
-        t = t.replace("オホ", "あえぎ声オホ")
-        t = t.replace("見下し", "見下す侮蔑")
-        t = t.replace("泣きながら", "涙を流しながら")
-        t = t.replace("必死に", "必死の思いで")
-        t = t.replace("～", " ～ ")
-        t = t.replace("〜", " ～ ")
 
         return t
+    }
+
+    /**
+     * Pra-pemrosesan ringan khusus subtitle/dialog agar alur percakapan tetap natural.
+     */
+    fun preProcessForSubtitle(text: String): String {
+        var t = text
+        for ((regex, rep) in FUSEJI_RULES) {
+            t = t.replace(regex, rep)
+        }
+        return t.replace("○", "").replace("●", "").replace("×", "").replace("〇", "")
     }
 }

@@ -18,8 +18,9 @@ class TranslationGlossaryTest {
         // Make sure "お仕置き" is never injected because it causes "おShiji き" glitch
         assertFalse("Preprocessed text should not contain お仕置き", pre.contains("お仕置き"))
         assertTrue("Preprocessed text should normalize wakarase choukyou", pre.contains("懲らしめの調教"))
-        assertTrue("Preprocessed text should normalize dogeza", pre.contains("土下座謝罪"))
-        assertTrue("Preprocessed text should normalize soku nuki", pre.contains("即時射精"))
+        // Make sure natural Japanese words are not forcibly mutated
+        assertTrue("Normal word dogeza should remain natural", pre.contains("土下座"))
+        assertFalse("Subtitle preprocessor should not inject parenthetical tags", JapaneseAsmrGlossary.preProcessForSubtitle("あぁっ、いっちゃう！").contains("絶頂"))
     }
 
     @Test
@@ -139,5 +140,20 @@ class TranslationGlossaryTest {
             val tr = res[c]
             assertFalse("Chapter '$c' should be translated, got '$tr'", TranslationService.isPoisonedTranslation(c, tr, "id"))
         }
+    }
+
+    @Test
+    fun testIndonesianPostFilter_preservesNormalWords() {
+        val normalText = "Dia memotong bawang dan mengecat dinding dengan cat biru"
+        val refined = IndonesianPostFilter.refineIndonesian(normalText)
+        assertEquals(normalText, refined)
+    }
+
+    @Test
+    fun testTranslateText_preservesFilenameExtensionAndPrefix() = kotlinx.coroutines.runBlocking {
+        val result = TranslationService.translateText("01_耳かき.mp3", "id", "google")
+        assertTrue("Must keep 01_ prefix, got '$result'", result.startsWith("01_"))
+        assertTrue("Must keep .mp3 extension, got '$result'", result.endsWith(".mp3"))
+        assertTrue("Must translate body, got '$result'", result.contains("Pembersihan Telinga", ignoreCase = true))
     }
 }

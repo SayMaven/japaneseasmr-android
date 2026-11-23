@@ -709,8 +709,8 @@ class DownloadService : Service() {
                 } catch (_: Exception) {
                 }
 
-                // Hitung total ukuran dan bab virtual
-                val folderAudioFiles = AudioStorageHelper.getAudioFilesInFolder(workFolder)
+                // Hitung total ukuran dan bab virtual secara rekursif (mendukung subfolder per-trek)
+                val folderAudioFiles = AudioStorageHelper.getAudioFilesRecursive(workFolder)
                 val totalBytes = folderAudioFiles.sumOf { it.length() }
                 val fileSizeStr = AudioDownloader.formatFileSize(totalBytes)
                 val dateStr = AudioStorageHelper.formatDateForDisplay(System.currentTimeMillis())

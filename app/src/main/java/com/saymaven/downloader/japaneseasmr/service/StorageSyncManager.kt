@@ -341,8 +341,53 @@ object StorageSyncManager {
         val prefs = PreferencesManager(context)
         val formatPriority = prefs.getInitialAudioFormatPriority()
         val leafFolders = AudioStorageHelper.findLeafAudioFolders(rootDir, maxDepth = 5)
+        val variantDirRegex = Regex("(?:mp3|wav|flac|m4a|aac|opus|wma|seあり|se有り|seなし|se無し|se_ari|se_nashi|効果音|nose|音声原本)", RegexOption.IGNORE_CASE)
+
+        // Deteksi folder karya ber-kode RJ yang memecah setiap trek ke subfolder berbeda (bukan varian format/SE)
+        val mergedWorkDirs = mutableSetOf<String>()
+        val rjWorkGroups = leafFolders
+            .filter { it != rootDir }
+            .groupBy { leaf ->
+                var curr: File? = leaf.parentFile
+                var foundWorkDir: File? = null
+                while (curr != null && curr != rootDir.parentFile) {
+                    if (AudioStorageHelper.extractRjCode(curr.name) != null) {
+                        foundWorkDir = curr
+                        break
+                    }
+                    if (curr == rootDir) break
+                    curr = curr.parentFile
+                }
+                foundWorkDir
+            }
+
+        for ((workDir, groupLeaves) in rjWorkGroups) {
+            if (workDir != null && groupLeaves.size >= 2) {
+                val hasVariantSubfolders = groupLeaves.any { variantDirRegex.containsMatchIn(it.name) }
+                val allSingleOrSmallLeaves = groupLeaves.all { AudioStorageHelper.getAudioFilesInFolder(it).size <= 2 }
+                if (!hasVariantSubfolders && allSingleOrSmallLeaves) {
+                    val allRecursiveTracks = filterAudioFilesByPriority(
+                        AudioStorageHelper.getAudioFilesRecursive(workDir),
+                        formatPriority
+                    )
+                    if (allRecursiveTracks.size >= 2) {
+                        val rj = AudioStorageHelper.extractRjCode(workDir.name)
+                        val fallbackCover = AudioStorageHelper.findCoverInPath(workDir, rootBoundary = rootDir)
+                        val existingByRj = if (rj != null) dao.getHistoryById(rj) else null
+                        val effectiveCustomRjid = if (rj != null && existingByRj != null && existingByRj.localFilePath != workDir.absolutePath && File(existingByRj.localFilePath).exists()) {
+                            "${rj}_IMPORT_${AudioStorageHelper.generateLocalId(workDir.absolutePath).takeLast(6)}"
+                        } else {
+                            rj
+                        }
+                        syncMultiTrackFolder(context, dao, workDir, allRecursiveTracks, customRjid = effectiveCustomRjid, linkedRj = rj, fallbackCover = fallbackCover)
+                        groupLeaves.forEach { mergedWorkDirs.add(it.canonicalPath) }
+                    }
+                }
+            }
+        }
 
         for (leaf in leafFolders) {
+            if (mergedWorkDirs.contains(leaf.canonicalPath)) continue
             val rawAudioFiles = AudioStorageHelper.getAudioFilesInFolder(leaf)
             if (rawAudioFiles.isEmpty()) continue
             val audioFiles = filterAudioFilesByPriority(rawAudioFiles, formatPriority)
@@ -357,7 +402,13 @@ object StorageSyncManager {
                     AudioStorageHelper.extractRjCode(f.name) ?: AudioStorageHelper.extractRjFromAudioMetadata(f)
                 }.distinct()
                 val rj = pathRj ?: fileRjs.firstOrNull()
-                syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = rj, linkedRj = rj, fallbackCover = fallbackCover)
+                val existingByRj = if (rj != null) dao.getHistoryById(rj) else null
+                val effectiveCustomRjid = if (rj != null && existingByRj != null && existingByRj.localFilePath != leaf.absolutePath && File(existingByRj.localFilePath).exists()) {
+                    "${rj}_IMPORT_${AudioStorageHelper.generateLocalId(leaf.absolutePath).takeLast(6)}"
+                } else {
+                    rj
+                }
+                syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = effectiveCustomRjid, linkedRj = rj, fallbackCover = fallbackCover)
             } else {
                 // Bersihkan entitas virtual album palsu/usang jika folder ini sebelumnya pernah salah didaftarkan sebagai album
                 val bogusAlbums = dao.getAllHistoryDirect().filter {
@@ -440,12 +491,17 @@ object StorageSyncManager {
                 try { retriever.release() } catch (e: Exception) {}
             }
 
+            val relFileName = try {
+                track.relativeTo(folder).path.replace('\\', '/')
+            } catch (_: Exception) {
+                track.name
+            }
             chapters.add(
                 ChapterItem(
                     startMs = cumMs,
                     endMs = cumMs + durMs,
                     title = trackTitle,
-                    fileName = track.name
+                    fileName = relFileName
                 )
             )
             cumMs += durMs
