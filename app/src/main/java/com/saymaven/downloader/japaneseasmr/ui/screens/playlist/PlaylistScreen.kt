@@ -486,6 +486,12 @@ fun PlaylistScreen(
                 val currentPl = selectedUserPlaylist!!
                 val playlistItems by viewModel.getItemsForPlaylist(currentPl.id).collectAsState(initial = null)
 
+                LaunchedEffect(isTranslationActive, playlistItems) {
+                    if (isTranslationActive && !playlistItems.isNullOrEmpty()) {
+                        viewModel.translateCustomPlaylistTitles(playlistItems!!)
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()

@@ -24,6 +24,48 @@ object JapaneseAsmrGlossary {
         "後編" to "Bagian Akhir",
         "中編" to "Bagian Tengah",
 
+        // DLsite Title Tropes & Format
+        "土下座" to "Dogeza (Sujud Memohon)",
+        "全裸土下座" to "Sujud Telanjang Bulat",
+        "即ヌキ" to "Langsung Ejakulasi",
+        "即ヌキ110円" to "Langsung Ejakulasi 110 Yen",
+        "ヌキ" to "Ejakulasi",
+        "抜き" to "Ejakulasi",
+        "ハーレム" to "Harem",
+        "ナース" to "Perawat",
+        "ハーレムナース" to "Harem Perawat",
+        "パパ活" to "Kencan Berbayar (Papa Katsu)",
+        "パパ生活" to "Kehidupan Papa Katsu (Sugar Dating)",
+        "おじさん" to "Paman (Om-om)",
+        "見下し" to "Merendahkan",
+        "快楽堕ち" to "Tunduk Pasrah pada Kenikmatan",
+        "オホ" to "Desahan Ahegao (Oho)",
+        "ちマゾ" to "Sangat Masokis (Chimaso)",
+        "チマゾ" to "Sangat Masokis (Chimaso)",
+        "オナホ化" to "Dijadikan Boneka Pemuas (Onaho)",
+        "バイノーラル" to "Audio Binaural (3D)",
+        "バイノーラルサウンド" to "Audio Binaural (3D)",
+        "ダウナー" to "Gadis Pendiam (Downer)",
+        "ダウナーJK" to "Siswi SMA Pendiam",
+        "JK" to "Siswi SMA (JK)",
+        "全裸" to "Telanjang Bulat",
+        "必死に" to "Mati-matian",
+        "泣きながら" to "Sambil Menangis",
+        "調教" to "Pelatihan Penundukan Disiplin",
+        "わからせ調教" to "Pelatihan Penundukan Bocah Tengil",
+        "勃起不全" to "Gangguan Ereksi",
+        "入院したら" to "Saat Masuk Rumah Sakit",
+        "夜勤" to "Dinas Malam",
+        "再会" to "Bertemu Kembali",
+        "巨根" to "Penis Besar",
+        "屈服" to "Tunduk Pasrah",
+        "別離" to "Perpisahan",
+        "誘惑" to "Godaan",
+        "性交" to "Persetubuhan",
+        "湯気" to "Uap Hangat",
+        "精液" to "Sperma",
+        "嗅ぎ" to "Menghirup / Mengendus",
+
         // Onomatopoeia & Suara Aksi
         "シコシコ" to "Onani / Mengocok Nikmat",
         "しこしこ" to "Onani / Mengocok Nikmat",
@@ -259,10 +301,30 @@ object JapaneseAsmrGlossary {
         t = t.replace("筆下ろし", "童貞喪失")
         t = t.replace("筆おろし", "童貞喪失")
         t = t.replace("ピロートーク", "ベッドでの会話ピロートーク")
-        t = t.replace("わからせ", "お仕置き")
-        t = t.replace("理解らせ", "お仕置き")
+        t = t.replace("わからせ調教", "懲らしめの調教")
+        t = t.replace("理解らせ調教", "懲らしめの調教")
+        t = t.replace("わからせ", "懲らしめ")
+        t = t.replace("理解らせ", "懲らしめ")
         t = t.replace("メス堕ち", "快楽への屈服")
         t = t.replace("悪堕ち", "悪への堕落")
+
+        // Title Compounds & Normalizations
+        t = t.replace("土下座", "土下座謝罪")
+        t = t.replace("即ヌキ", "即時射精")
+        t = t.replace("ハーレムナース", "ハーレム看護師")
+        t = t.replace("ハーレム", "ハーレム")
+        t = t.replace("ナース", "看護師")
+        t = t.replace("パパ生活", "パパ活生活")
+        t = t.replace("快楽fall", "快楽堕ち")
+        t = t.replace("ちマゾ", "重度マゾヒスト")
+        t = t.replace("チマゾ", "重度マゾヒスト")
+        t = t.replace("オナホ化", "オナホール化")
+        t = t.replace("オホ", "あえぎ声オホ")
+        t = t.replace("見下し", "見下す侮蔑")
+        t = t.replace("泣きながら", "涙を流しながら")
+        t = t.replace("必死に", "必死の思いで")
+        t = t.replace("～", " ～ ")
+        t = t.replace("〜", " ～ ")
 
         return t
     }

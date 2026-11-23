@@ -69,7 +69,39 @@ object IndonesianPostFilter {
         Regex("\\bpermainan\\s+seks\\b", RegexOption.IGNORE_CASE) to "bercinta",
         Regex("\\bkuas\\s+ditarik\\s+ke\\s+bawah\\b", RegexOption.IGNORE_CASE) to "pengambilan keperawanan (fudeoroshi)",
         Regex("\\bkotak\\s+makan\\s+siang\\s+stasiun\\b", RegexOption.IGNORE_CASE) to "posisi gendong (ekiben)",
-        Regex("\\bnasi\\s+kotak\\s+stasiun\\b", RegexOption.IGNORE_CASE) to "posisi gendong (ekiben)"
+        Regex("\\bnasi\\s+kotak\\s+stasiun\\b", RegexOption.IGNORE_CASE) to "posisi gendong (ekiben)",
+
+        // Glitch Mesin Terjemahan & Istilah Judul DLsite
+        Regex("\\bkursi\\s+tanah\\b", RegexOption.IGNORE_CASE) to "bersujud memohon ampun",
+        Regex("\\bakan\\s+mati\\s*に", RegexOption.IGNORE_CASE) to "mati-matian",
+        Regex("\\bakan\\s+mati\\b", RegexOption.IGNORE_CASE) to "mati-matian",
+        Regex("menangis\\s*きながら", RegexOption.IGNORE_CASE) to "sambil menangis",
+        Regex("きながら") to "sambil",
+        Regex("お\\s*Shiji\\s*き|おShijiき|oshiji", RegexOption.IGNORE_CASE) to "hukuman penundukan",
+        Regex("わからせ|理解らせ") to "penundukan",
+        Regex("Kuai\\s*楽fall\\s*ち", RegexOption.IGNORE_CASE) to "tunduk kenikmatan",
+        Regex("即ヌキ") to "langsung klimaks",
+        Regex("ヌキ") to "ejakulasi",
+        Regex("ハーレムナース") to "harem perawat",
+        Regex("ハーレム") to "harem",
+        Regex("ナース") to "perawat",
+        Regex("オホ") to "ahegao (oho)",
+        Regex("ちマゾ|チマゾ") to "masokis",
+        Regex("オナホ化") to "dijadikan boneka pemuas",
+        Regex("オナホ") to "boneka pemuas (onaho)",
+        Regex("おじさん") to "Paman (Om-om)",
+        Regex("パパ生活|パパ活") to "kencan berbayar (papa katsu)",
+        Regex("見下し") to "merendahkan",
+        Regex("バイノーラル(?:サウンド)?") to "Binaural 3D",
+        Regex("ダウナー") to "pendiam",
+        Regex("チンポ|ちんぽ") to "penis",
+        Regex("させられる") to "dipaksa",
+        Regex("してくる") to "melakukan",
+        Regex("りのたびに|のたびに") to "setiap kali",
+        Regex("\\bbertemukembali\\b", RegexOption.IGNORE_CASE) to "bertemu kembali",
+        Regex("\\bSubmission\\b", RegexOption.IGNORE_CASE) to "tunduk pasrah",
+        Regex("\\bSeparation\\b", RegexOption.IGNORE_CASE) to "perpisahan",
+        Regex("[にをでからぎち](?:\\s+|$)") to " "
     )
 
     /**

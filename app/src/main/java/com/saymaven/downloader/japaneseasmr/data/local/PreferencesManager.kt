@@ -169,6 +169,29 @@ class PreferencesManager(private val context: Context) {
                 "google"
             }
         }
+
+        data class FastLlmConfig(
+            val url: String,
+            val key: String,
+            val model: String,
+            val prompt: String,
+            val concurrency: Int
+        )
+
+        fun getFastCachedLlmConfig(context: Context): FastLlmConfig {
+            return try {
+                val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+                FastLlmConfig(
+                    url = sp.getString("cached_llm_url", "") ?: "",
+                    key = sp.getString("cached_llm_key", "") ?: "",
+                    model = sp.getString("cached_llm_model", "claude-haiku-5-5") ?: "claude-haiku-5-5",
+                    prompt = sp.getString("cached_llm_prompt", DEFAULT_LLM_PROMPT) ?: DEFAULT_LLM_PROMPT,
+                    concurrency = sp.getInt("cached_llm_concurrency", 2).coerceIn(1, 5)
+                )
+            } catch (_: Exception) {
+                FastLlmConfig("", "", "claude-haiku-5-5", DEFAULT_LLM_PROMPT, 2)
+            }
+        }
     }
 
     fun getInitialThemeMode(): ThemeMode {
@@ -585,6 +608,15 @@ class PreferencesManager(private val context: Context) {
     val llmConcurrencyFlow: Flow<Int> = context.dataStore.data.map { (it[KEY_LLM_CONCURRENCY] ?: 2).coerceIn(1, 5) }
 
     suspend fun setLlmConfig(url: String, key: String, model: String, prompt: String, concurrency: Int = 2) {
+        try {
+            fastSp.edit()
+                .putString("cached_llm_url", url)
+                .putString("cached_llm_key", key)
+                .putString("cached_llm_model", model)
+                .putString("cached_llm_prompt", prompt)
+                .putInt("cached_llm_concurrency", concurrency.coerceIn(1, 5))
+                .apply()
+        } catch (_: Exception) {}
         context.dataStore.edit {
             it[KEY_LLM_API_URL] = url
             it[KEY_LLM_API_KEY] = key
@@ -594,8 +626,13 @@ class PreferencesManager(private val context: Context) {
         }
     }
 
-    suspend fun setLlmConcurrency(concurrency: Int) = context.dataStore.edit {
-        it[KEY_LLM_CONCURRENCY] = concurrency.coerceIn(1, 5)
+    suspend fun setLlmConcurrency(concurrency: Int) {
+        try {
+            fastSp.edit().putInt("cached_llm_concurrency", concurrency.coerceIn(1, 5)).apply()
+        } catch (_: Exception) {}
+        context.dataStore.edit {
+            it[KEY_LLM_CONCURRENCY] = concurrency.coerceIn(1, 5)
+        }
     }
 
     // Floating Lyrics Settings

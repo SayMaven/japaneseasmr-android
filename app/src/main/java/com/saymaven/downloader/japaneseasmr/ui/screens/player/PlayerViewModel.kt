@@ -525,6 +525,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var sleepTimerJob: Job? = null
 
     init {
+        TranslationService.addOnCacheClearedListener {
+            clearInMemoryTranslations()
+        }
         viewModelScope.launch(Dispatchers.IO) {
             // Instant 0ms Cache-first boot: populate immediately from direct database
             val initialDbList = historyDao.getAllHistoryDirect()
@@ -2220,6 +2223,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun clearInMemoryTranslations() {
+        _playlistTranslatedTitles.value = emptyMap()
+        _translatedTitle.value = null
+        _translatedChapters.value = emptyList()
+        lastTranslatedKey = null
+        val current = _playlist.value
+        if (current.isNotEmpty()) {
+            _playlist.value = current.map { it.copy(translatedTitle = null, translatedChaptersJson = null) }
+        }
+    }
+
     fun toggleTranslation(context: Context? = null) {
         val next = !_isTranslationActive.value
         _isTranslationActive.value = next
@@ -2227,6 +2241,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (next) {
                 if (!_currentRjId.value.isNullOrBlank()) {
                     loadOrFetchTranslations(_currentRjId.value, forceOnline = _isOnlineStreaming.value)
+                }
+                val visible = _playlist.value.take(40)
+                if (visible.isNotEmpty()) {
+                    translateCurrentPageTitles(visible, forceRefresh = true)
                 }
             } else {
                 _translatedTitle.value = null
@@ -2238,13 +2256,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private var pageTranslateJob: kotlinx.coroutines.Job? = null
 
-    fun translateCurrentPageTitles(items: List<com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity>) {
+    fun translateCurrentPageTitles(
+        items: List<com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity>,
+        forceRefresh: Boolean = false
+    ) {
         pageTranslateJob?.cancel()
         pageTranslateJob = viewModelScope.launch(Dispatchers.IO) {
             val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
             val provider = TranslationService.getActiveProvider(getApplication())
 
-            val needTranslation = items.filter { it.translatedTitle.isNullOrBlank() }
+            val needTranslation = if (forceRefresh) items else items.filter { it.translatedTitle.isNullOrBlank() }
             if (needTranslation.isEmpty()) {
                 val currentMap = _playlistTranslatedTitles.value.toMutableMap()
                 items.forEach { item ->
@@ -2267,6 +2288,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (item.translatedTitle != tr) {
                         historyDao.updateTranslations(item.rjid, tr, item.translatedChaptersJson)
                     }
+                }
+            }
+            _playlistTranslatedTitles.value = currentMap
+        }
+    }
+
+    fun translateCustomPlaylistTitles(
+        items: List<com.saymaven.downloader.japaneseasmr.data.local.entity.PlaylistItemEntity>,
+        forceRefresh: Boolean = false
+    ) {
+        if (!_isTranslationActive.value || items.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+            val provider = TranslationService.getActiveProvider(getApplication())
+            val currentMap = _playlistTranslatedTitles.value.toMutableMap()
+
+            val needTranslation = if (forceRefresh) items else items.filter { currentMap[it.rjid].isNullOrBlank() }
+            if (needTranslation.isEmpty()) return@launch
+
+            val titles = needTranslation.map { it.title }
+            val batchResult = TranslationService.translateBatch(titles, targetLang, provider)
+            items.forEach { item ->
+                val tr = batchResult[item.title]
+                if (!tr.isNullOrBlank()) {
+                    currentMap[item.rjid] = tr
                 }
             }
             _playlistTranslatedTitles.value = currentMap
@@ -2318,15 +2364,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     .replace("\\[$targetRjid\\]".toRegex(RegexOption.IGNORE_CASE), "")
                     .trim()
 
+                val provider = TranslationService.getActiveProvider(getApplication())
                 val translatedTitleRes = withContext(Dispatchers.IO) {
-                    TranslationService.translateText(rawTitle, targetLang)
+                    TranslationService.translateText(rawTitle, targetLang, provider)
                 }
                 _translatedTitle.value = translatedTitleRes
 
                 // Terjemahkan Daftar Bab jika sudah ada
                 val currentChaps = _currentChapters.value
                 val translatedChapsList = if (currentChaps.isNotEmpty()) {
-                    translateChaptersBatch(currentChaps, targetLang).also {
+                    translateChaptersBatch(currentChaps, targetLang, provider).also {
                         _translatedChapters.value = it
                     }
                 } else emptyList()
@@ -2350,11 +2397,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun translateChaptersBatch(
         chapters: List<ChapterItem>,
-        targetLang: String
+        targetLang: String,
+        provider: String = TranslationService.getActiveProvider(getApplication())
     ): List<ChapterItem> = withContext(Dispatchers.IO) {
         if (chapters.isEmpty()) return@withContext emptyList()
         val titles = chapters.map { it.title }
-        val translatedMap = TranslationService.translateBatch(titles, targetLang)
+        val translatedMap = TranslationService.translateBatch(titles, targetLang, provider)
         chapters.map { orig ->
             orig.copy(title = translatedMap[orig.title] ?: orig.title)
         }

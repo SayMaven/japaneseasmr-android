@@ -167,6 +167,9 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
     private var translationJob: Job? = null
 
     init {
+        TranslationService.addOnCacheClearedListener {
+            _translatedTitles.value = emptyMap()
+        }
         loadPage(1)
         viewModelScope.launch {
             prefs.autoTranslateListsFlow.collect { autoActive ->
@@ -368,22 +371,23 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
         val nextState = !_isTranslationActive.value
         _isTranslationActive.value = nextState
         if (nextState) {
-            translateCurrentWorks(context)
+            translateCurrentWorks(context, forceRefresh = true)
         }
     }
 
-    fun translateCurrentWorks(context: Context = getApplication()) {
+    fun translateCurrentWorks(context: Context = getApplication(), forceRefresh: Boolean = false) {
         translationJob?.cancel()
         translationJob = viewModelScope.launch {
             val targetLang = TranslationService.getActiveTargetLanguage(context)
+            val provider = TranslationService.getActiveProvider(context)
             if (targetLang == "ja") return@launch
 
-            val currentMap = _translatedTitles.value.toMutableMap()
-            val worksToTranslate = _works.value.filter { it.rjid !in currentMap }
+            val currentMap = if (forceRefresh) mutableMapOf() else _translatedTitles.value.toMutableMap()
+            val worksToTranslate = if (forceRefresh) _works.value else _works.value.filter { it.rjid !in currentMap }
             if (worksToTranslate.isEmpty()) return@launch
 
             val titles = worksToTranslate.map { it.title }
-            val batchResults = TranslationService.translateBatch(titles, targetLang)
+            val batchResults = TranslationService.translateBatch(titles, targetLang, provider)
             for (w in worksToTranslate) {
                 val tr = batchResults[w.title]
                 if (!tr.isNullOrBlank()) {

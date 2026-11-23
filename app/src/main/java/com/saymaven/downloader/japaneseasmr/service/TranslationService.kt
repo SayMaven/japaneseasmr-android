@@ -39,7 +39,10 @@ object TranslationService {
 
     @Volatile
     private var cacheDao: TranslationCacheDao? = null
+    @Volatile
+    private var appContext: Context? = null
     private val memoryCache = ConcurrentHashMap<String, String>()
+    private val cacheClearedListeners = java.util.Collections.synchronizedList(mutableListOf<() -> Unit>())
 
     private val networkSemaphore = Semaphore(3)
 
@@ -60,11 +63,22 @@ object TranslationService {
     }
 
     fun init(context: Context) {
+        if (appContext == null) {
+            appContext = context.applicationContext
+        }
         if (cacheDao == null) {
             synchronized(this) {
                 if (cacheDao == null) {
                     cacheDao = AsmrDatabase.getDatabase(context.applicationContext).translationCacheDao()
                 }
+            }
+        }
+    }
+
+    fun addOnCacheClearedListener(listener: () -> Unit) {
+        synchronized(cacheClearedListeners) {
+            if (!cacheClearedListeners.contains(listener)) {
+                cacheClearedListeners.add(listener)
             }
         }
     }
@@ -75,28 +89,38 @@ object TranslationService {
 
     suspend fun clearAllCache(context: Context? = null) {
         memoryCache.clear()
+        val ctx = context ?: appContext
         try {
             withContext(Dispatchers.IO) {
                 cacheDao?.clearAll()
-                if (context != null) {
-                    val db = AsmrDatabase.getDatabase(context.applicationContext)
+                if (ctx != null) {
+                    val db = AsmrDatabase.getDatabase(ctx.applicationContext)
                     db.historyDao().clearAllTranslations()
+                    val fastPlaylistFile = java.io.File(ctx.applicationContext.filesDir, "fast_playlist.json")
+                    if (fastPlaylistFile.exists()) {
+                        fastPlaylistFile.delete()
+                    }
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        synchronized(cacheClearedListeners) {
+            cacheClearedListeners.forEach {
+                try { it.invoke() } catch (_: Exception) {}
+            }
+        }
     }
 
     fun getActiveTargetLanguage(context: Context): String {
-        val configured = PreferencesManager.getFastCachedTranslationLanguage(context).lowercase()
-        if (configured != "auto" && configured.isNotBlank()) {
+        val configured = PreferencesManager.getFastCachedTranslationLanguage(context).lowercase().trim()
+        if (configured.isNotBlank() && configured != "auto") {
             return configured
         }
 
-        val lang = PreferencesManager.getFastCachedLanguage(context).lowercase()
-        val effectiveLang = if (lang == "system") {
-            java.util.Locale.getDefault().language.lowercase()
+        val lang = PreferencesManager.getFastCachedLanguage(context).lowercase().trim()
+        val effectiveLang = if (lang == "system" || lang.isBlank()) {
+            com.saymaven.downloader.japaneseasmr.util.LocaleHelper.getSystemLocale().language.lowercase().trim()
         } else lang
 
         return when {
@@ -128,18 +152,25 @@ object TranslationService {
      */
     suspend fun translateText(
         sourceText: String,
-        targetLang: String = "id",
-        provider: String = "google"
+        targetLang: String = "",
+        provider: String = ""
     ): String = withContext(Dispatchers.IO) {
         val trimmed = sourceText.trim()
         if (trimmed.isBlank()) return@withContext ""
 
-        val cacheKey = "$targetLang:$trimmed"
+        val effectiveTargetLang = if (targetLang.isNotBlank() && targetLang != "auto") targetLang else {
+            appContext?.let { getActiveTargetLanguage(it) } ?: "id"
+        }
+        val effectiveProvider = if (provider.isNotBlank()) provider else {
+            appContext?.let { getActiveProvider(it) } ?: "google"
+        }
+
+        val cacheKey = "$effectiveTargetLang:$trimmed"
         memoryCache[cacheKey]?.let { return@withContext it }
 
         // 1. Cek kecocokan langsung kamus ASMR
         JapaneseAsmrGlossary.GLOSSARY_ID[trimmed]?.let {
-            val res = if (targetLang.startsWith("id") || targetLang.startsWith("in")) it else trimmed
+            val res = if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) it else trimmed
             if (res != trimmed) {
                 memoryCache[cacheKey] = res
                 return@withContext res
@@ -160,7 +191,7 @@ object TranslationService {
 
         // 1c. Cek Room Database Cache persisten
         try {
-            val cachedInDb = cacheDao?.getTranslation(trimmed, targetLang)
+            val cachedInDb = cacheDao?.getTranslation(trimmed, effectiveTargetLang)
             if (!cachedInDb.isNullOrBlank()) {
                 memoryCache[cacheKey] = cachedInDb
                 return@withContext cachedInDb
@@ -177,13 +208,14 @@ object TranslationService {
             t
         }
 
-        val normalizedTl = normalizeTargetLang(targetLang)
+        val normalizedTl = normalizeTargetLang(effectiveTargetLang)
 
         // 3. Panggil Provider Aktif via Network Semaphore
         val rawOnline = networkSemaphore.withPermit {
-            when (provider.lowercase()) {
+            when (effectiveProvider.lowercase()) {
                 "microsoft" -> translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl)
                 "youdao" -> translateViaYoudaoWeb(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl)
+                "llm" -> translateViaLlmSingle(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl)
                 else -> translateViaGoogleWeb(preProcessed, normalizedTl)
             }
         }
@@ -192,7 +224,7 @@ object TranslationService {
 
         // 4. Post-processing filter bahasa Indonesia alami
         val finalResult = withContext(Dispatchers.Default) {
-            if (targetLang.startsWith("id") || targetLang.startsWith("in")) {
+            if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) {
                 IndonesianPostFilter.refineIndonesian(intermediate)
             } else intermediate
         }
@@ -203,7 +235,7 @@ object TranslationService {
                 cacheDao?.insertTranslation(
                     TranslationCacheEntity(
                         sourceText = trimmed,
-                        targetLang = targetLang,
+                        targetLang = effectiveTargetLang,
                         translatedText = finalResult
                     )
                 )
@@ -220,19 +252,26 @@ object TranslationService {
      */
     suspend fun translateBatch(
         texts: List<String>,
-        targetLang: String = "id",
-        provider: String = "google"
+        targetLang: String = "",
+        provider: String = ""
     ): Map<String, String> = withContext(Dispatchers.IO) {
         val unique = texts.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (unique.isEmpty()) return@withContext emptyMap()
 
+        val effectiveTargetLang = if (targetLang.isNotBlank() && targetLang != "auto") targetLang else {
+            appContext?.let { getActiveTargetLanguage(it) } ?: "id"
+        }
+        val effectiveProvider = if (provider.isNotBlank()) provider else {
+            appContext?.let { getActiveProvider(it) } ?: "google"
+        }
+
         val result = ConcurrentHashMap<String, String>()
-        val normalizedTl = normalizeTargetLang(targetLang)
+        val normalizedTl = normalizeTargetLang(effectiveTargetLang)
 
         // 1. Cek memory cache
         val missingAfterMem = mutableListOf<String>()
         for (t in unique) {
-            val memVal = memoryCache["$targetLang:$t"]
+            val memVal = memoryCache["$effectiveTargetLang:$t"]
             if (!memVal.isNullOrBlank()) {
                 result[t] = memVal
             } else {
@@ -244,7 +283,7 @@ object TranslationService {
         val missingAfterDb = mutableListOf<String>()
         if (missingAfterMem.isNotEmpty()) {
             val dbItems = try {
-                cacheDao?.getTranslations(missingAfterMem, targetLang) ?: emptyList()
+                cacheDao?.getTranslations(missingAfterMem, effectiveTargetLang) ?: emptyList()
             } catch (_: Exception) {
                 emptyList()
             }
@@ -252,7 +291,7 @@ object TranslationService {
             for (t in missingAfterMem) {
                 val dbVal = dbMap[t]
                 if (!dbVal.isNullOrBlank()) {
-                    memoryCache["$targetLang:$t"] = dbVal
+                    memoryCache["$effectiveTargetLang:$t"] = dbVal
                     result[t] = dbVal
                 } else {
                     missingAfterDb.add(t)
@@ -263,80 +302,102 @@ object TranslationService {
         // 3. Batching Delimiter Anti-Gagal untuk sisa yang belum ada di cache
         if (missingAfterDb.isNotEmpty()) {
             val newEntities = java.util.Collections.synchronizedList(mutableListOf<TranslationCacheEntity>())
-            val chunks = missingAfterDb.chunked(30)
 
-            coroutineScope {
-                chunks.map { chunk ->
-                    async(Dispatchers.IO) {
-                        // Pre-process chunk di Dispatchers.Default
-                        val preparedChunk = withContext(Dispatchers.Default) {
-                            chunk.map { item ->
-                                var pre = JapaneseAsmrGlossary.preProcessJapanese(item)
-                                if (ChineseAsmrGlossary.containsChinese(pre)) {
-                                    pre = ChineseAsmrGlossary.preProcessChinese(pre)
-                                }
-                                // Escape tag kurung siku ganda yang mungkin ada di teks sumber
-                                pre.replace("[[", "⟦").replace("]]", "⟧").replace('\n', ' ').trim().ifEmpty { item }
-                            }
-                        }
-
-                        // Susun paket tag bernomor [[0]] Teks 0\n[[1]] Teks 1
-                        val taggedPayload = preparedChunk.mapIndexed { idx, str -> "[[$idx]] $str" }.joinToString("\n")
-
-                        val batchResponse = networkSemaphore.withPermit {
-                            when (provider.lowercase()) {
-                                "microsoft" -> translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl)
-                                "youdao" -> translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl)
-                                else -> translateViaGoogleWeb(taggedPayload, normalizedTl)
-                            }
-                        }
-
-                        // Ekstrak hasil via Regex deterministik
-                        val parsedMap = mutableMapOf<Int, String>()
-                        if (!batchResponse.isNullOrBlank()) {
-                            val tagRegex = Regex("\\[\\[(\\d+)\\]\\]\\s*([\\s\\S]*?)(?=\\[\\[\\d+\\]\\]|$)")
-                            val matches = tagRegex.findAll(batchResponse)
-                            for (m in matches) {
-                                val idx = m.groupValues[1].toIntOrNull()
-                                val body = m.groupValues[2].trim()
-                                if (idx != null && body.isNotEmpty()) {
-                                    parsedMap[idx] = body
-                                }
-                            }
-                        }
-
-                        // Jika parsing berhasil untuk chunk
-                        if (parsedMap.size == chunk.size) {
-                            for (i in chunk.indices) {
-                                val src = chunk[i]
-                                val rawTr = parsedMap[i]?.replace("⟦", "[[")?.replace("⟧", "]]") ?: src
-                                val finalTr = if (targetLang.startsWith("id") || targetLang.startsWith("in")) {
-                                    IndonesianPostFilter.refineIndonesian(rawTr)
-                                } else rawTr
-
-                                if (finalTr.isNotBlank()) {
-                                    result[src] = finalTr
-                                    memoryCache["$targetLang:$src"] = finalTr
-                                    newEntities.add(
-                                        TranslationCacheEntity(
-                                            sourceText = src,
-                                            targetLang = targetLang,
-                                            translatedText = finalTr
-                                        )
-                                    )
-                                }
-                            }
-                        } else {
-                            // Fallback bertahap: jika ada format delimiter yang rusak, fallback ke chunk kecil
-                            for (src in chunk) {
-                                val tr = translateText(src, targetLang, provider)
-                                if (tr.isNotBlank()) {
-                                    result[src] = tr
-                                }
-                            }
-                        }
+            var toTranslateOnline: List<String> = missingAfterDb
+            if (effectiveProvider.lowercase() == "llm") {
+                val llmRes = translateBatchViaLlm(missingAfterDb, normalizedTl)
+                if (llmRes.isNotEmpty()) {
+                    for ((src, tr) in llmRes) {
+                        result[src] = tr
+                        memoryCache["$effectiveTargetLang:$src"] = tr
+                        newEntities.add(
+                            TranslationCacheEntity(
+                                sourceText = src,
+                                targetLang = effectiveTargetLang,
+                                translatedText = tr
+                            )
+                        )
                     }
-                }.awaitAll()
+                    toTranslateOnline = missingAfterDb.filter { !result.containsKey(it) }
+                }
+            }
+
+            if (toTranslateOnline.isNotEmpty()) {
+                val chunks = toTranslateOnline.chunked(30)
+
+                coroutineScope {
+                    chunks.map { chunk ->
+                        async(Dispatchers.IO) {
+                            // Pre-process chunk di Dispatchers.Default
+                            val preparedChunk = withContext(Dispatchers.Default) {
+                                chunk.map { item ->
+                                    var pre = JapaneseAsmrGlossary.preProcessJapanese(item)
+                                    if (ChineseAsmrGlossary.containsChinese(pre)) {
+                                        pre = ChineseAsmrGlossary.preProcessChinese(pre)
+                                    }
+                                    // Escape tag kurung siku ganda yang mungkin ada di teks sumber
+                                    pre.replace("[[", "⟦").replace("]]", "⟧").replace('\n', ' ').trim().ifEmpty { item }
+                                }
+                            }
+
+                            // Susun paket tag bernomor [[0]] Teks 0\n[[1]] Teks 1
+                            val taggedPayload = preparedChunk.mapIndexed { idx, str -> "[[$idx]] $str" }.joinToString("\n")
+
+                            val batchResponse = networkSemaphore.withPermit {
+                                when (effectiveProvider.lowercase()) {
+                                    "microsoft" -> translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl)
+                                    "youdao" -> translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl)
+                                    else -> translateViaGoogleWeb(taggedPayload, normalizedTl)
+                                }
+                            }
+
+                            // Ekstrak hasil via Regex deterministik
+                            val parsedMap = mutableMapOf<Int, String>()
+                            if (!batchResponse.isNullOrBlank()) {
+                                val tagRegex = Regex("\\[\\[(\\d+)\\]\\]\\s*([\\s\\S]*?)(?=\\[\\[\\d+\\]\\]|$)")
+                                val matches = tagRegex.findAll(batchResponse)
+                                for (m in matches) {
+                                    val idx = m.groupValues[1].toIntOrNull()
+                                    val body = m.groupValues[2].trim()
+                                    if (idx != null && body.isNotEmpty()) {
+                                        parsedMap[idx] = body
+                                    }
+                                }
+                            }
+
+                            // Jika parsing berhasil untuk chunk
+                            if (parsedMap.size == chunk.size) {
+                                for (i in chunk.indices) {
+                                    val src = chunk[i]
+                                    val rawTr = parsedMap[i]?.replace("⟦", "[[")?.replace("⟧", "]]") ?: src
+                                    val finalTr = if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) {
+                                        IndonesianPostFilter.refineIndonesian(rawTr)
+                                    } else rawTr
+
+                                    if (finalTr.isNotBlank()) {
+                                        result[src] = finalTr
+                                        memoryCache["$effectiveTargetLang:$src"] = finalTr
+                                        newEntities.add(
+                                            TranslationCacheEntity(
+                                                sourceText = src,
+                                                targetLang = effectiveTargetLang,
+                                                translatedText = finalTr
+                                            )
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Fallback bertahap: jika ada format delimiter yang rusak, fallback ke chunk kecil
+                                for (src in chunk) {
+                                    val tr = translateText(src, effectiveTargetLang, effectiveProvider)
+                                    if (tr.isNotBlank()) {
+                                        result[src] = tr
+                                    }
+                                }
+                            }
+                        }
+                    }.awaitAll()
+                }
             }
 
             if (newEntities.isNotEmpty()) {
@@ -444,6 +505,96 @@ object TranslationService {
 
         // Auto-fallback ke Google Translate + Smart Glossary jika LLM kosong / gagal / ditolak NSFW
         translateBatch(unique, targetLang)
+    }
+
+    private suspend fun translateViaLlmSingle(
+        text: String,
+        targetLang: String
+    ): String? {
+        val ctx = appContext ?: return null
+        val config = PreferencesManager.getFastCachedLlmConfig(ctx)
+        if (config.key.isBlank() || config.url.isBlank()) return null
+
+        val langName = when {
+            targetLang.startsWith("id") || targetLang.startsWith("in") -> "id"
+            targetLang.startsWith("zh") -> "zh-CN"
+            targetLang.startsWith("ja") -> "ja"
+            else -> "en"
+        }
+
+        val defaultSystem = PreferencesManager.DEFAULT_LLM_PROMPT.replace("into id", "into $langName")
+        val systemInstruction = if (config.prompt.isNotBlank()) config.prompt.trim() else defaultSystem
+
+        val res = if (config.url.contains("anthropic.com", ignoreCase = true)) {
+            callClaudeAnthropic(config.key, config.model.ifBlank { "claude-haiku-5-5" }, systemInstruction, text)
+        } else {
+            callOpenAiCompatibleLlm(config.url, config.key, config.model.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, text)
+        }
+
+        return res?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private suspend fun translateBatchViaLlm(
+        texts: List<String>,
+        targetLang: String
+    ): Map<String, String> {
+        val ctx = appContext ?: return emptyMap()
+        val config = PreferencesManager.getFastCachedLlmConfig(ctx)
+        if (config.key.isBlank() || config.url.isBlank()) return emptyMap()
+
+        val llmResult = ConcurrentHashMap<String, String>()
+        val langName = when {
+            targetLang.startsWith("id") || targetLang.startsWith("in") -> "id"
+            targetLang.startsWith("zh") -> "zh-CN"
+            targetLang.startsWith("ja") -> "ja"
+            else -> "en"
+        }
+
+        val defaultSystem = PreferencesManager.DEFAULT_LLM_PROMPT.replace("into id", "into $langName")
+        val systemInstruction = if (config.prompt.isNotBlank()) config.prompt.trim() else defaultSystem
+
+        val llmSemaphore = Semaphore(config.concurrency.coerceIn(1, 5))
+        val chunks = texts.chunked(25)
+
+        coroutineScope {
+            chunks.map { chunk ->
+                async(Dispatchers.IO) {
+                    val userPrompt = chunk.mapIndexed { idx, s -> "[[$idx]] $s" }.joinToString("\n")
+                    val response = llmSemaphore.withPermit {
+                        if (config.url.contains("anthropic.com", ignoreCase = true)) {
+                            callClaudeAnthropic(config.key, config.model.ifBlank { "claude-haiku-5-5" }, systemInstruction, userPrompt)
+                        } else {
+                            callOpenAiCompatibleLlm(config.url, config.key, config.model.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, userPrompt)
+                        }
+                    }
+
+                    if (!response.isNullOrBlank()) {
+                        val tagRegex = Regex("\\[\\[?(\\d+)\\]\\]?\\s*([\\s\\S]*?)(?=\\[\\[?\\d+\\]\\]?|$)")
+                        val matches = tagRegex.findAll(response)
+                        val parsed = mutableMapOf<Int, String>()
+                        for (m in matches) {
+                            val idx = m.groupValues[1].toIntOrNull()
+                            val body = m.groupValues[2].trim()
+                            if (idx != null && body.isNotEmpty()) {
+                                parsed[idx] = body
+                            }
+                        }
+
+                        for (i in chunk.indices) {
+                            val tr = parsed[i]
+                            if (!tr.isNullOrBlank()) {
+                                val cleaned = if (targetLang.startsWith("id") || targetLang.startsWith("in")) {
+                                    IndonesianPostFilter.refineIndonesian(tr)
+                                } else tr
+                                llmResult[chunk[i]] = cleaned
+                            }
+                        }
+                    }
+                }
+            }.awaitAll()
+        }
+
+        return llmResult
     }
 
     private fun callClaudeAnthropic(
