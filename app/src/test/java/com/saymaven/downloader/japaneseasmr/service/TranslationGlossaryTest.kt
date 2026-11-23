@@ -113,4 +113,31 @@ class TranslationGlossaryTest {
         val parsed2 = TranslationService.parseGoogleWebResponse(gtxJson)
         assertEquals("Halo dunia", parsed2)
     }
+
+    @Test
+    fun testIsPoisonedTranslation_detectsUnchangedAndHalfJapaneseCache() {
+        val src = "【即ヌキ110円】全裸土下座 ～泣きながら必死に土下座するJKをわからせ調教～"
+        // Identical source text
+        assertTrue(TranslationService.isPoisonedTranslation(src, src, "id"))
+        // Blank / null
+        assertTrue(TranslationService.isPoisonedTranslation(src, "", "id"))
+        assertTrue(TranslationService.isPoisonedTranslation(src, null, "id"))
+        // Half-mutated Japanese from preProcessJapanese failure
+        val halfMutated = "【即時射精110円】全裸土下座謝罪 ～泣きながら必死に土下座するJKを懲らしめの調教～"
+        assertTrue(TranslationService.isPoisonedTranslation(src, halfMutated, "id"))
+        // Valid Indonesian translation
+        val valid = "[Langsung keluar 110 yen] Bersujud telanjang ~ Pelatihan JK yang menangis memohon ampun ~"
+        assertFalse(TranslationService.isPoisonedTranslation(src, valid, "id"))
+    }
+
+    @Test
+    fun testLiveGoogleTranslation_batch15Items() = kotlinx.coroutines.runBlocking {
+        val chapters = (1..15).map { i -> "トラック$i 耳かきと囁きボイス" }
+        val res = TranslationService.translateBatch(chapters, "id", "google")
+        assertEquals(15, res.size)
+        for (c in chapters) {
+            val tr = res[c]
+            assertFalse("Chapter '$c' should be translated, got '$tr'", TranslationService.isPoisonedTranslation(c, tr, "id"))
+        }
+    }
 }

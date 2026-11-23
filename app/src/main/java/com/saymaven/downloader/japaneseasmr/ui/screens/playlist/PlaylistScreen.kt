@@ -188,7 +188,11 @@ fun PlaylistScreen(
 
     LaunchedEffect(isTranslationActive, pagedPlaylist) {
         if (isTranslationActive && pagedPlaylist.isNotEmpty()) {
-            viewModel.translateCurrentPageTitles(pagedPlaylist)
+            // Hanya terjemahkan item di halaman saat ini yang belum ada di map agar tidak membatalkan togglePlaylistTranslation
+            val missing = pagedPlaylist.filter { playlistTranslatedTitles[it.rjid].isNullOrBlank() }
+            if (missing.isNotEmpty()) {
+                viewModel.translateCurrentPageTitles(missing)
+            }
         }
     }
 

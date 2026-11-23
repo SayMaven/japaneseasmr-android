@@ -2307,53 +2307,72 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private var pageTranslateJob: kotlinx.coroutines.Job? = null
+    @Volatile
+    private var isForceRefreshingPage: Boolean = false
 
     fun translateCurrentPageTitles(
         items: List<com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity>,
         forceRefresh: Boolean = false
     ) {
+        if (!forceRefresh && isForceRefreshingPage && pageTranslateJob?.isActive == true) {
+            return
+        }
+        isForceRefreshingPage = forceRefresh
         pageTranslateJob?.cancel()
         pageTranslateJob = viewModelScope.launch(Dispatchers.IO) {
-            val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-            val provider = TranslationService.getActiveProvider(getApplication())
+            try {
+                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+                val provider = TranslationService.getActiveProvider(getApplication())
 
-            val lastLang = sp.getString("last_playlist_trans_lang", null)
-            val langChanged = lastLang != targetLang
-            if (langChanged) {
-                sp.edit().putString("last_playlist_trans_lang", targetLang).apply()
-                if (lastLang != null) {
-                    historyDao.clearAllTranslations()
-                    clearInMemoryTranslations()
+                val lastLang = sp.getString("last_playlist_trans_lang", null)
+                val langChanged = lastLang != targetLang
+                if (langChanged) {
+                    sp.edit().putString("last_playlist_trans_lang", targetLang).apply()
+                    if (lastLang != null) {
+                        historyDao.clearAllTranslations()
+                        clearInMemoryTranslations()
+                    }
                 }
-            }
 
-            val effectiveForce = forceRefresh || langChanged
-            val needTranslation = if (effectiveForce) items else items.filter { it.translatedTitle.isNullOrBlank() || it.translatedTitle == it.title }
-            if (needTranslation.isEmpty()) {
+                val effectiveForce = forceRefresh || langChanged
+                val needTranslation = if (effectiveForce) {
+                    items
+                } else {
+                    items.filter { TranslationService.isPoisonedTranslation(it.title, it.translatedTitle, targetLang) }
+                }
+                if (needTranslation.isEmpty()) {
+                    val currentMap = _playlistTranslatedTitles.value.toMutableMap()
+                    items.forEach { item ->
+                        if (!TranslationService.isPoisonedTranslation(item.title, item.translatedTitle, targetLang)) {
+                            currentMap[item.rjid] = item.translatedTitle!!
+                        }
+                    }
+                    _playlistTranslatedTitles.value = currentMap
+                    return@launch
+                }
+
+                val titles = needTranslation.map { it.title }
+                val batchResult = TranslationService.translateBatch(titles, targetLang, provider)
                 val currentMap = _playlistTranslatedTitles.value.toMutableMap()
+
                 items.forEach { item ->
-                    if (!item.translatedTitle.isNullOrBlank() && item.translatedTitle != item.title) {
-                        currentMap[item.rjid] = item.translatedTitle
+                    val fallbackValid = if (!TranslationService.isPoisonedTranslation(item.title, item.translatedTitle, targetLang)) {
+                        item.translatedTitle
+                    } else null
+                    val tr = batchResult[item.title] ?: fallbackValid
+                    if (!tr.isNullOrBlank() && !TranslationService.isPoisonedTranslation(item.title, tr, targetLang)) {
+                        currentMap[item.rjid] = tr
+                        if (item.translatedTitle != tr) {
+                            historyDao.updateTranslations(item.rjid, tr, item.translatedChaptersJson)
+                        }
                     }
                 }
                 _playlistTranslatedTitles.value = currentMap
-                return@launch
-            }
-
-            val titles = needTranslation.map { it.title }
-            val batchResult = TranslationService.translateBatch(titles, targetLang, provider)
-            val currentMap = _playlistTranslatedTitles.value.toMutableMap()
-
-            items.forEach { item ->
-                val tr = batchResult[item.title] ?: (if (!item.translatedTitle.isNullOrBlank() && item.translatedTitle != item.title) item.translatedTitle else null)
-                if (!tr.isNullOrBlank() && tr != item.title) {
-                    currentMap[item.rjid] = tr
-                    if (item.translatedTitle != tr) {
-                        historyDao.updateTranslations(item.rjid, tr, item.translatedChaptersJson)
-                    }
+            } finally {
+                if (forceRefresh) {
+                    isForceRefreshingPage = false
                 }
             }
-            _playlistTranslatedTitles.value = currentMap
         }
     }
 
@@ -2413,8 +2432,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     .replace("\\[$targetRjid\\]".toRegex(RegexOption.IGNORE_CASE), "")
                     .trim()
 
-                // 1. Cek cache DB jika tidak forceOnline dan bukan stream online (pastikan bukan teks asli yang gagal)
-                if (!forceOnline && history != null && !history.translatedTitle.isNullOrBlank() && history.translatedTitle != rawTitle) {
+                // 1. Cek cache DB jika tidak forceOnline dan bukan stream online (pastikan bukan teks asli/beracun)
+                if (!forceOnline && history != null && !TranslationService.isPoisonedTranslation(rawTitle, history.translatedTitle, targetLang)) {
                     _translatedTitle.value = history.translatedTitle
                     if (!history.translatedChaptersJson.isNullOrBlank()) {
                         val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
@@ -2492,8 +2511,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (!forceOnline && !history?.translatedChaptersJson.isNullOrBlank()) {
                     val parsed = ChapterItem.fromJsonArray(history!!.translatedChaptersJson)
                     if (parsed.size == chapters.size) {
-                        val isAllIdentical = parsed.indices.all { parsed[it].title == chapters[it].title }
-                        if (!isAllIdentical) {
+                        val isAllPoisoned = parsed.indices.all {
+                            TranslationService.isPoisonedTranslation(chapters[it].title, parsed[it].title, targetLang)
+                        }
+                        if (!isAllPoisoned) {
                             _translatedChapters.value = parsed
                             lastTranslatedKey = "$targetRjid:$targetLang:${chapters.size}"
                             return@launch
@@ -2936,6 +2957,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val autoSave = prefs.autoSaveTranslatedLyricsFlow.first()
 
             val texts = current.map { it.text }
+            val provider = TranslationService.getActiveProvider(getApplication())
             val translatedMap = TranslationService.translateLyricsNaturally(
                 lines = texts,
                 targetLang = targetLang,
@@ -2943,7 +2965,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 llmKey = llmKey,
                 llmModel = llmModel,
                 llmPrompt = llmPrompt,
-                concurrency = concurrency
+                concurrency = concurrency,
+                provider = provider
             )
 
             _currentLyrics.value = current.map { line ->

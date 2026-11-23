@@ -8,10 +8,12 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.TranslationCacheEn
 import com.saymaven.downloader.japaneseasmr.service.glossary.ChineseAsmrGlossary
 import com.saymaven.downloader.japaneseasmr.service.glossary.IndonesianPostFilter
 import com.saymaven.downloader.japaneseasmr.service.glossary.JapaneseAsmrGlossary
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -75,6 +77,53 @@ object TranslationService {
                 }
             }
         }
+        // One-time purge of poisoned cache entries created during d4930d9/07cbd71
+        try {
+            val sp = context.applicationContext.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+            if (sp.getInt("translation_cache_version", 0) < 2) {
+                sp.edit().putInt("translation_cache_version", 2).apply()
+                memoryCache.clear()
+                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        cacheDao?.clearAll()
+                        AsmrDatabase.getDatabase(context.applicationContext).historyDao().clearAllTranslations()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Memeriksa apakah hasil cache terjemahan terindikasi beracun (gagal diterjemahkan / masih teks Jepang).
+     */
+    fun isPoisonedTranslation(source: String, translated: String?, targetLang: String): Boolean {
+        if (translated.isNullOrBlank()) return true
+        val cleanSrc = source.trim()
+        val cleanTr = translated.trim()
+        if (cleanTr == cleanSrc) return true
+
+        val lowerTl = targetLang.lowercase().trim()
+        if (lowerTl.startsWith("id") || lowerTl.startsWith("in") || lowerTl.startsWith("en")) {
+            val srcKana = countJapaneseKana(cleanSrc)
+            val trKana = countJapaneseKana(cleanTr)
+            if (srcKana >= 3 && trKana >= 3 && trKana >= (srcKana / 2)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun countJapaneseKana(text: String): Int {
+        var count = 0
+        for (char in text) {
+            val ub = Character.UnicodeBlock.of(char)
+            if (ub == Character.UnicodeBlock.HIRAGANA || ub == Character.UnicodeBlock.KATAKANA) {
+                count++
+            }
+        }
+        return count
     }
 
     fun addOnCacheClearedListener(listener: () -> Unit) {
@@ -206,11 +255,11 @@ object TranslationService {
         try {
             val cachedInDb = cacheDao?.getTranslation(trimmed, effectiveTargetLang)
             if (!cachedInDb.isNullOrBlank()) {
-                if (cachedInDb != trimmed) {
+                if (!isPoisonedTranslation(trimmed, cachedInDb, effectiveTargetLang)) {
                     memoryCache[cacheKey] = cachedInDb
                     return@withContext cachedInDb
                 } else {
-                    // Cache teracuni teks asli (karena kegagalan jaringan sebelumnya), bersihkan
+                    // Cache teracuni teks asli/setengah Jepang, bersihkan
                     cacheDao?.deleteTranslation(trimmed, effectiveTargetLang)
                 }
             }
@@ -240,17 +289,19 @@ object TranslationService {
             }
         }
 
-        val intermediate = rawOnline ?: preProcessed
+        if (rawOnline.isNullOrBlank()) {
+            return@withContext trimmed
+        }
 
         // 4. Post-processing filter bahasa Indonesia alami
         val finalResult = withContext(Dispatchers.Default) {
             if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) {
-                IndonesianPostFilter.refineIndonesian(intermediate)
-            } else intermediate
+                IndonesianPostFilter.refineIndonesian(rawOnline)
+            } else rawOnline
         }
 
         // Simpan ke cache HANYA jika terjemahan online berhasil dan bukan teks asli yang gagal
-        if (!rawOnline.isNullOrBlank() && finalResult.isNotBlank() && finalResult != trimmed) {
+        if (finalResult.isNotBlank() && !isPoisonedTranslation(trimmed, finalResult, effectiveTargetLang)) {
             memoryCache[cacheKey] = finalResult
             try {
                 cacheDao?.insertTranslation(
@@ -311,7 +362,7 @@ object TranslationService {
             val dbMap = dbItems.associate { it.sourceText to it.translatedText }
             for (t in missingAfterMem) {
                 val dbVal = dbMap[t]
-                if (!dbVal.isNullOrBlank()) {
+                if (!dbVal.isNullOrBlank() && !isPoisonedTranslation(t, dbVal, effectiveTargetLang)) {
                     memoryCache["$effectiveTargetLang:$t"] = dbVal
                     result[t] = dbVal
                 } else {
@@ -450,7 +501,8 @@ object TranslationService {
         llmKey: String,
         llmModel: String,
         llmPrompt: String,
-        concurrency: Int = 2
+        concurrency: Int = 2,
+        provider: String = ""
     ): Map<String, String> = withContext(Dispatchers.IO) {
         val unique = lines.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (unique.isEmpty()) return@withContext emptyMap()
@@ -524,14 +576,14 @@ object TranslationService {
             if (allSucceeded && llmResult.isNotEmpty()) {
                 val missing = unique.filter { !llmResult.containsKey(it) }
                 if (missing.isNotEmpty()) {
-                    llmResult.putAll(translateBatch(missing, targetLang))
+                    llmResult.putAll(translateBatch(missing, targetLang, provider))
                 }
                 return@withContext llmResult
             }
         }
 
         // Auto-fallback ke Google Translate + Smart Glossary jika LLM kosong / gagal / ditolak NSFW
-        translateBatch(unique, targetLang)
+        translateBatch(unique, targetLang, provider)
     }
 
     private suspend fun translateViaLlmSingle(
@@ -719,20 +771,37 @@ object TranslationService {
             return null
         }
 
-        // Endpoint 1: clients5.google.com (Super cepat ~100ms via Google Chrome Extension CDN)
-        val clients5Url = "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=$sl&tl=$tl&q=$encoded"
-        val r1 = tryGet(clients5Url)
-        if (!r1.isNullOrBlank()) return r1
+        // 1. Jika payload pendek/sedang (<= 1200 chars encoded): prioritaskan GET translate.googleapis.com gtx
+        //    (paling stabil, tidak memotong tag [[idx]], latensi ~150ms)
+        if (encoded.length <= 1200) {
+            val gtxUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t&q=$encoded"
+            tryGet(gtxUrl)?.let { return it }
 
-        // Endpoint 2: translate.googleapis.com single?client=gtx via GET (~150-250ms)
-        val gtxUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t&q=$encoded"
-        val r2 = tryGet(gtxUrl)
-        if (!r2.isNullOrBlank()) return r2
+            if (sl != "auto") {
+                val gtxAutoUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t&q=$encoded"
+                tryGet(gtxAutoUrl)?.let { return it }
+            }
 
-        // Endpoint 3: Fallback POST FormBody jika teks panjang atau GET dibatasi
+            if (trimmed.length <= 500) {
+                val clients5Url = "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=$sl&tl=$tl&q=$encoded"
+                tryGet(clients5Url)?.let { return it }
+            }
+        }
+
+        // 2. Untuk payload batch panjang (> 1200 chars) atau fallback jika GET gagal: POST FormBody ke gtx
         val postUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t"
-        val r3 = tryPost(postUrl, trimmed)
-        if (!r3.isNullOrBlank()) return r3
+        tryPost(postUrl, trimmed)?.let { return it }
+
+        if (sl != "auto") {
+            val postAutoUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t"
+            tryPost(postAutoUrl, trimmed)?.let { return it }
+        }
+
+        // 3. Fallback GET gtx terakhir jika panjang masih wajar
+        if (encoded.length in 1201..2500) {
+            val gtxUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t&q=$encoded"
+            tryGet(gtxUrl)?.let { return it }
+        }
 
         return null
     }
@@ -810,6 +879,7 @@ object TranslationService {
     }
 
     private fun translateViaMyMemory(text: String, targetLang: String, sourceLang: String = "ja"): String? {
+        if (text.length > 400) return null
         return try {
             val encoded = URLEncoder.encode(text, "UTF-8")
             val tl = if (targetLang.startsWith("id") || targetLang.startsWith("in")) "id" else targetLang

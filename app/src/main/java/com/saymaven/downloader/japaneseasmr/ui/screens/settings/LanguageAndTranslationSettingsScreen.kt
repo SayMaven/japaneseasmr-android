@@ -61,9 +61,9 @@ fun LanguageAndTranslationSettingsScreen(
     )
 
     val providers = listOf(
-        "google" to ("Google Translate" to "100% Gratis, Cepat, Tanpa API Key"),
-        "microsoft" to ("Microsoft Translator (Bing)" to "Mesin terjemahan Microsoft Edge"),
-        "youdao" to ("Youdao Translator" to "Spesialis kosa kata anime & kultur Asia Timur"),
+        "google" to ("Google Translate" to "100% Gratis, Cepat, Stabil, Tanpa API Key (Disarankan)"),
+        "microsoft" to ("Microsoft Translator (Bing)" to "Mesin Microsoft Edge (otomatis fallback ke Google jika dibatasi)"),
+        "youdao" to ("Youdao Translator" to "Kosa kata Asia Timur (otomatis fallback ke Google jika dibatasi)"),
         "llm" to ("LLM Translation (AI)" to "Diterjemahkan via Claude, Gemini, DeepSeek, dll.")
     )
 
