@@ -100,7 +100,15 @@ object ChineseAsmrGlossary {
 
     // Karakter Hanzi Simplified spesifik yang TIDAK ada dalam daftar Jouyou/Jinmeiyou Kanji Jepang
     private val CHINESE_SPECIFIC_CHARS = setOf(
-        '这', '们', '么', '谁', '给', '说', '话', '没', '让', '从', '时', '样', '点', '还', '把', '被'
+        '这', '们', '么', '谁', '给', '说', '话', '没', '让', '从', '时', '样', '点', '还', '把', '被',
+        '欢', '鸡', '妈', '爸', '吗', '呢', '喔', '诶', '爱', '觉', '听', '见', '问', '过', '对', '开',
+        '关', '头', '边', '东', '西', '奶', '爷', '哥', '姐', '妹', '弟', '嘴', '脸', '脚', '裤', '裙'
+    )
+
+    // Partikel & kata ganti Mandarin umum untuk mode subtitle (saat 0 Kana Jepang)
+    private val CHINESE_SUBTITLE_COMMON_CHARS = setOf(
+        '的', '了', '我', '你', '他', '她', '它', '啊', '吧', '嘛', '呀', '哦', '嗯',
+        '是', '在', '有', '不', '要', '去', '来', '好', '很', '都', '也', '就', '再', '想', '做'
     )
 
     /**
@@ -119,13 +127,14 @@ object ChineseAsmrGlossary {
     /**
      * Mendeteksi apakah teks benar-benar berbahasa Mandarin (bukan judul Jepang yang menggunakan Kanji).
      */
-    fun isDefinitivelyChinese(text: String): Boolean {
+    fun isDefinitivelyChinese(text: String, isSubtitleMode: Boolean = false): Boolean {
         if (containsJapaneseKana(text)) return false
         for (marker in CHINESE_DISTINCTIVE_MARKERS) {
             if (text.contains(marker, ignoreCase = true)) return true
         }
         for (char in text) {
             if (char in CHINESE_SPECIFIC_CHARS) return true
+            if (isSubtitleMode && char in CHINESE_SUBTITLE_COMMON_CHARS) return true
         }
         return false
     }

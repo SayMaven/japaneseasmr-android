@@ -2453,7 +2453,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 val provider = TranslationService.getActiveProvider(getApplication())
 
-                kotlinx.coroutines.withTimeoutOrNull(25_000L) {
+                kotlinx.coroutines.withTimeoutOrNull(45_000L) {
                     coroutineScope {
                         val titleDeferred = if (!forceOnline && hasValidTitle) null else async(Dispatchers.IO) {
                             TranslationService.translateText(rawTitle, targetLang, provider)

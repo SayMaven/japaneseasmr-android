@@ -171,4 +171,20 @@ class TranslationGlossaryTest {
         val cnForWeb = ChineseAsmrGlossary.preProcessChinese(cnInput, forLlm = false)
         assertFalse("Web mode should avoid stiff medical term 女性阴道", cnForWeb.contains("女性阴道"))
     }
+
+    @Test
+    fun testChineseSubtitleAndEnglishSourceDetection() {
+        // Real Mandarin subtitle lines from RJ01724138 DB that previously fell back to "ja"
+        assertEquals("zh-CN", TranslationService.detectSourceLanguage("爸爸的鸡巴", isSubtitleMode = true))
+        assertEquals("zh-CN", TranslationService.detectSourceLanguage("喜欢 喜欢", isSubtitleMode = true))
+        assertEquals("zh-CN", TranslationService.detectSourceLanguage("爸爸 你的表情都融化了喔", isSubtitleMode = true))
+        assertEquals("zh-CN", TranslationService.detectSourceLanguage("要去了", isSubtitleMode = true))
+
+        // English source must not be forced to "ja"
+        assertEquals("en", TranslationService.detectSourceLanguage("01_Whispering Ear Cleaning_No SE.mp3"))
+
+        // Poisoned mixed CJK translations must be rejected
+        assertTrue(TranslationService.isPoisonedTranslation("爸爸 你的表情都融化了喔", "ekspresi 爸爸 你 di kota", "id"))
+        assertTrue(TranslationService.isPoisonedTranslation("诶？因为是爱衣菜的缘故？", "诶? Apakah karena kegagalan Aiina?", "id"))
+    }
 }

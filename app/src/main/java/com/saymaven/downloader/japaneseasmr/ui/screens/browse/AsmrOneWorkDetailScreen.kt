@@ -109,13 +109,20 @@ fun AsmrOneWorkDetailScreen(
                 val targetLang = TranslationService.getActiveTargetLanguage(context)
                 val provider = TranslationService.getActiveProvider(context)
                 val titlesToTranslate = mutableSetOf<String>()
-                fun collectTitles(nodes: List<AsmrOneFileNode>) {
+                fun collectVisibleTitles(nodes: List<AsmrOneFileNode>) {
                     for (n in nodes) {
                         if (n.title.isNotBlank()) titlesToTranslate.add(n.title)
-                        if (n.children.isNotEmpty()) collectTitles(n.children)
+                        if (n.type == "folder" && autoExpandedFolders.contains(n.title) && n.children.isNotEmpty()) {
+                            collectVisibleTitles(n.children)
+                        }
                     }
                 }
-                collectTitles(fileTree)
+                collectVisibleTitles(fileTree)
+                if (audioTracks.isNotEmpty()) {
+                    for (tr in audioTracks) {
+                        if (tr.title.isNotBlank()) titlesToTranslate.add(tr.title)
+                    }
+                }
                 val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLang, provider)
                 if (map.entries.any { (k, v) -> !TranslationService.isPoisonedTranslation(k, v, targetLang) }) {
                     translatedNodeTitles = map
@@ -507,16 +514,18 @@ fun AsmrOneWorkDetailScreen(
                                             isTranslatingFileTree = true
                                             try {
                                                 val titlesToTranslate = mutableSetOf<String>()
-                                                fun collectTitles(nodes: List<AsmrOneFileNode>) {
+                                                fun collectVisibleTitles(nodes: List<AsmrOneFileNode>) {
                                                     for (node in nodes) {
-                                                        titlesToTranslate.add(node.title)
-                                                        collectTitles(node.children)
+                                                        if (node.title.isNotBlank()) titlesToTranslate.add(node.title)
+                                                        if (node.type == "folder" && autoExpandedFolders.contains(node.title)) {
+                                                            collectVisibleTitles(node.children)
+                                                        }
                                                     }
                                                 }
-                                                collectTitles(fileTree)
+                                                collectVisibleTitles(fileTree)
                                                 if (audioTracks.isNotEmpty()) {
                                                     for (tr in audioTracks) {
-                                                        titlesToTranslate.add(tr.title)
+                                                        if (tr.title.isNotBlank()) titlesToTranslate.add(tr.title)
                                                     }
                                                 }
 
@@ -606,15 +615,31 @@ fun AsmrOneWorkDetailScreen(
                             translatedTitles = translatedNodeTitles,
                             isTranslationActive = isFileTreeTranslated,
                             onOpenPlayer = onOpenPlayer,
-                            parentFolderTracks = rootDirectTracks.takeIf { it.isNotEmpty() }
+                            parentFolderTracks = rootDirectTracks.takeIf { it.isNotEmpty() },
+                            onTranslateNodes = { missingTitles ->
+                                coroutineScope.launch {
+                                    val targetLangNow = TranslationService.getActiveTargetLanguage(context)
+                                    val provider = TranslationService.getActiveProvider(context)
+                                    val map = TranslationService.translateBatch(missingTitles, targetLangNow, provider)
+                                    if (map.isNotEmpty()) {
+                                        translatedNodeTitles = translatedNodeTitles + map
+                                    }
+                                }
+                            }
                         )
                     }
                 } else {
                     // Fallback to flat audio tracks list
                     items(audioTracks) { track ->
                         val trackIdx = audioTracks.indexOf(track)
+                        val displayTrackTitle = if (isFileTreeTranslated) {
+                            translatedNodeTitles[track.title.trim()] ?: translatedNodeTitles[track.title] ?: track.title
+                        } else {
+                            track.title
+                        }
                         AudioTrackRow(
                             track = track,
+                            displayTitle = displayTrackTitle,
                             onPlay = {
                                 playerViewModel.playOnlineWork(
                                     rjid = work.rjid,
@@ -747,11 +772,23 @@ fun FileTreeNodeItem(
     isTranslationActive: Boolean,
     onOpenPlayer: () -> Unit = {},
     depth: Int = 0,
-    parentFolderTracks: List<AsmrOneTrack>? = null
+    parentFolderTracks: List<AsmrOneTrack>? = null,
+    onTranslateNodes: (List<String>) -> Unit = {}
 ) {
     val context = LocalContext.current
     val shouldExpandInitially = autoExpandedFolders.contains(node.title)
     var isExpanded by remember(node.title, shouldExpandInitially) { mutableStateOf(shouldExpandInitially) }
+
+    LaunchedEffect(isExpanded, isTranslationActive) {
+        if (isExpanded && isTranslationActive && node.type == "folder") {
+            val missing = node.children.map { it.title }
+                .filter { it.isNotBlank() && translatedTitles[it.trim()].isNullOrBlank() && translatedTitles[it].isNullOrBlank() }
+                .distinct()
+            if (missing.isNotEmpty()) {
+                onTranslateNodes(missing)
+            }
+        }
+    }
 
     val displayNodeTitle = if (isTranslationActive) {
         translatedTitles[node.title.trim()] ?: translatedTitles[node.title] ?: node.title
@@ -805,7 +842,8 @@ fun FileTreeNodeItem(
                             isTranslationActive = isTranslationActive,
                             onOpenPlayer = onOpenPlayer,
                             depth = depth + 1,
-                            parentFolderTracks = if (isolatedFolderTracks.isNotEmpty()) isolatedFolderTracks else parentFolderTracks
+                            parentFolderTracks = if (isolatedFolderTracks.isNotEmpty()) isolatedFolderTracks else parentFolderTracks,
+                            onTranslateNodes = onTranslateNodes
                         )
                     }
                 }
@@ -971,6 +1009,7 @@ fun FileTreeNodeItem(
 @Composable
 fun AudioTrackRow(
     track: AsmrOneTrack,
+    displayTitle: String = track.title,
     onPlay: () -> Unit
 ) {
     Surface(
@@ -999,7 +1038,7 @@ fun AudioTrackRow(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = track.title,
+                    text = displayTitle,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,

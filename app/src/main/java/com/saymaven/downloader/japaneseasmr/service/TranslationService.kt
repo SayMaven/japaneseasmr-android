@@ -122,11 +122,11 @@ object TranslationService {
                 }
             }
         }
-        // One-time purge of poisoned/stiff cache entries
+        // One-time purge of poisoned/stiff cache entries (v4: clears Mandarin-as-Japanese poisoned rows)
         try {
             val sp = context.applicationContext.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
-            if (sp.getInt("translation_cache_version", 0) < 3) {
-                sp.edit().putInt("translation_cache_version", 3).apply()
+            if (sp.getInt("translation_cache_version", 0) < 4) {
+                sp.edit().putInt("translation_cache_version", 4).apply()
                 memoryCache.clear()
                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                     try {
@@ -141,7 +141,7 @@ object TranslationService {
     }
 
     /**
-     * Memeriksa apakah hasil cache terjemahan terindikasi beracun (gagal diterjemahkan / masih teks Jepang).
+     * Memeriksa apakah hasil cache terjemahan terindikasi beracun (gagal diterjemahkan / masih teks Jepang atau Hanzi).
      */
     fun isPoisonedTranslation(source: String, translated: String?, targetLang: String): Boolean {
         if (translated.isNullOrBlank()) return true
@@ -156,8 +156,23 @@ object TranslationService {
             if (srcKana >= 3 && trKana >= 3 && trKana >= (srcKana / 2)) {
                 return true
             }
+            val srcCjk = countCjkIdeographs(cleanSrc)
+            val trCjk = countCjkIdeographs(cleanTr)
+            if ((srcCjk > 0 || srcKana > 0) && trCjk >= 1) {
+                return true
+            }
         }
         return false
+    }
+
+    private fun countCjkIdeographs(text: String): Int {
+        var count = 0
+        for (char in text) {
+            if (Character.UnicodeBlock.of(char) == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS) {
+                count++
+            }
+        }
+        return count
     }
 
     private fun countJapaneseKana(text: String): Int {
@@ -230,12 +245,17 @@ object TranslationService {
 
     /**
      * Mendeteksi bahasa sumber teks ASMR secara presisi.
-     * Mencegah kanji judul Jepang salah terdeteksi sebagai Mandarin oleh Google.
+     * Mencegah kanji judul Jepang salah terdeteksi sebagai Mandarin, dan mencegah
+     * teks Mandarin atau Inggris dipaksa sebagai bahasa Jepang.
      */
-    fun detectSourceLanguage(text: String): String {
+    fun detectSourceLanguage(text: String, isSubtitleMode: Boolean = false): String {
         if (ChineseAsmrGlossary.containsJapaneseKana(text)) return "ja"
-        if (ChineseAsmrGlossary.isDefinitivelyChinese(text)) return "zh-CN"
-        return "ja"
+        if (ChineseAsmrGlossary.isDefinitivelyChinese(text, isSubtitleMode)) return "zh-CN"
+        val hasCjk = countCjkIdeographs(text) > 0
+        if (!hasCjk) {
+            return if (text.any { it in 'a'..'z' || it in 'A'..'Z' }) "en" else "auto"
+        }
+        return if (isSubtitleMode) "auto" else "ja"
     }
 
     fun getActiveProvider(context: Context): String {
@@ -333,10 +353,10 @@ object TranslationService {
 
         // 2. Pre-processing di Dispatchers.Default (Non-blocking UI thread)
         val preProcessed = withContext(Dispatchers.Default) {
-            if (detectedSl == "ja") {
-                JapaneseAsmrGlossary.preProcessJapanese(bodyToTranslate, forLlm = isLlm)
-            } else {
-                ChineseAsmrGlossary.preProcessChinese(bodyToTranslate, forLlm = isLlm)
+            when (detectedSl) {
+                "ja" -> JapaneseAsmrGlossary.preProcessJapanese(bodyToTranslate, forLlm = isLlm)
+                "zh-CN" -> ChineseAsmrGlossary.preProcessChinese(bodyToTranslate, forLlm = isLlm)
+                else -> bodyToTranslate
             }
         }
 
@@ -475,10 +495,11 @@ object TranslationService {
             }
 
             if (toTranslateOnline.isNotEmpty()) {
-                val (jaItems, zhItems) = toTranslateOnline.partition { detectSourceLanguage(it) == "ja" }
-                val chunkPairs = jaItems.chunked(10).map { it to "ja" } + zhItems.chunked(10).map { it to "zh-CN" }
+                val chunkPairs = toTranslateOnline
+                    .groupBy { detectSourceLanguage(it, isSubtitleMode) }
+                    .flatMap { (lang, items) -> items.chunked(10).map { it to lang } }
 
-                withTimeoutOrNull(25_000L) {
+                val completedOrTimedOut = withTimeoutOrNull(35_000L) {
                     coroutineScope {
                         chunkPairs.map { (chunk, sourceLang) ->
                             async(Dispatchers.IO) {
@@ -486,11 +507,11 @@ object TranslationService {
                                 val preparedChunk = withContext(Dispatchers.Default) {
                                     chunk.map { item ->
                                         val cleanBody = if (isSubtitleMode) item else stripFilenameForTranslation(item).second
-                                        val pre = if (sourceLang == "ja") {
-                                            if (isSubtitleMode) JapaneseAsmrGlossary.preProcessForSubtitle(cleanBody)
-                                            else JapaneseAsmrGlossary.preProcessJapanese(cleanBody)
-                                        } else {
-                                            ChineseAsmrGlossary.preProcessChinese(cleanBody)
+                                        val pre = when (sourceLang) {
+                                            "ja" -> if (isSubtitleMode) JapaneseAsmrGlossary.preProcessForSubtitle(cleanBody)
+                                                    else JapaneseAsmrGlossary.preProcessJapanese(cleanBody)
+                                            "zh-CN" -> ChineseAsmrGlossary.preProcessChinese(cleanBody)
+                                            else -> cleanBody
                                         }
                                         // Escape tag kurung siku ganda yang mungkin ada di teks sumber
                                         pre.replace("[[", "⟦").replace("]]", "⟧").replace('\n', ' ').trim().ifEmpty { item }
@@ -518,6 +539,26 @@ object TranslationService {
                                         val body = m.groupValues[2].trim()
                                         if (idx != null && body.isNotEmpty()) {
                                             parsedMap[idx] = body
+                                        }
+                                    }
+                                }
+
+                                // Fallback newline-only jika tag [[idx]] dirusak oleh mesin terjemah (khususnya mode subtitle)
+                                if (parsedMap.size < chunk.size / 2 && chunk.size > 1 && System.currentTimeMillis() >= googleRateLimitUntilMs) {
+                                    val plainPayload = preparedChunk.joinToString("\n")
+                                    val plainResponse = batchSemaphore.withPermit {
+                                        when (effectiveProvider.lowercase()) {
+                                            "microsoft" -> translateViaMicrosoftEdge(plainPayload, normalizedTl) ?: translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
+                                            "youdao" -> translateViaYoudaoWeb(plainPayload, normalizedTl) ?: translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
+                                            else -> translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
+                                        }
+                                    }
+                                    val respLines = plainResponse?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+                                    if (respLines.size == chunk.size) {
+                                        for (i in chunk.indices) {
+                                            if (!parsedMap.containsKey(i)) {
+                                                parsedMap[i] = respLines[i]
+                                            }
                                         }
                                     }
                                 }
@@ -572,12 +613,22 @@ object TranslationService {
                         }.awaitAll()
                     }
                 }
+                if (completedOrTimedOut == null) {
+                    emitError("Waktu terjemahan habis (timeout). Sebagian hasil mungkin belum lengkap.")
+                }
             }
 
             if (newEntities.isNotEmpty()) {
                 try {
                     cacheDao?.insertTranslations(newEntities.toList())
                 } catch (_: Exception) {
+                }
+            }
+            if (result.isEmpty() && missingAfterDb.isNotEmpty()) {
+                if (System.currentTimeMillis() < googleRateLimitUntilMs) {
+                    emitError("Batas permintaan tercapai (HTTP 429). Coba lagi dalam beberapa detik.")
+                } else {
+                    emitError("Gagal menerjemahkan${if (!lastNetworkError.isNullOrBlank()) ": $lastNetworkError" else ". Periksa koneksi internet."}")
                 }
             }
         }
