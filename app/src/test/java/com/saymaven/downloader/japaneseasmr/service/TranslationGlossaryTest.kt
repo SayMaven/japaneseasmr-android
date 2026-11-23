@@ -3,6 +3,7 @@ package com.saymaven.downloader.japaneseasmr.service
 import com.saymaven.downloader.japaneseasmr.service.glossary.ChineseAsmrGlossary
 import com.saymaven.downloader.japaneseasmr.service.glossary.IndonesianPostFilter
 import com.saymaven.downloader.japaneseasmr.service.glossary.JapaneseAsmrGlossary
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -58,9 +59,22 @@ class TranslationGlossaryTest {
         val jaTitle = "【繁体中文版】巨根でおじさんに中出しされるJK"
         assertTrue(ChineseAsmrGlossary.containsJapaneseKana(jaTitle))
         assertFalse("Japanese title with kana must not trigger Chinese preprocessor", ChineseAsmrGlossary.containsChinese(jaTitle))
+        org.junit.Assert.assertEquals("ja", TranslationService.detectSourceLanguage(jaTitle))
+
+        // Japanese title with Katakana (ヌキ) is identified via kana
+        val jaTitleWithKatakana = "【繁体中文版】【即ヌキ110円】全裸土下座調教"
+        assertTrue(ChineseAsmrGlossary.containsJapaneseKana(jaTitleWithKatakana))
+        assertEquals("ja", TranslationService.detectSourceLanguage(jaTitleWithKatakana))
+
+        // Pure kanji title without kana must still be detected as Japanese
+        val jaTitlePureKanji = "【繁体中文版】全裸土下座調教"
+        assertFalse(ChineseAsmrGlossary.containsJapaneseKana(jaTitlePureKanji))
+        assertFalse("Pure kanji Japanese title must not be marked definitively Chinese", ChineseAsmrGlossary.isDefinitivelyChinese(jaTitlePureKanji))
+        assertEquals("ja", TranslationService.detectSourceLanguage(jaTitlePureKanji))
 
         val cnTitle = "【中文音声】大肉棒中出"
         assertFalse(ChineseAsmrGlossary.containsJapaneseKana(cnTitle))
         assertTrue("Pure Chinese title must trigger Chinese preprocessor", ChineseAsmrGlossary.containsChinese(cnTitle))
+        org.junit.Assert.assertEquals("zh-CN", TranslationService.detectSourceLanguage(cnTitle))
     }
 }

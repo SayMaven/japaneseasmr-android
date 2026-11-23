@@ -92,6 +92,17 @@ object ChineseAsmrGlossary {
         "大叔" to "叔叔"
     )
 
+    // Penanda judul khusus rilis Mandarin / terjemahan Mandarin DLsite
+    private val CHINESE_DISTINCTIVE_MARKERS = listOf(
+        "【中文】", "【中文版】", "【漢化】", "【汉化】", "【国语】", "【普通话】", "【台配】", "【字幕】",
+        "中文音声", "漢化組", "汉化组", "字幕组", "字幕組"
+    )
+
+    // Karakter Hanzi Simplified spesifik yang TIDAK ada dalam daftar Jouyou/Jinmeiyou Kanji Jepang
+    private val CHINESE_SPECIFIC_CHARS = setOf(
+        '这', '们', '么', '谁', '给', '说', '话', '没', '让', '从', '时', '样', '点', '还', '把', '被'
+    )
+
     /**
      * Mendeteksi apakah teks mengandung huruf Kana Jepang (Hiragana/Katakana).
      */
@@ -106,21 +117,23 @@ object ChineseAsmrGlossary {
     }
 
     /**
-     * Mendeteksi apakah teks mengandung karakter Hanzi/Mandarin murni (bukan teks Jepang).
+     * Mendeteksi apakah teks benar-benar berbahasa Mandarin (bukan judul Jepang yang menggunakan Kanji).
      */
-    fun containsChinese(text: String): Boolean {
+    fun isDefinitivelyChinese(text: String): Boolean {
         if (containsJapaneseKana(text)) return false
+        for (marker in CHINESE_DISTINCTIVE_MARKERS) {
+            if (text.contains(marker, ignoreCase = true)) return true
+        }
         for (char in text) {
-            val ub = Character.UnicodeBlock.of(char)
-            if (ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
-                ub == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
-                ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
-            ) {
-                return true
-            }
+            if (char in CHINESE_SPECIFIC_CHARS) return true
         }
         return false
     }
+
+    /**
+     * Kompatibilitas alias untuk isDefinitivelyChinese.
+     */
+    fun containsChinese(text: String): Boolean = isDefinitivelyChinese(text)
 
     /**
      * Menormalisasi slang teks Mandarin sebelum dikirim ke mesin terjemahan.

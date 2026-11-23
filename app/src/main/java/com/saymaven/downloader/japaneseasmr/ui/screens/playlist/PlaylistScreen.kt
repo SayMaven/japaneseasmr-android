@@ -852,7 +852,8 @@ fun PlaylistScreen(
                             ) {
                                 items(pagedPlaylist, key = { it.rjid }) { item ->
                                     val isCurrentTrack = (item.rjid == currentRjId)
-                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.translatedTitle ?: item.title else item.title
+                                    val validHistoryTrans = if (!item.translatedTitle.isNullOrBlank() && item.translatedTitle != item.title) item.translatedTitle else null
+                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: validHistoryTrans ?: item.title else item.title
                                     LocalWorkPinterestCard(
                                         item = item,
                                         displayTitle = displayTitle,
@@ -903,7 +904,8 @@ fun PlaylistScreen(
                             ) {
                                 items(pagedPlaylist, key = { it.rjid }) { item ->
                                     val isCurrentTrack = (item.rjid == currentRjId)
-                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.translatedTitle ?: item.title else item.title
+                                    val validHistoryTrans = if (!item.translatedTitle.isNullOrBlank() && item.translatedTitle != item.title) item.translatedTitle else null
+                                    val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: validHistoryTrans ?: item.title else item.title
                                     LocalWorkListViewItem(
                                         modifier = Modifier.fillMaxWidth(),
                                         item = item,

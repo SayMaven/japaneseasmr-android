@@ -21,6 +21,9 @@ interface TranslationCacheDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTranslations(items: List<TranslationCacheEntity>)
 
+    @Query("DELETE FROM translation_cache WHERE sourceText = :sourceText AND targetLang = :targetLang")
+    suspend fun deleteTranslation(sourceText: String, targetLang: String)
+
     @Query("DELETE FROM translation_cache WHERE targetLang = :targetLang")
     suspend fun clearByLang(targetLang: String)
 

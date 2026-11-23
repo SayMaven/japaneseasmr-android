@@ -16,6 +16,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.Dispatcher
+import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -120,7 +121,8 @@ object TranslationService {
 
         val lang = PreferencesManager.getFastCachedLanguage(context).lowercase().trim()
         val effectiveLang = if (lang == "system" || lang.isBlank()) {
-            com.saymaven.downloader.japaneseasmr.util.LocaleHelper.getSystemLocale().language.lowercase().trim()
+            val appLocale = java.util.Locale.getDefault()
+            appLocale.language.lowercase().trim()
         } else lang
 
         return when {
@@ -129,6 +131,16 @@ object TranslationService {
             effectiveLang.startsWith("ja") -> "ja"
             else -> "en"
         }
+    }
+
+    /**
+     * Mendeteksi bahasa sumber teks ASMR secara presisi.
+     * Mencegah kanji judul Jepang salah terdeteksi sebagai Mandarin oleh Google.
+     */
+    fun detectSourceLanguage(text: String): String {
+        if (ChineseAsmrGlossary.containsJapaneseKana(text)) return "ja"
+        if (ChineseAsmrGlossary.isDefinitivelyChinese(text)) return "zh-CN"
+        return "ja"
     }
 
     fun getActiveProvider(context: Context): String {
@@ -193,23 +205,29 @@ object TranslationService {
         try {
             val cachedInDb = cacheDao?.getTranslation(trimmed, effectiveTargetLang)
             if (!cachedInDb.isNullOrBlank()) {
-                memoryCache[cacheKey] = cachedInDb
-                return@withContext cachedInDb
+                if (cachedInDb != trimmed) {
+                    memoryCache[cacheKey] = cachedInDb
+                    return@withContext cachedInDb
+                } else {
+                    // Cache teracuni teks asli (karena kegagalan jaringan sebelumnya), bersihkan
+                    cacheDao?.deleteTranslation(trimmed, effectiveTargetLang)
+                }
             }
         } catch (_: Exception) {
         }
 
+        val detectedSl = detectSourceLanguage(trimmed)
+
         // 2. Pre-processing di Dispatchers.Default (Non-blocking UI thread)
         val preProcessed = withContext(Dispatchers.Default) {
-            var t = JapaneseAsmrGlossary.preProcessJapanese(trimmed)
-            if (ChineseAsmrGlossary.containsChinese(t)) {
-                t = ChineseAsmrGlossary.preProcessChinese(t)
+            if (detectedSl == "ja") {
+                JapaneseAsmrGlossary.preProcessJapanese(trimmed)
+            } else {
+                ChineseAsmrGlossary.preProcessChinese(trimmed)
             }
-            t
         }
 
         val normalizedTl = normalizeTargetLang(effectiveTargetLang)
-        val detectedSl = if (ChineseAsmrGlossary.containsJapaneseKana(preProcessed) || ChineseAsmrGlossary.containsJapaneseKana(trimmed)) "ja" else "auto"
 
         // 3. Panggil Provider Aktif via Network Semaphore
         val rawOnline = networkSemaphore.withPermit {
@@ -230,7 +248,8 @@ object TranslationService {
             } else intermediate
         }
 
-        if (finalResult.isNotBlank()) {
+        // Simpan ke cache HANYA jika terjemahan online berhasil dan bukan teks asli yang gagal
+        if (!rawOnline.isNullOrBlank() && finalResult.isNotBlank() && finalResult != trimmed) {
             memoryCache[cacheKey] = finalResult
             try {
                 cacheDao?.insertTranslation(
@@ -324,8 +343,8 @@ object TranslationService {
             }
 
             if (toTranslateOnline.isNotEmpty()) {
-                val (jaItems, otherItems) = toTranslateOnline.partition { ChineseAsmrGlossary.containsJapaneseKana(it) }
-                val chunkPairs = jaItems.chunked(15).map { it to "ja" } + otherItems.chunked(15).map { it to "auto" }
+                val (jaItems, zhItems) = toTranslateOnline.partition { detectSourceLanguage(it) == "ja" }
+                val chunkPairs = jaItems.chunked(15).map { it to "ja" } + zhItems.chunked(15).map { it to "zh-CN" }
 
                 coroutineScope {
                     chunkPairs.map { (chunk, sourceLang) ->
@@ -333,9 +352,10 @@ object TranslationService {
                             // Pre-process chunk di Dispatchers.Default
                             val preparedChunk = withContext(Dispatchers.Default) {
                                 chunk.map { item ->
-                                    var pre = JapaneseAsmrGlossary.preProcessJapanese(item)
-                                    if (ChineseAsmrGlossary.containsChinese(pre)) {
-                                        pre = ChineseAsmrGlossary.preProcessChinese(pre)
+                                    val pre = if (sourceLang == "ja") {
+                                        JapaneseAsmrGlossary.preProcessJapanese(item)
+                                    } else {
+                                        ChineseAsmrGlossary.preProcessChinese(item)
                                     }
                                     // Escape tag kurung siku ganda yang mungkin ada di teks sumber
                                     pre.replace("[[", "⟦").replace("]]", "⟧").replace('\n', ' ').trim().ifEmpty { item }
@@ -353,10 +373,10 @@ object TranslationService {
                                 }
                             }
 
-                            // Ekstrak hasil via Regex deterministik
+                            // Ekstrak hasil via Regex deterministik (mendukung bracket ASCII, fullwidth, dan spasi)
                             val parsedMap = mutableMapOf<Int, String>()
                             if (!batchResponse.isNullOrBlank()) {
-                                val tagRegex = Regex("\\[\\[(\\d+)\\]\\]\\s*([\\s\\S]*?)(?=\\[\\[\\d+\\]\\]|$)")
+                                val tagRegex = Regex("""(?:\[\[|［［|\[\s*\[)(\d+)(?:\]\]|］］|\]\s*\])\s*([\s\S]*?)(?=(?:\[\[|［［|\[\s*\[)\d+(?:\]\]|］］|\]\s*\])|$)""")
                                 val matches = tagRegex.findAll(batchResponse)
                                 for (m in matches) {
                                     val idx = m.groupValues[1].toIntOrNull()
@@ -376,7 +396,7 @@ object TranslationService {
                                         IndonesianPostFilter.refineIndonesian(rawTr)
                                     } else rawTr
 
-                                    if (finalTr.isNotBlank()) {
+                                    if (finalTr.isNotBlank() && finalTr != src) {
                                         result[src] = finalTr
                                         memoryCache["$effectiveTargetLang:$src"] = finalTr
                                         newEntities.add(
@@ -685,10 +705,21 @@ object TranslationService {
     }
 
     private fun translateViaGoogleWeb(text: String, tl: String, sl: String = "auto"): String? {
-        return try {
-            val encoded = URLEncoder.encode(text, "UTF-8")
-            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t"
-            val formBody = "q=$encoded".toRequestBody("application/x-www-form-urlencoded; charset=utf-8".toMediaType())
+        val clients = listOf("dict-chrome-ex", "gtx")
+        for (clientType in clients) {
+            val res = tryGoogleWeb(text, tl, sl, clientType)
+            if (!res.isNullOrBlank()) return res
+        }
+        return null
+    }
+
+    private fun tryGoogleWeb(text: String, tl: String, sl: String, clientType: String): String? {
+        val url = "https://translate.googleapis.com/translate_a/single?client=$clientType&sl=$sl&tl=$tl&dt=t"
+        // 1. Coba via POST FormBody OkHttp (bebas batas panjang karakter URL)
+        val postResult = try {
+            val formBody = FormBody.Builder()
+                .add("q", text)
+                .build()
             val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", USER_AGENT)
@@ -696,21 +727,53 @@ object TranslationService {
                 .build()
 
             client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val body = resp.body?.string() ?: return null
-                val array = JSONArray(body)
-                val parts = array.optJSONArray(0) ?: return null
-                val sb = StringBuilder()
-                for (i in 0 until parts.length()) {
-                    val item = parts.optJSONArray(i)
-                    val segment = item?.optString(0)
-                    if (!segment.isNullOrBlank()) {
-                        sb.append(segment)
-                    }
-                }
-                val res = sb.toString().trim()
-                if (res.isNotBlank()) cleanHtmlEntities(res) else null
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string()
+                    parseGoogleWebResponse(body)
+                } else null
             }
+        } catch (_: Exception) {
+            null
+        }
+
+        if (!postResult.isNullOrBlank()) return postResult
+
+        // 2. Fallback via GET jika POST gagal
+        return try {
+            val encoded = URLEncoder.encode(text, "UTF-8")
+            val getUrl = "$url&q=$encoded"
+            val req = Request.Builder()
+                .url(getUrl)
+                .header("User-Agent", USER_AGENT)
+                .get()
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string()
+                    parseGoogleWebResponse(body)
+                } else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun parseGoogleWebResponse(body: String?): String? {
+        if (body.isNullOrBlank()) return null
+        return try {
+            val array = JSONArray(body)
+            val parts = array.optJSONArray(0) ?: return null
+            val sb = StringBuilder()
+            for (i in 0 until parts.length()) {
+                val item = parts.optJSONArray(i)
+                val segment = item?.optString(0)
+                if (!segment.isNullOrBlank()) {
+                    sb.append(segment)
+                }
+            }
+            val res = sb.toString().trim()
+            if (res.isNotBlank()) cleanHtmlEntities(res) else null
         } catch (_: Exception) {
             null
         }

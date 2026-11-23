@@ -2322,8 +2322,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val currentMap = _playlistTranslatedTitles.value.toMutableMap()
 
             items.forEach { item ->
-                val tr = batchResult[item.title] ?: item.translatedTitle
-                if (!tr.isNullOrBlank()) {
+                val tr = batchResult[item.title] ?: (if (!item.translatedTitle.isNullOrBlank() && item.translatedTitle != item.title) item.translatedTitle else null)
+                if (!tr.isNullOrBlank() && tr != item.title) {
                     currentMap[item.rjid] = tr
                     if (item.translatedTitle != tr) {
                         historyDao.updateTranslations(item.rjid, tr, item.translatedChaptersJson)
