@@ -43,7 +43,7 @@ object StorageSyncManager {
     private val _syncTick = MutableStateFlow<Long>(0L)
     val syncTick = _syncTick.asStateFlow()
 
-    val RJ_REGEX = Regex("((?:RJ|VJ|BJ)\\d{6,8})", RegexOption.IGNORE_CASE)
+    val RJ_REGEX = Regex("((?:RJ|VJ|BJ)[-_ ]?\\d{6,8})", RegexOption.IGNORE_CASE)
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -180,12 +180,49 @@ object StorageSyncManager {
                 }
                 allTargetDirs.addAll(importedDirs)
 
-                // 1. Normalisasi semua format tanggal lama di database secara batch
+                // 1. Normalisasi semua format tanggal lama & pulihkan cover salah waris di database secara batch
                 val existingHistoryList = dao.getAllHistoryDirect()
                 for (item in existingHistoryList) {
+                    var itemToUpdate = item
+                    var itemNeedsUpdate = false
+
                     val normalized = AudioStorageHelper.normalizeDateString(item.downloadDate, item.localFilePath)
                     if (normalized != item.downloadDate) {
-                        dao.insertHistory(item.copy(downloadDate = normalized))
+                        itemToUpdate = itemToUpdate.copy(downloadDate = normalized)
+                        itemNeedsUpdate = true
+                    }
+
+                    val localF = File(item.localFilePath)
+                    if (localF.isFile) {
+                        val cleanRj = item.linkedRjId
+                            ?: AudioStorageHelper.extractRjCode(item.rjid)
+                            ?: AudioStorageHelper.extractRjCode(localF.name)
+                            ?: AudioStorageHelper.extractRjFromAudioMetadata(localF)
+
+                        if (cleanRj != null && item.linkedRjId != cleanRj) {
+                            itemToUpdate = itemToUpdate.copy(linkedRjId = cleanRj)
+                            itemNeedsUpdate = true
+                        }
+
+                        if (AudioStorageHelper.isMismatchedFolderCover(localF, itemToUpdate.coverUrl, cleanRj)) {
+                            val corrected = AudioStorageHelper.findSpecificCoverForAudioFile(localF, cleanRj)
+                                ?: AudioStorageHelper.getLocalCoverFile(context, cleanRj ?: "", localF.absolutePath)
+                            val newCover = corrected?.absolutePath ?: if (!cleanRj.isNullOrBlank()) {
+                                val prefix = if (cleanRj.length >= 2) cleanRj.substring(0, 2) else "RJ"
+                                "https://img.dlsite.jp/modpub/images2/work/doujin/${prefix}0000/${cleanRj}_img_main.jpg"
+                            } else ""
+                            if (newCover != itemToUpdate.coverUrl) {
+                                itemToUpdate = itemToUpdate.copy(coverUrl = newCover)
+                                itemNeedsUpdate = true
+                            }
+                            if (!cleanRj.isNullOrBlank()) {
+                                scope.launch { fetchAndCacheMetadata(context, dao, itemToUpdate) }
+                            }
+                        }
+                    }
+
+                    if (itemNeedsUpdate) {
+                        dao.insertHistory(itemToUpdate)
                     }
                 }
 
@@ -219,7 +256,9 @@ object StorageSyncManager {
         if (audioFiles.size < 2) return false
 
         // 1. Periksa kode RJ pada masing-masing file
-        val fileRjs = audioFiles.mapNotNull { f -> RJ_REGEX.find(f.name)?.value?.uppercase() }.distinct()
+        val fileRjs = audioFiles.mapNotNull { f ->
+            AudioStorageHelper.extractRjCode(f.name) ?: AudioStorageHelper.extractRjFromAudioMetadata(f)
+        }.distinct()
 
         // Jika file-file memiliki kode RJ yang BERBEDA (misal RJ01075892 dan RJ01081584),
         // maka ini PASTI kumpulan karya mandiri (folder playlist/kategori), BUKAN satu album multi-track!
@@ -246,9 +285,12 @@ object StorageSyncManager {
             return fileRjs.isEmpty() || (fileRjs.size == 1 && fileRjs.first() == pathRj)
         }
 
-        // 5. Jika semua file di dalam folder berbagi 1 kode RJ yang sama:
+        // 5. Jika file-file berbagi 1 kode RJ yang sama:
         if (fileRjs.size == 1) {
-            return true
+            val withRjCount = audioFiles.count { AudioStorageHelper.extractRjCode(it.name) != null }
+            if (withRjCount >= audioFiles.size / 2 || audioFiles.size <= 3) {
+                return true
+            }
         }
 
         // 6. Untuk folder tanpa kode RJ: cek apakah penamaan file mengikuti pola penomoran track album
@@ -311,7 +353,9 @@ object StorageSyncManager {
             val isAlbum = isMultiTrackAlbumFolder(leaf, audioFiles, isImported, rootDir)
 
             if (isAlbum) {
-                val fileRjs = audioFiles.mapNotNull { f -> RJ_REGEX.find(f.name)?.value?.uppercase() }.distinct()
+                val fileRjs = audioFiles.mapNotNull { f ->
+                    AudioStorageHelper.extractRjCode(f.name) ?: AudioStorageHelper.extractRjFromAudioMetadata(f)
+                }.distinct()
                 val rj = pathRj ?: fileRjs.firstOrNull()
                 syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = rj, linkedRj = rj, fallbackCover = fallbackCover)
             } else {
@@ -326,16 +370,20 @@ object StorageSyncManager {
                 // Proses file audio secara individual
                 val rjCounts = mutableMapOf<String, Int>()
                 for (f in audioFiles) {
-                    val fileRj = RJ_REGEX.find(f.name)?.value?.uppercase() ?: pathRj
+                    val fileRj = AudioStorageHelper.extractRjCode(f.name)
+                        ?: AudioStorageHelper.extractRjFromAudioMetadata(f)
+                        ?: pathRj
+
                     val customId = if (fileRj != null) {
                         val count = rjCounts.getOrDefault(fileRj, 0) + 1
                         rjCounts[fileRj] = count
                         if (count == 1) fileRj else "${fileRj}_${count}"
                     } else null
 
-                    val fileCover = AudioStorageHelper.findLocalCoverArt(f.parentFile ?: f)
+                    // HANYA gunakan cover yang spesifik untuk file audio ini (companion, embedded, atau cache resmi)
+                    // JANGAN gunakan blanket cover folder sembarang untuk file individual di multi-file folder!
+                    val fileCover = AudioStorageHelper.findSpecificCoverForAudioFile(f, fileRj)
                         ?: AudioStorageHelper.getLocalCoverFile(context, fileRj ?: "", f.absolutePath)
-                        ?: fallbackCover
 
                     syncSingleAudioFile(
                         context = context,
@@ -496,8 +544,10 @@ object StorageSyncManager {
         linkedRj: String? = null,
         fallbackCover: File? = null
     ) {
-        val rjMatch = RJ_REGEX.find(file.name) ?: RJ_REGEX.find(file.parentFile?.name ?: "")
-        val baseRj = linkedRj ?: rjMatch?.value?.uppercase()
+        val rjMatch = AudioStorageHelper.extractRjCode(file.name)
+            ?: AudioStorageHelper.extractRjFromAudioMetadata(file)
+            ?: AudioStorageHelper.extractRjCode(file.parentFile?.name ?: "")
+        val baseRj = linkedRj ?: rjMatch
         val isOfficialRj = baseRj != null
         val rjid = customRjid ?: baseRj ?: AudioStorageHelper.generateLocalId(file.absolutePath)
         val finalLinkedRjId = linkedRj ?: if (isOfficialRj) baseRj else null
@@ -526,7 +576,7 @@ object StorageSyncManager {
             }
 
             val localCover = fallbackCover
-                ?: AudioStorageHelper.findLocalCoverArt(file.parentFile ?: file)
+                ?: AudioStorageHelper.findSpecificCoverForAudioFile(file, finalLinkedRjId)
                 ?: AudioStorageHelper.getLocalCoverFile(context, finalLinkedRjId ?: rjid, file.absolutePath)
 
             val fallbackCoverUrl = if (finalLinkedRjId != null) {
@@ -575,16 +625,33 @@ object StorageSyncManager {
                 updated = updated.copy(linkedRjId = finalLinkedRjId)
                 needsUpdate = true
             }
-            if (existing.coverUrl.isBlank() && fallbackCover != null) {
+            val isMismatchedFolderCover = AudioStorageHelper.isMismatchedFolderCover(file, existing.coverUrl, finalLinkedRjId)
+            val fallbackCoverUrl = if (finalLinkedRjId != null) {
+                val prefix = if (finalLinkedRjId.length >= 2) finalLinkedRjId.substring(0, 2) else "RJ"
+                "https://img.dlsite.jp/modpub/images2/work/doujin/${prefix}0000/${finalLinkedRjId}_img_main.jpg"
+            } else ""
+
+            if (isMismatchedFolderCover) {
+                val correctedCover = fallbackCover
+                    ?: AudioStorageHelper.findSpecificCoverForAudioFile(file, finalLinkedRjId)
+                    ?: AudioStorageHelper.getLocalCoverFile(context, finalLinkedRjId ?: rjid, file.absolutePath)
+                val newCoverUrl = correctedCover?.absolutePath ?: fallbackCoverUrl
+                if (newCoverUrl != existing.coverUrl) {
+                    updated = updated.copy(coverUrl = newCoverUrl)
+                    needsUpdate = true
+                }
+            } else if (existing.coverUrl.isBlank() && fallbackCover != null) {
                 updated = updated.copy(coverUrl = fallbackCover.absolutePath)
                 needsUpdate = true
             }
 
-            val isCoverPlaceholder = existing.coverUrl.isBlank() || existing.coverUrl.contains("modpub/images2")
-            val isMetaIncomplete = existing.title.isBlank() || existing.title == rjid || existing.cv == "-" || existing.circle == "-"
+            val isCoverPlaceholder = updated.coverUrl.isBlank() ||
+                updated.coverUrl.contains("modpub/images2") ||
+                isMismatchedFolderCover
+            val isMetaIncomplete = updated.title.isBlank() || updated.title == rjid || updated.cv == "-" || updated.circle == "-"
 
             if (isOfficialRj && (isCoverPlaceholder || isMetaIncomplete)) {
-                scope.launch { fetchAndCacheMetadata(context, dao, existing) }
+                scope.launch { fetchAndCacheMetadata(context, dao, updated) }
             }
 
             if (needsUpdate) {
@@ -610,12 +677,12 @@ object StorageSyncManager {
 
             suspend fun scanDocRecursive(dir: DocumentFile, depth: Int, parentRj: String?) {
                 if (depth > 5) return
-                val rjHere = RJ_REGEX.find(dir.name.orEmpty())?.value?.uppercase() ?: parentRj
+                val rjHere = AudioStorageHelper.extractRjCode(dir.name.orEmpty()) ?: parentRj
                 val children = dir.listFiles()
                 val audioDocs = children.filter { it.isFile && AudioStorageHelper.AUDIO_EXTENSIONS.contains(it.name?.substringAfterLast('.', "")?.lowercase()) }
 
                 if (audioDocs.isNotEmpty()) {
-                    val rjCode = rjHere ?: audioDocs.firstNotNullOfOrNull { RJ_REGEX.find(it.name.orEmpty())?.value?.uppercase() }
+                    val rjCode = rjHere ?: audioDocs.firstNotNullOfOrNull { AudioStorageHelper.extractRjCode(it.name.orEmpty()) }
                     val isOfficialRj = rjCode != null
                     val rjid = rjCode ?: AudioStorageHelper.generateLocalId(dir.uri.toString())
 
@@ -671,30 +738,35 @@ object StorageSyncManager {
             val rjid = entity.linkedRjId ?: entity.rjid
             val meta = DLsiteScraper.fetchMetadata(rjid)
 
-            var resolvedCoverPath = entity.coverUrl
+            val audioF = File(entity.localFilePath)
+            val isMismatched = if (audioF.isFile) AudioStorageHelper.isMismatchedFolderCover(audioF, entity.coverUrl, rjid) else false
+            var resolvedCoverPath = if (isMismatched) "" else entity.coverUrl
             val localCover = AudioStorageHelper.getLocalCoverFile(context, rjid, entity.localFilePath)
 
             if (localCover != null && localCover.exists() && localCover.length() > 0) {
                 resolvedCoverPath = localCover.absolutePath
-            } else if (!meta.coverUrl.isNullOrBlank()) {
-                val coversDir = File(context.cacheDir, "covers").apply { if (!exists()) mkdirs() }
-                val targetCoverFile = File(coversDir, "${rjid.uppercase()}.jpg")
+            } else {
+                val targetCoverUrl = if (!meta.coverUrl.isNullOrBlank()) meta.coverUrl else DLsiteScraper.resolveBestCoverUrl(rjid)
+                if (targetCoverUrl.isNotBlank()) {
+                    val coversDir = File(context.cacheDir, "covers").apply { if (!exists()) mkdirs() }
+                    val targetCoverFile = File(coversDir, "${rjid.uppercase()}.jpg")
 
-                val req = Request.Builder()
-                    .url(meta.coverUrl)
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                    .header("Referer", "https://japaneseasmr.com")
-                    .build()
+                    val req = Request.Builder()
+                        .url(targetCoverUrl)
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                        .header("Referer", "https://japaneseasmr.com")
+                        .build()
 
-                val resp = okHttpClient.newCall(req).execute()
-                if (resp.isSuccessful) {
-                    resp.body?.byteStream()?.use { input ->
-                        FileOutputStream(targetCoverFile).use { output ->
-                            input.copyTo(output)
+                    val resp = okHttpClient.newCall(req).execute()
+                    if (resp.isSuccessful) {
+                        resp.body?.byteStream()?.use { input ->
+                            FileOutputStream(targetCoverFile).use { output ->
+                                input.copyTo(output)
+                            }
                         }
-                    }
-                    if (targetCoverFile.exists() && targetCoverFile.length() > 0) {
-                        resolvedCoverPath = targetCoverFile.absolutePath
+                        if (targetCoverFile.exists() && targetCoverFile.length() > 0) {
+                            resolvedCoverPath = targetCoverFile.absolutePath
+                        }
                     }
                 }
             }

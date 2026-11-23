@@ -81,8 +81,61 @@ object AudioStorageHelper {
 
     val AUDIO_EXTENSIONS = setOf("m4a", "mp3", "aac", "flac", "wav", "ogg", "wma")
     val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
+    val RJ_EXTRACT_REGEX = Regex("(?:RJ|VJ|BJ)[-_ ]?(\\d{6,8})", RegexOption.IGNORE_CASE)
     private val COVER_CANDIDATE_NAMES = listOf("cover", "folder", "front", "main", "poster", "thumb", "artwork", "default")
     private val IMAGE_SUBDIRECTORIES = listOf("thumb", "thumbnail", "img", "image", "images", "jacket", "cover", "サムネイル", "画像")
+
+    /**
+     * Mengekstrak dan menormalisasi kode karya DLsite (RJ, VJ, atau BJ) menjadi format kanonikal (misal: RJ01081584).
+     * Mendukung variasi pemisah seperti RJ-01081584, RJ_01081584, atau RJ 01081584.
+     */
+    fun extractRjCode(text: String?): String? {
+        if (text.isNullOrBlank()) return null
+        val match = RJ_EXTRACT_REGEX.find(text) ?: return null
+        val raw = match.value.uppercase()
+        val prefix = raw.take(2)
+        val digits = raw.filter { it.isDigit() }
+        return if (digits.length in 6..8) "$prefix$digits" else null
+    }
+
+    /**
+     * Mengekstrak kode RJ dari metadata ID3 tag internal audio (Title, Album, Artist, Composer)
+     * atau berkas lembar cue/lrc pendamping.
+     */
+    fun extractRjFromAudioMetadata(file: File): String? {
+        if (!file.exists() || !file.isFile || file.length() == 0L) return null
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(file.absolutePath)
+            val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+            extractRjCode(title)?.let { return it }
+
+            val album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+            extractRjCode(album)?.let { return it }
+
+            val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            extractRjCode(artist)?.let { return it }
+
+            val author = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_AUTHOR)
+            extractRjCode(author)?.let { return it }
+
+            val composer = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_COMPOSER)
+            extractRjCode(composer)?.let { return it }
+        } catch (e: Exception) {
+        } finally {
+            try { retriever.release() } catch (e: Exception) {}
+        }
+
+        try {
+            val cueFile = File(file.parentFile, "${file.nameWithoutExtension}.cue")
+            if (cueFile.exists() && cueFile.isFile) {
+                val cueText = cueFile.readText()
+                extractRjCode(cueText)?.let { return it }
+            }
+        } catch (e: Exception) {}
+
+        return null
+    }
 
     /**
      * Natural sort order comparator untuk file bernomor (contoh: 1.mp3, 2.mp3, 10.mp3).
@@ -267,12 +320,11 @@ object AudioStorageHelper {
      * Mencari kode RJ ke atas hierarki folder (ancestor) hingga mencapai boundary/root direktori.
      */
     fun findRjCodeInPath(fileOrFolder: File, rootBoundary: File? = null): String? {
-        val rjRegex = Regex("((?:RJ|VJ|BJ)\\d{6,8})", RegexOption.IGNORE_CASE)
         var curr: File? = fileOrFolder
         val stopPath = rootBoundary?.canonicalPath
         while (curr != null) {
-            val match = rjRegex.find(curr.name)
-            if (match != null) return match.value.uppercase()
+            val match = extractRjCode(curr.name)
+            if (match != null) return match
             if (stopPath != null && curr.canonicalPath.equals(stopPath, ignoreCase = true)) break
             curr = curr.parentFile
         }
@@ -492,6 +544,99 @@ object AudioStorageHelper {
     }
 
     /**
+     * Mencari cover art yang secara spesifik milik file audio ini:
+     * 1. Companion image dengan nama berkas stem identik (misal: audio1.mp3 -> audio1.jpg/png/webp).
+     * 2. Berkas gambar di folder yang namanya memuat kode RJ yang sama (misal: RJ01081584.jpg).
+     */
+    fun findSpecificCoverForAudioFile(audioFile: File, rjCode: String? = null): File? {
+        val parent = audioFile.parentFile ?: return null
+        if (!parent.exists() || !parent.isDirectory) return null
+
+        val nameWithoutExt = audioFile.nameWithoutExtension
+        // 1. Companion cover persis dengan nama stem file audio
+        for (ext in IMAGE_EXTENSIONS) {
+            val companion = File(parent, "$nameWithoutExt.$ext")
+            if (companion.exists() && companion.isFile && companion.length() > 0) {
+                return companion
+            }
+        }
+
+        // 2. Berkas gambar yang memuat kode RJ spesifik audio ini
+        val targetRj = (rjCode ?: extractRjCode(audioFile.name))?.uppercase()?.trim()
+        if (!targetRj.isNullOrBlank()) {
+            val images = getAllLocalImagesInFolder(parent)
+            val rjImage = images.firstOrNull { img ->
+                img.name.uppercase().contains(targetRj)
+            }
+            if (rjImage != null && rjImage.exists() && rjImage.length() > 0) {
+                return rjImage
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * Memeriksa apakah folder fisik merupakan folder khusus untuk 1 karya saja:
+     * - Hanya memiliki <= 1 file audio di dalamnya, ATAU
+     * - Nama folder memuat rjCode dan tidak memiliki file audio dengan kode RJ yang berbeda.
+     */
+    fun isDedicatedSingleWorkFolder(folder: File, rjCode: String? = null): Boolean {
+        if (!folder.exists() || !folder.isDirectory) return false
+        val audios = getAudioFilesInFolder(folder)
+        if (audios.size <= 1) return true
+        val cleanRj = rjCode?.uppercase()?.trim()
+        if (!cleanRj.isNullOrBlank() && folder.name.uppercase().contains(cleanRj)) {
+            val rjs = audios.mapNotNull { extractRjCode(it.name) }.distinct()
+            return rjs.isEmpty() || (rjs.size == 1 && rjs.first().equals(cleanRj, ignoreCase = true))
+        }
+        return false
+    }
+
+    /**
+     * Memvalidasi apakah coverUrl saat ini merupakan cover folder yang salah waris (bocor ke file audio individual).
+     * Mengembalikan true jika coverUrl adalah cover lokal yang tidak cocok dengan audioFile ini.
+     */
+    fun isMismatchedFolderCover(audioFile: File, coverUrl: String?, rjCode: String?): Boolean {
+        if (coverUrl.isNullOrBlank()) return false
+        if (coverUrl.startsWith("http://") || coverUrl.startsWith("https://")) return false
+        val cover = File(coverUrl)
+        if (!cover.exists() || cover.length() == 0L) return true
+
+        val parent = audioFile.parentFile ?: return false
+        val cleanRj = rjCode?.uppercase()?.trim()
+
+        // 1. Cover resmi tersimpan di direktori cache covers -> valid
+        val canonical = try { cover.canonicalPath } catch (e: Exception) { cover.absolutePath }
+        if (canonical.contains("covers") && (cleanRj.isNullOrBlank() || cover.name.uppercase().contains(cleanRj))) {
+            return false
+        }
+
+        // 2. Companion cover persis dengan nama stem audio -> valid
+        if (cover.nameWithoutExtension.equals(audioFile.nameWithoutExtension, ignoreCase = true)) {
+            return false
+        }
+
+        // 3. Nama berkas cover memuat kode RJ karya ini -> valid
+        if (!cleanRj.isNullOrBlank() && cover.name.uppercase().contains(cleanRj)) {
+            return false
+        }
+
+        // 4. Jika cover berada di parent folder audio:
+        val coverParent = cover.parentFile
+        if (coverParent != null && coverParent.canonicalPath.equals(parent.canonicalPath, ignoreCase = true)) {
+            val audios = getAudioFilesInFolder(parent)
+            // Jika folder hanya memuat 1 file audio, maka cover.jpg/folder.jpg adalah milik audio ini
+            if (audios.size <= 1) return false
+            // Namun jika folder memuat >= 2 audio (multi-audio non-album), cover generik adalah salah waris!
+            return true
+        }
+
+        // Cover berada di folder luar / hierarki lebih tinggi yang tidak spesifik -> mismatch
+        return true
+    }
+
+    /**
      * Mengambil file cover lokal instan (0ms) dari cache, cover folder fisik, atau mengekstrak dari embedded audio.
      */
     fun getLocalCoverFile(context: Context, rjid: String, audioFilePath: String?): File? {
@@ -500,10 +645,12 @@ object AudioStorageHelper {
         localCoverCache[cacheKey]?.let { return it }
 
         val coversDir = File(context.cacheDir, "covers")
-        val cachedCover = File(coversDir, "$cleanRj.jpg")
-        if (cachedCover.exists() && cachedCover.length() > 0) {
-            localCoverCache[cacheKey] = cachedCover
-            return cachedCover
+        if (cleanRj.isNotBlank()) {
+            val cachedCover = File(coversDir, "$cleanRj.jpg")
+            if (cachedCover.exists() && cachedCover.length() > 0) {
+                localCoverCache[cacheKey] = cachedCover
+                return cachedCover
+            }
         }
 
         if (!audioFilePath.isNullOrBlank()) {
@@ -520,27 +667,42 @@ object AudioStorageHelper {
                         return getLocalCoverFile(context, rjid, firstAudio.absolutePath)
                     }
                 } else if (fileOrDir.length() > 0) {
-                    val parent = fileOrDir.parentFile
-                    if (parent != null && parent.exists()) {
-                        val folderCover = findLocalCoverArt(parent)
-                        if (folderCover != null && folderCover.exists() && folderCover.length() > 0) {
-                            localCoverCache[cacheKey] = folderCover
-                            return folderCover
-                        }
+                    // 1. Cek cover spesifik milik file audio ini (companion atau RJ match)
+                    val specificCover = findSpecificCoverForAudioFile(fileOrDir, cleanRj)
+                    if (specificCover != null) {
+                        localCoverCache[cacheKey] = specificCover
+                        return specificCover
                     }
+
+                    // 2. Cek embedded picture dari metadata berkas audio
                     if (!coversDir.exists()) coversDir.mkdirs()
+                    val targetCachedFile = if (cleanRj.isNotBlank()) {
+                        File(coversDir, "$cleanRj.jpg")
+                    } else {
+                        File(coversDir, "${generateLocalId(fileOrDir.absolutePath)}.jpg")
+                    }
                     val retriever = MediaMetadataRetriever()
                     try {
                         retriever.setDataSource(fileOrDir.absolutePath)
                         val pic = retriever.embeddedPicture
                         if (pic != null && pic.isNotEmpty()) {
-                            FileOutputStream(cachedCover).use { it.write(pic) }
-                            localCoverCache[cacheKey] = cachedCover
-                            return cachedCover
+                            FileOutputStream(targetCachedFile).use { it.write(pic) }
+                            localCoverCache[cacheKey] = targetCachedFile
+                            return targetCachedFile
                         }
                     } catch (e: Exception) {
                     } finally {
                         try { retriever.release() } catch (e: Exception) {}
+                    }
+
+                    // 3. Hanya gunakan cover parent folder JIKA parent adalah folder khusus 1 karya
+                    val parent = fileOrDir.parentFile
+                    if (parent != null && parent.exists() && isDedicatedSingleWorkFolder(parent, cleanRj)) {
+                        val folderCover = findLocalCoverArt(parent)
+                        if (folderCover != null && folderCover.exists() && folderCover.length() > 0) {
+                            localCoverCache[cacheKey] = folderCover
+                            return folderCover
+                        }
                     }
                 }
             }

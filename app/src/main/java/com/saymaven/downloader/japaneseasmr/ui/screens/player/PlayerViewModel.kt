@@ -1490,10 +1490,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = _playlist.value, startPositionMs: Long = 0L) {
+        val cleanRj = history.linkedRjId ?: history.rjid
         val earlyCover = if (!history.coverUrl.isNullOrBlank() && File(history.coverUrl).exists()) {
-            history.coverUrl
+            val audioF = File(history.localFilePath)
+            if (audioF.isFile && AudioStorageHelper.isMismatchedFolderCover(audioF, history.coverUrl, cleanRj)) {
+                val cached = AudioStorageHelper.getLocalCoverFile(getApplication(), cleanRj, history.localFilePath)
+                cached?.absolutePath ?: history.coverUrl
+            } else {
+                history.coverUrl
+            }
         } else {
-            val cachedCover = AudioStorageHelper.getLocalCoverFile(getApplication(), history.rjid, history.localFilePath)
+            val cachedCover = AudioStorageHelper.getLocalCoverFile(getApplication(), cleanRj, history.localFilePath)
             cachedCover?.absolutePath ?: history.coverUrl
         }
         if (!earlyCover.isNullOrBlank()) {
@@ -1526,9 +1533,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val tracks = withContext(Dispatchers.IO) { AudioStorageHelper.getAudioFilesInFolder(folder) }
                 if (tracks.isEmpty()) return@launch
 
-                val customCover = if (!history.coverUrl.isNullOrBlank() && File(history.coverUrl).exists()) history.coverUrl else null
+                val cleanRj = history.linkedRjId ?: history.rjid
+                val customCover = if (!history.coverUrl.isNullOrBlank() && File(history.coverUrl).exists()) {
+                    if (targetFile.isFile && AudioStorageHelper.isMismatchedFolderCover(targetFile, history.coverUrl, cleanRj)) {
+                        null
+                    } else {
+                        history.coverUrl
+                    }
+                } else null
                 val localCover = customCover ?: withContext(Dispatchers.IO) {
-                    AudioStorageHelper.getLocalCoverFile(getApplication(), history.rjid, targetFile.absolutePath)?.absolutePath
+                    AudioStorageHelper.getLocalCoverFile(getApplication(), cleanRj, targetFile.absolutePath)?.absolutePath
                 }
                 val finalCover = localCover ?: history.coverUrl
                 val coverBytes = loadArtworkBytes(targetFile.absolutePath, finalCover)
@@ -1634,9 +1648,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 currentAlbumHistory = null
                 calculateAudioSpecs(targetFile)
 
-                val customCover = if (!history.coverUrl.isNullOrBlank() && File(history.coverUrl).exists()) history.coverUrl else null
+                val cleanRj = history.linkedRjId ?: history.rjid
+                val customCover = if (!history.coverUrl.isNullOrBlank() && File(history.coverUrl).exists()) {
+                    if (targetFile.isFile && AudioStorageHelper.isMismatchedFolderCover(targetFile, history.coverUrl, cleanRj)) {
+                        null
+                    } else {
+                        history.coverUrl
+                    }
+                } else null
                 val localCover = customCover ?: withContext(Dispatchers.IO) {
-                    AudioStorageHelper.getLocalCoverFile(getApplication(), history.rjid, targetFile.absolutePath)?.absolutePath
+                    AudioStorageHelper.getLocalCoverFile(getApplication(), cleanRj, targetFile.absolutePath)?.absolutePath
                 }
                 val finalCover = localCover ?: history.coverUrl
                 val coverBytes = loadArtworkBytes(targetFile.absolutePath, finalCover)

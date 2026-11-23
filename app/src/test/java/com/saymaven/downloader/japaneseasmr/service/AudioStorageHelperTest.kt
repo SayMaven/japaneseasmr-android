@@ -151,4 +151,73 @@ class AudioStorageHelperTest {
         assertTrue("Companion .cue must be moved", File(movedFile.parentFile, "RJ123456.cue").exists())
         assertTrue("Companion .jpg must be moved", File(movedFile.parentFile, "RJ123456.jpg").exists())
     }
+
+    @Test
+    fun testExtractRjCode_handlesVariationsAndNormalizes() {
+        assertEquals("RJ01081584", AudioStorageHelper.extractRjCode("RJ01081584"))
+        assertEquals("RJ01081584", AudioStorageHelper.extractRjCode("[RJ-01081584] Title"))
+        assertEquals("VJ12345678", AudioStorageHelper.extractRjCode("vj_12345678"))
+        assertEquals("BJ123456", AudioStorageHelper.extractRjCode("bj 123456"))
+        assertEquals(null, AudioStorageHelper.extractRjCode("plain_audio_file.mp3"))
+        assertEquals(null, AudioStorageHelper.extractRjCode("RJ1234"))
+    }
+
+    @Test
+    fun testFindSpecificCoverForAudioFile_resolvesCompanionAndRjMatchingImage() {
+        val root = tempFolder.newFolder("MultiAudioCollection")
+        val audio1 = File(root, "voice_track_01.mp3").apply { writeText("audio") }
+        val audio2 = File(root, "[RJ01081584] Work.mp3").apply { writeText("audio") }
+        val audio3 = File(root, "unrelated_track.mp3").apply { writeText("audio") }
+
+        val companion1 = File(root, "voice_track_01.jpg").apply { writeText("image 1") }
+        val rjImage2 = File(root, "RJ01081584_img_main.jpg").apply { writeText("image 2") }
+        File(root, "cover.jpg").apply { writeText("generic blanket cover") }
+
+        // audio1 matches its companion stem
+        val resolvedCover1 = AudioStorageHelper.findSpecificCoverForAudioFile(audio1)
+        assertNotNull(resolvedCover1)
+        assertEquals(companion1.canonicalPath, resolvedCover1?.canonicalPath)
+
+        // audio2 matches image containing its RJ code
+        val resolvedCover2 = AudioStorageHelper.findSpecificCoverForAudioFile(audio2, "RJ01081584")
+        assertNotNull(resolvedCover2)
+        assertEquals(rjImage2.canonicalPath, resolvedCover2?.canonicalPath)
+
+        // audio3 has no companion or RJ match; must NOT pick the generic cover.jpg
+        val resolvedCover3 = AudioStorageHelper.findSpecificCoverForAudioFile(audio3)
+        assertEquals(null, resolvedCover3)
+    }
+
+    @Test
+    fun testIsDedicatedSingleWorkFolder_identifiesSingleVsMultiTrackFolders() {
+        val root = tempFolder.newFolder("FolderStructure")
+        val singleFolder = File(root, "SingleWork").apply { mkdir() }
+        File(singleFolder, "track.mp3").writeText("audio")
+
+        val multiFolder = File(root, "HardcoreCollection").apply { mkdir() }
+        File(multiFolder, "audio1.mp3").writeText("audio")
+        File(multiFolder, "audio2.mp3").writeText("audio")
+        File(multiFolder, "audio3.mp3").writeText("audio")
+
+        assertTrue("Single track folder is dedicated", AudioStorageHelper.isDedicatedSingleWorkFolder(singleFolder))
+        org.junit.Assert.assertFalse("Collection folder with multiple audios is not dedicated", AudioStorageHelper.isDedicatedSingleWorkFolder(multiFolder))
+    }
+
+    @Test
+    fun testIsMismatchedFolderCover_detectsBlanketCoverOnIndividualAudio() {
+        val root = tempFolder.newFolder("Hardcore")
+        val audio1 = File(root, "[RJ01081584] Audio1.mp3").apply { writeText("audio") }
+        File(root, "Audio2.mp3").apply { writeText("audio") }
+        val blanketCover = File(root, "cover.jpg").apply { writeText("blanket cover") }
+        val specificCover = File(root, "[RJ01081584] Audio1.jpg").apply { writeText("specific cover") }
+
+        // A blanket cover in a multi-audio folder is a mismatch for individual audios
+        assertTrue(AudioStorageHelper.isMismatchedFolderCover(audio1, blanketCover.absolutePath, "RJ01081584"))
+
+        // A specific companion cover matching stem is NOT a mismatch
+        org.junit.Assert.assertFalse(AudioStorageHelper.isMismatchedFolderCover(audio1, specificCover.absolutePath, "RJ01081584"))
+
+        // Remote DLsite URLs are NOT mismatched
+        org.junit.Assert.assertFalse(AudioStorageHelper.isMismatchedFolderCover(audio1, "https://img.dlsite.jp/modpub/images2/work/doujin/RJ01080000/RJ01081584_img_main.jpg", "RJ01081584"))
+    }
 }
