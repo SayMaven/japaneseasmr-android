@@ -152,6 +152,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         preferencesManager.getInitialAutoTranslateDetail()
     )
 
+    val autoTranslatePlayer = preferencesManager.autoTranslatePlayerFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        preferencesManager.getInitialAutoTranslatePlayer()
+    )
+
     val autoTranslateLists = preferencesManager.autoTranslateListsFlow.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
@@ -282,6 +288,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setAutoTranslateDetail(enabled: Boolean) {
         viewModelScope.launch {
             preferencesManager.setAutoTranslateDetail(enabled)
+        }
+    }
+
+    fun setAutoTranslatePlayer(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesManager.setAutoTranslatePlayer(enabled)
         }
     }
 

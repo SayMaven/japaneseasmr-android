@@ -92,7 +92,7 @@ fun PlaylistScreen(
     val currentRjId by viewModel.currentRjId.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val sortState by viewModel.sortState.collectAsState()
-    val isTranslationActive by viewModel.isTranslationActive.collectAsState()
+    val isTranslationActive by viewModel.isPlaylistTranslationActive.collectAsState()
     val playlistTranslatedTitles by viewModel.playlistTranslatedTitles.collectAsState()
     val homeViewMode by viewModel.homeViewMode.collectAsState()
     val isGridMode = (homeViewMode == "grid")
@@ -285,7 +285,7 @@ fun PlaylistScreen(
 
             // Dynamic Title Translate Button
             IconButton(
-                onClick = { viewModel.toggleTranslation(context) },
+                onClick = { viewModel.togglePlaylistTranslation() },
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(

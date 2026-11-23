@@ -93,9 +93,23 @@ object ChineseAsmrGlossary {
     )
 
     /**
-     * Mendeteksi apakah teks mengandung karakter Hanzi/Mandarin.
+     * Mendeteksi apakah teks mengandung huruf Kana Jepang (Hiragana/Katakana).
+     */
+    fun containsJapaneseKana(text: String): Boolean {
+        for (char in text) {
+            val ub = Character.UnicodeBlock.of(char)
+            if (ub == Character.UnicodeBlock.HIRAGANA || ub == Character.UnicodeBlock.KATAKANA) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Mendeteksi apakah teks mengandung karakter Hanzi/Mandarin murni (bukan teks Jepang).
      */
     fun containsChinese(text: String): Boolean {
+        if (containsJapaneseKana(text)) return false
         for (char in text) {
             val ub = Character.UnicodeBlock.of(char)
             if (ub == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||

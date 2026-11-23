@@ -209,14 +209,15 @@ object TranslationService {
         }
 
         val normalizedTl = normalizeTargetLang(effectiveTargetLang)
+        val detectedSl = if (ChineseAsmrGlossary.containsJapaneseKana(preProcessed) || ChineseAsmrGlossary.containsJapaneseKana(trimmed)) "ja" else "auto"
 
         // 3. Panggil Provider Aktif via Network Semaphore
         val rawOnline = networkSemaphore.withPermit {
             when (effectiveProvider.lowercase()) {
-                "microsoft" -> translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl)
-                "youdao" -> translateViaYoudaoWeb(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl)
-                "llm" -> translateViaLlmSingle(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl)
-                else -> translateViaGoogleWeb(preProcessed, normalizedTl)
+                "microsoft" -> translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl)
+                "youdao" -> translateViaYoudaoWeb(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl)
+                "llm" -> translateViaLlmSingle(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl)
+                else -> translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl)
             }
         }
 
@@ -323,10 +324,11 @@ object TranslationService {
             }
 
             if (toTranslateOnline.isNotEmpty()) {
-                val chunks = toTranslateOnline.chunked(30)
+                val (jaItems, otherItems) = toTranslateOnline.partition { ChineseAsmrGlossary.containsJapaneseKana(it) }
+                val chunkPairs = jaItems.chunked(15).map { it to "ja" } + otherItems.chunked(15).map { it to "auto" }
 
                 coroutineScope {
-                    chunks.map { chunk ->
+                    chunkPairs.map { (chunk, sourceLang) ->
                         async(Dispatchers.IO) {
                             // Pre-process chunk di Dispatchers.Default
                             val preparedChunk = withContext(Dispatchers.Default) {
@@ -345,9 +347,9 @@ object TranslationService {
 
                             val batchResponse = networkSemaphore.withPermit {
                                 when (effectiveProvider.lowercase()) {
-                                    "microsoft" -> translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl)
-                                    "youdao" -> translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl)
-                                    else -> translateViaGoogleWeb(taggedPayload, normalizedTl)
+                                    "microsoft" -> translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
+                                    "youdao" -> translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
+                                    else -> translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
                                 }
                             }
 
@@ -682,13 +684,15 @@ object TranslationService {
         }
     }
 
-    private fun translateViaGoogleWeb(text: String, tl: String): String? {
+    private fun translateViaGoogleWeb(text: String, tl: String, sl: String = "auto"): String? {
         return try {
             val encoded = URLEncoder.encode(text, "UTF-8")
-            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t&q=$encoded"
+            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t"
+            val formBody = "q=$encoded".toRequestBody("application/x-www-form-urlencoded; charset=utf-8".toMediaType())
             val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", USER_AGENT)
+                .post(formBody)
                 .build()
 
             client.newCall(req).execute().use { resp ->

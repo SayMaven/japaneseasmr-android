@@ -465,6 +465,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _isTranslationActive = MutableStateFlow(false)
     val isTranslationActive = _isTranslationActive.asStateFlow()
 
+    // Status terjemahan khusus daftar/header Koleksi Lokal (terpisah dari terjemahan pemutar)
+    private val _isPlaylistTranslationActive = MutableStateFlow(false)
+    val isPlaylistTranslationActive = _isPlaylistTranslationActive.asStateFlow()
+
     private val _isTranslating = MutableStateFlow(false)
     val isTranslating = _isTranslating.asStateFlow()
 
@@ -906,8 +910,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun observeTranslationPreference() {
         viewModelScope.launch {
-            prefs.autoTranslateListsFlow.distinctUntilChanged().collect { autoActive ->
+            prefs.autoTranslatePlayerFlow.distinctUntilChanged().collect { autoActive ->
                 _isTranslationActive.value = autoActive
+                if (autoActive) {
+                    if (!_currentRjId.value.isNullOrBlank()) {
+                        loadOrFetchTranslations(_currentRjId.value)
+                    }
+                } else {
+                    _translatedTitle.value = null
+                    _translatedChapters.value = emptyList()
+                }
+            }
+        }
+        viewModelScope.launch {
+            prefs.autoTranslateListsFlow.distinctUntilChanged().collect { autoActive ->
+                _isPlaylistTranslationActive.value = autoActive
                 if (!autoActive) {
                     _playlistTranslatedTitles.value = emptyMap()
                 }
@@ -920,10 +937,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     isFirstLang = false
                     return@collect
                 }
-                if (_isTranslationActive.value) {
+                if (_isPlaylistTranslationActive.value) {
                     _playlistTranslatedTitles.value = emptyMap()
                 }
-                if (!_currentRjId.value.isNullOrBlank()) {
+                if (_isTranslationActive.value && !_currentRjId.value.isNullOrBlank()) {
                     loadOrFetchTranslations(_currentRjId.value, forceOnline = true)
                 }
             }
@@ -2234,6 +2251,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** Toggle terjemahan pemutar (judul + bab) saja; tidak memengaruhi daftar Koleksi Lokal. */
     fun toggleTranslation(context: Context? = null) {
         val next = !_isTranslationActive.value
         _isTranslationActive.value = next
@@ -2242,13 +2260,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (!_currentRjId.value.isNullOrBlank()) {
                     loadOrFetchTranslations(_currentRjId.value, forceOnline = _isOnlineStreaming.value)
                 }
+            } else {
+                _translatedTitle.value = null
+                _translatedChapters.value = emptyList()
+            }
+        }
+    }
+
+    /** Toggle terjemahan judul pada header Koleksi Lokal saja; tidak memengaruhi pemutar. */
+    fun togglePlaylistTranslation() {
+        val next = !_isPlaylistTranslationActive.value
+        _isPlaylistTranslationActive.value = next
+        viewModelScope.launch {
+            if (next) {
                 val visible = _playlist.value.take(40)
                 if (visible.isNotEmpty()) {
                     translateCurrentPageTitles(visible, forceRefresh = true)
                 }
             } else {
-                _translatedTitle.value = null
-                _translatedChapters.value = emptyList()
                 _playlistTranslatedTitles.value = emptyMap()
             }
         }
@@ -2265,7 +2294,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
             val provider = TranslationService.getActiveProvider(getApplication())
 
-            val needTranslation = if (forceRefresh) items else items.filter { it.translatedTitle.isNullOrBlank() }
+            val lastLang = sp.getString("last_playlist_trans_lang", null)
+            val langChanged = lastLang != targetLang
+            if (langChanged) {
+                sp.edit().putString("last_playlist_trans_lang", targetLang).apply()
+                if (lastLang != null) {
+                    historyDao.clearAllTranslations()
+                    clearInMemoryTranslations()
+                }
+            }
+
+            val effectiveForce = forceRefresh || langChanged
+            val needTranslation = if (effectiveForce) items else items.filter { it.translatedTitle.isNullOrBlank() }
             if (needTranslation.isEmpty()) {
                 val currentMap = _playlistTranslatedTitles.value.toMutableMap()
                 items.forEach { item ->
@@ -2298,7 +2338,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         items: List<com.saymaven.downloader.japaneseasmr.data.local.entity.PlaylistItemEntity>,
         forceRefresh: Boolean = false
     ) {
-        if (!_isTranslationActive.value || items.isEmpty()) return
+        if (!_isPlaylistTranslationActive.value || items.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
             val provider = TranslationService.getActiveProvider(getApplication())

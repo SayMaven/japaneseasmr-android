@@ -42,6 +42,7 @@ fun LanguageAndTranslationSettingsScreen(
     val autoTranslateLyrics by viewModel.autoTranslateLyrics.collectAsState()
     val autoTranslateDetail by viewModel.autoTranslateDetail.collectAsState()
     val autoTranslateLists by viewModel.autoTranslateLists.collectAsState()
+    val autoTranslatePlayer by viewModel.autoTranslatePlayer.collectAsState()
 
     val uiLanguages = listOf(
         "system" to stringResource(R.string.settings_lang_system),
@@ -298,6 +299,29 @@ fun LanguageAndTranslationSettingsScreen(
                             Switch(
                                 checked = autoTranslateDetail,
                                 onCheckedChange = { viewModel.setAutoTranslateDetail(it) }
+                            )
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.settings_auto_translate_player),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                text = stringResource(R.string.settings_auto_translate_player_desc),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = autoTranslatePlayer,
+                                onCheckedChange = { viewModel.setAutoTranslatePlayer(it) }
                             )
                         }
                     )

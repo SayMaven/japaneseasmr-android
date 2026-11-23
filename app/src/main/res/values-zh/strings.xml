@@ -607,6 +607,8 @@
     <string name="settings_auto_translate_lyrics_desc">播放音频时自动翻译歌词和字幕</string>
     <string name="settings_auto_translate_detail">自动翻译详情页</string>
     <string name="settings_auto_translate_detail_desc">自动翻译作品详情页的标题和文件树</string>
+    <string name="settings_auto_translate_player">自动翻译播放器</string>
+    <string name="settings_auto_translate_player_desc">自动翻译播放器中的标题和章节列表</string>
     <string name="settings_auto_translate_lists">自动翻译列表标题</string>
     <string name="settings_auto_translate_lists_desc">自动翻译探索和本地收藏的作品标题</string>
     <string name="settings_lang_and_trans_title">语言与翻译</string>

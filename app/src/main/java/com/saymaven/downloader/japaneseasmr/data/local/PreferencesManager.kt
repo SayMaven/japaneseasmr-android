@@ -37,6 +37,7 @@ class PreferencesManager(private val context: Context) {
         val KEY_AUTO_TRANSLATE_LYRICS = booleanPreferencesKey("auto_translate_lyrics")
         val KEY_AUTO_TRANSLATE_DETAIL = booleanPreferencesKey("auto_translate_detail")
         val KEY_AUTO_TRANSLATE_LISTS = booleanPreferencesKey("auto_translate_lists")
+        val KEY_AUTO_TRANSLATE_PLAYER = booleanPreferencesKey("auto_translate_player")
 
         // Audio Player Settings
         val KEY_EXCLUSIVE_USB_DAC = booleanPreferencesKey("exclusive_usb_dac")
@@ -219,7 +220,11 @@ class PreferencesManager(private val context: Context) {
     }
 
     val appLanguageFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[KEY_APP_LANGUAGE] ?: "system"
+        val lang = preferences[KEY_APP_LANGUAGE] ?: "system"
+        if (fastSp.getString("cached_app_language", null) != lang) {
+            fastSp.edit().putString("cached_app_language", lang).apply()
+        }
+        lang
     }
 
     suspend fun setAppLanguage(lang: String) {
@@ -286,7 +291,11 @@ class PreferencesManager(private val context: Context) {
     fun getInitialMergeDownloadedAudio(): Boolean = fastSp.getBoolean("cached_merge_downloaded_audio", true)
 
     val translationLanguageFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[KEY_TRANSLATION_LANGUAGE] ?: "auto"
+        val lang = preferences[KEY_TRANSLATION_LANGUAGE] ?: "auto"
+        if (fastSp.getString("cached_trans_language", null) != lang) {
+            fastSp.edit().putString("cached_trans_language", lang).apply()
+        }
+        lang
     }.distinctUntilChanged()
 
     val isTranslationActiveFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -787,6 +796,19 @@ class PreferencesManager(private val context: Context) {
     val autoTranslateListsFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_AUTO_TRANSLATE_LISTS] ?: false
     }.distinctUntilChanged()
+
+    val autoTranslatePlayerFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_AUTO_TRANSLATE_PLAYER] ?: false
+    }.distinctUntilChanged()
+
+    fun getInitialAutoTranslatePlayer(): Boolean = fastSp.getBoolean("cached_auto_translate_player", false)
+
+    suspend fun setAutoTranslatePlayer(enabled: Boolean) {
+        fastSp.edit().putBoolean("cached_auto_translate_player", enabled).apply()
+        context.dataStore.edit { preferences ->
+            preferences[KEY_AUTO_TRANSLATE_PLAYER] = enabled
+        }
+    }
 
     fun getInitialAutoTranslateLyrics(): Boolean = fastSp.getBoolean("cached_auto_translate_lyrics", true)
     fun getInitialAutoTranslateDetail(): Boolean = fastSp.getBoolean("cached_auto_translate_detail", false)

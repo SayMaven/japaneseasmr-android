@@ -607,6 +607,8 @@
     <string name="settings_auto_translate_lyrics_desc">音声再生時に歌詞・字幕を自動的に翻訳します</string>
     <string name="settings_auto_translate_detail">詳細ページの自動翻訳</string>
     <string name="settings_auto_translate_detail_desc">詳細ページのタイトルおよびファイル一覧を自動的に翻訳します</string>
+    <string name="settings_auto_translate_player">プレーヤーの自動翻訳</string>
+    <string name="settings_auto_translate_player_desc">プレーヤーのタイトルとチャプター一覧を自動翻訳します</string>
     <string name="settings_auto_translate_lists">リストタイトルの自動翻訳</string>
     <string name="settings_auto_translate_lists_desc">ASMR探索およびローカルコレクションのタイトルを自動翻訳します</string>
     <string name="settings_lang_and_trans_title">言語と翻訳</string>

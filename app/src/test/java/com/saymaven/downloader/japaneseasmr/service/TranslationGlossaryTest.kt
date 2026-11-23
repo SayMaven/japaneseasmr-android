@@ -1,5 +1,6 @@
 package com.saymaven.downloader.japaneseasmr.service
 
+import com.saymaven.downloader.japaneseasmr.service.glossary.ChineseAsmrGlossary
 import com.saymaven.downloader.japaneseasmr.service.glossary.IndonesianPostFilter
 import com.saymaven.downloader.japaneseasmr.service.glossary.JapaneseAsmrGlossary
 import org.junit.Assert.assertFalse
@@ -50,5 +51,16 @@ class TranslationGlossaryTest {
         assertTrue(refined2.contains("tunduk kenikmatan", ignoreCase = true))
         assertTrue(refined2.contains("Paman", ignoreCase = true))
         assertTrue(refined2.contains("kencan berbayar", ignoreCase = true))
+    }
+
+    @Test
+    fun testJapaneseTitleNotProcessedAsChinese() {
+        val jaTitle = "【繁体中文版】巨根でおじさんに中出しされるJK"
+        assertTrue(ChineseAsmrGlossary.containsJapaneseKana(jaTitle))
+        assertFalse("Japanese title with kana must not trigger Chinese preprocessor", ChineseAsmrGlossary.containsChinese(jaTitle))
+
+        val cnTitle = "【中文音声】大肉棒中出"
+        assertFalse(ChineseAsmrGlossary.containsJapaneseKana(cnTitle))
+        assertTrue("Pure Chinese title must trigger Chinese preprocessor", ChineseAsmrGlossary.containsChinese(cnTitle))
     }
 }

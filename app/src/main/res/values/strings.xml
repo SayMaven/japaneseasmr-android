@@ -601,6 +601,8 @@
     <string name="settings_auto_translate_lyrics_desc">Automatically translate lyrics/subtitles when playing audio</string>
     <string name="settings_auto_translate_detail">Auto-Translate Detail Page</string>
     <string name="settings_auto_translate_detail_desc">Automatically translate title and file tree on detail page</string>
+    <string name="settings_auto_translate_player">Auto-Translate Player</string>
+    <string name="settings_auto_translate_player_desc">Automatically translate the title and chapter list in the player</string>
     <string name="settings_auto_translate_lists">Auto-Translate List Titles</string>
     <string name="settings_auto_translate_lists_desc">Automatically translate work titles in Browse and Local Collection</string>
     <string name="settings_lang_and_trans_title">Language &amp; Translation</string>
