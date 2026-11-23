@@ -117,8 +117,10 @@ fun AsmrOneWorkDetailScreen(
                 }
                 collectTitles(fileTree)
                 val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLang, provider)
-                translatedNodeTitles = map
-                isFileTreeTranslated = true
+                if (map.entries.any { (k, v) -> !TranslationService.isPoisonedTranslation(k, v, targetLang) }) {
+                    translatedNodeTitles = map
+                    isFileTreeTranslated = true
+                }
             } finally {
                 isTranslatingFileTree = false
             }
@@ -247,14 +249,15 @@ fun AsmrOneWorkDetailScreen(
 
                     IconButton(
                         onClick = {
-                            if (!isTitleTranslated && (translatedTitleText == null || translatedTitleText == work.title)) {
+                            val targetLangNow = TranslationService.getActiveTargetLanguage(context)
+                            val hasValidTitle = !TranslationService.isPoisonedTranslation(work.title, translatedTitleText, targetLangNow)
+                            if (!isTitleTranslated && !hasValidTitle) {
                                 coroutineScope.launch {
                                     isTranslating = true
                                     try {
-                                        val targetLang = TranslationService.getActiveTargetLanguage(context)
                                         val provider = TranslationService.getActiveProvider(context)
-                                        val translated = TranslationService.translateText(work.title, targetLang, provider)
-                                        if (translated.isNotBlank() && translated != work.title) {
+                                        val translated = TranslationService.translateText(work.title, targetLangNow, provider)
+                                        if (!TranslationService.isPoisonedTranslation(work.title, translated, targetLangNow)) {
                                             translatedTitleText = translated
                                             isTitleTranslated = true
                                         }
@@ -495,12 +498,14 @@ fun AsmrOneWorkDetailScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    val hasValidTranslations = translatedNodeTitles.entries.any { (k, v) -> v.isNotBlank() && v != k }
+                                    val targetLangNow = TranslationService.getActiveTargetLanguage(context)
+                                    val hasValidTranslations = translatedNodeTitles.entries.any { (k, v) ->
+                                        !TranslationService.isPoisonedTranslation(k, v, targetLangNow)
+                                    }
                                     if (!isFileTreeTranslated && !hasValidTranslations) {
                                         coroutineScope.launch {
                                             isTranslatingFileTree = true
                                             try {
-                                                val targetLang = TranslationService.getActiveTargetLanguage(context)
                                                 val titlesToTranslate = mutableSetOf<String>()
                                                 fun collectTitles(nodes: List<AsmrOneFileNode>) {
                                                     for (node in nodes) {
@@ -516,9 +521,14 @@ fun AsmrOneWorkDetailScreen(
                                                 }
 
                                                 val provider = TranslationService.getActiveProvider(context)
-                                                val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLang, provider)
-                                                translatedNodeTitles = map
-                                                isFileTreeTranslated = true
+                                                val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLangNow, provider)
+                                                val anyValid = map.entries.any { (k, v) ->
+                                                    !TranslationService.isPoisonedTranslation(k, v, targetLangNow)
+                                                }
+                                                if (anyValid) {
+                                                    translatedNodeTitles = map
+                                                    isFileTreeTranslated = true
+                                                }
                                             } finally {
                                                 isTranslatingFileTree = false
                                             }

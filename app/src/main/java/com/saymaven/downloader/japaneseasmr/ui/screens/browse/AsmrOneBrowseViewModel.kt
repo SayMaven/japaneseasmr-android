@@ -370,35 +370,41 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
     fun toggleTranslation(context: Context) {
         val nextState = !_isTranslationActive.value
         _isTranslationActive.value = nextState
-        if (nextState) {
-            translateCurrentWorks(context, forceRefresh = true)
-        }
     }
 
-    fun translateCurrentWorks(context: Context = getApplication(), forceRefresh: Boolean = false) {
+    fun translateVisibleWorks(context: Context = getApplication(), visibleWorks: List<AsmrOneWork>) {
+        if (!_isTranslationActive.value || visibleWorks.isEmpty()) return
         translationJob?.cancel()
         translationJob = viewModelScope.launch {
             val targetLang = TranslationService.getActiveTargetLanguage(context)
             val provider = TranslationService.getActiveProvider(context)
             if (targetLang == "ja") return@launch
 
-            val currentMap = if (forceRefresh) mutableMapOf() else _translatedTitles.value.toMutableMap()
-            val worksToTranslate = if (forceRefresh) _works.value else _works.value.filter { 
+            val currentMap = _translatedTitles.value.toMutableMap()
+            val worksToTranslate = visibleWorks.filter {
                 val existing = currentMap[it.rjid]
-                existing.isNullOrBlank() || existing == it.title
+                TranslationService.isPoisonedTranslation(it.title, existing, targetLang)
             }
             if (worksToTranslate.isEmpty()) return@launch
 
             val titles = worksToTranslate.map { it.title }
             val batchResults = TranslationService.translateBatch(titles, targetLang, provider)
+            var changed = false
             for (w in worksToTranslate) {
                 val tr = batchResults[w.title]
-                if (!tr.isNullOrBlank() && tr != w.title) {
+                if (!tr.isNullOrBlank() && !TranslationService.isPoisonedTranslation(w.title, tr, targetLang)) {
                     currentMap[w.rjid] = tr
+                    changed = true
                 }
             }
-            _translatedTitles.value = HashMap(currentMap)
+            if (changed) {
+                _translatedTitles.value = HashMap(currentMap)
+            }
         }
+    }
+
+    fun translateCurrentWorks(context: Context = getApplication(), forceRefresh: Boolean = false) {
+        translateVisibleWorks(context, _works.value.take(10))
     }
 
     fun enqueueDownload(work: AsmrOneWork): Boolean {

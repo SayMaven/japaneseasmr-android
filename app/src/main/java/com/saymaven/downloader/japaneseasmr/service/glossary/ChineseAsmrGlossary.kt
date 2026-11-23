@@ -20,15 +20,15 @@ object ChineseAsmrGlossary {
         "马眼" to "尿道口",
         "龟头" to "阴茎头部",
 
-        // Anatomi Wanita (mencegah glitch kucing/cat atau sekadar lubang)
-        "小穴" to "女性阴道",
-        "骚穴" to "女性阴道",
-        "肉穴" to "女性阴道",
-        "骚逼" to "女性阴道",
-        "小逼" to "女性阴道",
-        "蜜穴" to "女性阴道",
-        "嫩穴" to "女性阴道",
-        "花穴" to "女性阴道",
+        // Anatomi Wanita (mencegah glitch kucing/cat atau sekadar lubang, tetap natural)
+        "小穴" to "私处",
+        "骚穴" to "私处",
+        "肉穴" to "私处",
+        "骚逼" to "私处",
+        "小逼" to "私处",
+        "蜜穴" to "私处",
+        "嫩穴" to "私处",
+        "花穴" to "私处",
         "小红豆" to "阴蒂",
         "骚乳" to "丰满乳房",
         "骚屁股" to "性感臀部",
@@ -67,18 +67,18 @@ object ChineseAsmrGlossary {
         "做爱" to "亲密性交",
         "寸止" to "忍耐高潮边缘",
 
-        // Desahan & Dialog Intim (mencegah "aku pergi")
-        "我要去了" to "我快要高潮绝顶了",
-        "要去了" to "我快要高潮绝顶了",
-        "去了去了" to "我高潮绝顶了",
-        "高潮了" to "达到高潮绝顶了",
-        "好舒服啊" to "感觉非常舒服非常享受",
-        "好舒服" to "感觉非常舒服享受",
-        "好爽" to "感觉太美妙享受了",
-        "爽死了" to "感觉太美妙享受了",
-        "太爽了" to "感觉太美妙享受了",
-        "不行了" to "快要忍不住了",
-        "受不了了" to "快要忍受不住快感了",
+        // Desahan & Dialog Intim (mencegah "aku pergi", tetap santai & natural)
+        "我要去了" to "我快要高潮了",
+        "要去了" to "快要高潮了",
+        "去了去了" to "高潮了",
+        "高潮了" to "高潮了",
+        "好舒服啊" to "好舒服啊",
+        "好舒服" to "好舒服",
+        "好爽" to "好爽啊",
+        "爽死了" to "舒服死了",
+        "太爽了" to "太舒服了",
+        "不行了" to "受不了了",
+        "受不了了" to "快受不了了",
         "饶了我吧" to "求求你饶了我吧",
         "不要停" to "请千万不要停下来",
         "再深一点" to "请再深入一点",
@@ -137,8 +137,10 @@ object ChineseAsmrGlossary {
 
     /**
      * Menormalisasi slang teks Mandarin sebelum dikirim ke mesin terjemahan.
+     * Jika [forLlm] = true, teks asli dikirim langsung agar LLM menjaga gaya percakapan alami.
      */
-    fun preProcessChinese(text: String): String {
+    fun preProcessChinese(text: String, forLlm: Boolean = false): String {
+        if (forLlm) return text
         var t = text
         for ((target, replacement) in CN_REPLACEMENTS) {
             if (t.contains(target)) {

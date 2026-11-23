@@ -237,13 +237,15 @@ object JapaneseAsmrGlossary {
     /**
      * Membersihkan fuseji dan menormalkan istilah khusus ASMR/DLsite pada judul
      * tanpa merusak tata bahasa alami Jepang.
+     * Jika [forLlm] = true, hanya membersihkan fuseji agar LLM menerima nuansa slang asli.
      */
-    fun preProcessJapanese(text: String): String {
+    fun preProcessJapanese(text: String, forLlm: Boolean = false): String {
         var t = text
         for ((regex, rep) in FUSEJI_RULES) {
             t = t.replace(regex, rep)
         }
         t = t.replace("○", "").replace("●", "").replace("×", "").replace("〇", "")
+        if (forLlm) return t
 
         // Slang & Onomatopoeia normalizations (tanpa sisipan kurung kaku)
         t = t.replace("シコシコ", "オナニー")
@@ -260,8 +262,8 @@ object JapaneseAsmrGlossary {
         t = t.replace("おちんちん", "ペニス")
         t = t.replace("ちんちん", "ペニス")
         t = t.replace("肉棒", "ペニス")
-        t = t.replace("おまんこ", "女性器")
-        t = t.replace("まんこ", "女性器")
+        t = t.replace("おまんこ", "ヴァギナ")
+        t = t.replace("まんこ", "ヴァギナ")
         t = t.replace("ザー汁", "精液")
 
         // Trope DLsite yang sering salah arti jika dibiarkan mentah
@@ -277,7 +279,6 @@ object JapaneseAsmrGlossary {
         t = t.replace("理解らせ調教", "懲らしめの調教")
         t = t.replace("わからせ", "懲らしめ")
         t = t.replace("理解らせ", "懲らしめ")
-        t = t.replace("快楽fall", "快楽堕ち")
         t = t.replace("ちマゾ", "マゾヒスト")
         t = t.replace("チマゾ", "マゾヒスト")
         t = t.replace("オナホ化", "オナホール化")

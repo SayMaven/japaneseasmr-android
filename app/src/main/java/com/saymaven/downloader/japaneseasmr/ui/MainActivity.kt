@@ -174,6 +174,12 @@ class MainActivity : ComponentActivity() {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val drawerScope = rememberCoroutineScope()
 
+                LaunchedEffect(Unit) {
+                    com.saymaven.downloader.japaneseasmr.service.TranslationService.translationErrorEvents.collect { errorMsg ->
+                        Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_SHORT).show()
+                    }
+                }
+
                 BackHandler(enabled = drawerState.isOpen) {
                     drawerScope.launch { drawerState.close() }
                 }

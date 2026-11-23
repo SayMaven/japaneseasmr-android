@@ -117,6 +117,31 @@ fun AsmrOneBrowseScreen(
         listState.scrollToItem(0)
     }
 
+    // Visible-first incremental translation: hanya terjemahkan karya yang terlihat di layar
+    LaunchedEffect(isTranslationActive, isListView, works) {
+        if (!isTranslationActive || works.isEmpty()) return@LaunchedEffect
+        snapshotFlow {
+            val visibleIndices = if (isListView) {
+                listState.layoutInfo.visibleItemsInfo.map { it.index }
+            } else {
+                gridState.layoutInfo.visibleItemsInfo.map { it.index }
+            }
+            if (visibleIndices.isEmpty()) {
+                works.take(8)
+            } else {
+                val minIdx = (visibleIndices.min() - 2).coerceAtLeast(0)
+                val maxIdx = (visibleIndices.max() + 2).coerceAtMost(works.lastIndex)
+                works.subList(minIdx, maxIdx + 1)
+            }
+        }.collect { visibleSlice ->
+            val missing = visibleSlice.filter { translatedTitles[it.rjid].isNullOrBlank() }
+            if (missing.isNotEmpty()) {
+                kotlinx.coroutines.delay(120)
+                viewModel.translateVisibleWorks(context, missing)
+            }
+        }
+    }
+
     LaunchedEffect(isOnline) {
         if (isOnline && works.isEmpty()) {
             viewModel.loadPage(viewModel.currentPage.value)

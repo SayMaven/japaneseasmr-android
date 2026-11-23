@@ -186,14 +186,29 @@ fun PlaylistScreen(
         displayedPlaylist.drop(start).take(pageSize)
     }
 
-    LaunchedEffect(isTranslationActive, pagedPlaylist) {
-        if (isTranslationActive && pagedPlaylist.isNotEmpty()) {
-            // Hanya terjemahkan item di halaman saat ini yang belum ada di map agar tidak membatalkan togglePlaylistTranslation
-            val missing = pagedPlaylist.filter { playlistTranslatedTitles[it.rjid].isNullOrBlank() }
-            if (missing.isNotEmpty()) {
-                viewModel.translateCurrentPageTitles(missing)
+    LaunchedEffect(isTranslationActive, isGridMode, pagedPlaylist) {
+        if (!isTranslationActive || pagedPlaylist.isEmpty()) return@LaunchedEffect
+        snapshotFlow {
+            val visibleIndices = if (isGridMode) {
+                gridState.layoutInfo.visibleItemsInfo.map { it.index }
+            } else {
+                listState.layoutInfo.visibleItemsInfo.map { it.index }
+            }
+            if (visibleIndices.isEmpty()) {
+                pagedPlaylist.take(10)
+            } else {
+                val minIdx = (visibleIndices.min() - 2).coerceAtLeast(0)
+                val maxIdx = (visibleIndices.max() + 2).coerceAtMost(pagedPlaylist.lastIndex)
+                pagedPlaylist.subList(minIdx, maxIdx + 1)
             }
         }
+            .collect { visibleSlice ->
+                val missing = visibleSlice.filter { playlistTranslatedTitles[it.rjid].isNullOrBlank() }
+                if (missing.isNotEmpty()) {
+                    kotlinx.coroutines.delay(100)
+                    viewModel.translateCurrentPageTitles(missing)
+                }
+            }
     }
 
     // User Playlist Interaction States

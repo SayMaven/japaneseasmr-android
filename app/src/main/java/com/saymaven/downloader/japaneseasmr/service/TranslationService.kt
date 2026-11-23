@@ -13,6 +13,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -29,6 +32,7 @@ import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * TranslationService Engine v3:
@@ -60,14 +64,44 @@ object TranslationService {
     var lastNetworkError: String? = null
         private set
 
-    private val client = OkHttpClient.Builder()
+    private val _translationErrorEvents = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val translationErrorEvents: SharedFlow<String> = _translationErrorEvents.asSharedFlow()
+
+    @Volatile
+    private var lastErrorEmitMs: Long = 0L
+
+    private fun emitError(message: String) {
+        lastNetworkError = message
+        val now = System.currentTimeMillis()
+        if (now - lastErrorEmitMs >= 3_500L) {
+            lastErrorEmitMs = now
+            _translationErrorEvents.tryEmit(message)
+        }
+    }
+
+    fun resetRateLimit() {
+        googleRateLimitUntilMs = 0L
+        lastNetworkError = null
+    }
+
+    private val webClient = OkHttpClient.Builder()
         .dispatcher(Dispatcher().apply {
-            maxRequests = 64
-            maxRequestsPerHost = 32
+            maxRequests = 32
+            maxRequestsPerHost = 12
         })
-        .connectTimeout(3, TimeUnit.SECONDS)
-        .readTimeout(4, TimeUnit.SECONDS)
-        .callTimeout(6, TimeUnit.SECONDS)
+        .connectTimeout(4, TimeUnit.SECONDS)
+        .readTimeout(6, TimeUnit.SECONDS)
+        .callTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    private val llmClient = OkHttpClient.Builder()
+        .dispatcher(Dispatcher().apply {
+            maxRequests = 16
+            maxRequestsPerHost = 8
+        })
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(35, TimeUnit.SECONDS)
+        .callTimeout(45, TimeUnit.SECONDS)
         .build()
 
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
@@ -294,20 +328,23 @@ object TranslationService {
         }
 
         val detectedSl = detectSourceLanguage(trimmed)
+        val isLlm = effectiveProvider.equals("llm", ignoreCase = true)
+        val bodyToTranslate = if (coreBody.isNotBlank() && (filePrefix.isNotEmpty() || fileExt.isNotEmpty())) coreBody else trimmed
 
         // 2. Pre-processing di Dispatchers.Default (Non-blocking UI thread)
         val preProcessed = withContext(Dispatchers.Default) {
             if (detectedSl == "ja") {
-                JapaneseAsmrGlossary.preProcessJapanese(trimmed)
+                JapaneseAsmrGlossary.preProcessJapanese(bodyToTranslate, forLlm = isLlm)
             } else {
-                ChineseAsmrGlossary.preProcessChinese(trimmed)
+                ChineseAsmrGlossary.preProcessChinese(bodyToTranslate, forLlm = isLlm)
             }
         }
 
         val normalizedTl = normalizeTargetLang(effectiveTargetLang)
+        val timeoutMs = if (isLlm) 45_000L else 12_000L
 
-        // 3. Panggil Provider Aktif via Fast-Lane Semaphore dengan batas waktu keras 10 detik
-        val rawOnline = withTimeoutOrNull(10_000L) {
+        // 3. Panggil Provider Aktif via Fast-Lane Semaphore
+        val rawOnline = withTimeoutOrNull(timeoutMs) {
             singleTextSemaphore.withPermit {
                 when (effectiveProvider.lowercase()) {
                     "microsoft" -> translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
@@ -319,14 +356,25 @@ object TranslationService {
         }
 
         if (rawOnline.isNullOrBlank()) {
+            if (System.currentTimeMillis() < googleRateLimitUntilMs) {
+                emitError("Terlalu banyak permintaan terjemahan (HTTP 429). Coba lagi dalam beberapa detik.")
+            } else if (!lastNetworkError.isNullOrBlank()) {
+                emitError("Gagal menerjemahkan: $lastNetworkError")
+            }
             return@withContext trimmed
         }
 
         // 4. Post-processing filter bahasa Indonesia alami
-        val finalResult = withContext(Dispatchers.Default) {
+        val refinedBody = withContext(Dispatchers.Default) {
             if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) {
                 IndonesianPostFilter.refineIndonesian(rawOnline)
             } else rawOnline
+        }
+
+        val finalResult = if (coreBody.isNotBlank() && (filePrefix.isNotEmpty() || fileExt.isNotEmpty())) {
+            "$filePrefix$refinedBody$fileExt"
+        } else {
+            refinedBody
         }
 
         // Simpan ke cache HANYA jika terjemahan online berhasil dan bukan teks asli yang gagal
@@ -410,15 +458,17 @@ object TranslationService {
                 val llmRes = translateBatchViaLlm(missingAfterDb, normalizedTl)
                 if (llmRes.isNotEmpty()) {
                     for ((src, tr) in llmRes) {
-                        result[src] = tr
-                        memoryCache["$effectiveTargetLang:$src"] = tr
-                        newEntities.add(
-                            TranslationCacheEntity(
-                                sourceText = src,
-                                targetLang = effectiveTargetLang,
-                                translatedText = tr
+                        if (!isPoisonedTranslation(src, tr, effectiveTargetLang)) {
+                            result[src] = tr
+                            memoryCache["$effectiveTargetLang:$src"] = tr
+                            newEntities.add(
+                                TranslationCacheEntity(
+                                    sourceText = src,
+                                    targetLang = effectiveTargetLang,
+                                    translatedText = tr
+                                )
                             )
-                        )
+                        }
                     }
                     toTranslateOnline = missingAfterDb.filter { !result.containsKey(it) }
                 }
@@ -426,7 +476,7 @@ object TranslationService {
 
             if (toTranslateOnline.isNotEmpty()) {
                 val (jaItems, zhItems) = toTranslateOnline.partition { detectSourceLanguage(it) == "ja" }
-                val chunkPairs = jaItems.chunked(15).map { it to "ja" } + zhItems.chunked(15).map { it to "zh-CN" }
+                val chunkPairs = jaItems.chunked(10).map { it to "ja" } + zhItems.chunked(10).map { it to "zh-CN" }
 
                 withTimeoutOrNull(25_000L) {
                     coroutineScope {
@@ -507,18 +557,15 @@ object TranslationService {
                                     }
                                 }
 
-                                // Fallback HANYA untuk item yang benar-benar gagal/hilang, dan hentikan jika Google sedang rate-limited
+                                // Fallback HANYA untuk maksimal 3 item yang benar-benar gagal, dan hentikan jika Google sedang rate-limited
                                 if (missingIndices.isNotEmpty() && System.currentTimeMillis() >= googleRateLimitUntilMs) {
-                                    coroutineScope {
-                                        missingIndices.take(15).map { idx ->
-                                            val src = chunk[idx]
-                                            async(Dispatchers.IO) {
-                                                val tr = translateText(src, effectiveTargetLang, effectiveProvider)
-                                                if (tr.isNotBlank() && tr != src) {
-                                                    result[src] = tr
-                                                }
-                                            }
-                                        }.awaitAll()
+                                    for (idx in missingIndices.take(3)) {
+                                        if (System.currentTimeMillis() < googleRateLimitUntilMs) break
+                                        val src = chunk[idx]
+                                        val tr = translateText(src, effectiveTargetLang, effectiveProvider)
+                                        if (tr.isNotBlank() && !isPoisonedTranslation(src, tr, effectiveTargetLang)) {
+                                            result[src] = tr
+                                        }
                                     }
                                 }
                             }
@@ -556,8 +603,37 @@ object TranslationService {
         val unique = lines.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
         if (unique.isEmpty()) return@withContext emptyMap()
 
+        val result = ConcurrentHashMap<String, String>()
+        val missingAfterMem = mutableListOf<String>()
+        for (line in unique) {
+            val cached = memoryCache["$targetLang:$line"]
+            if (!cached.isNullOrBlank() && !isPoisonedTranslation(line, cached, targetLang)) {
+                result[line] = cached
+            } else {
+                missingAfterMem.add(line)
+            }
+        }
+        if (missingAfterMem.isEmpty()) return@withContext result
+
+        val missingAfterDb = mutableListOf<String>()
+        try {
+            val dbItems = cacheDao?.getTranslations(missingAfterMem, targetLang) ?: emptyList()
+            val dbMap = dbItems.associate { it.sourceText to it.translatedText }
+            for (line in missingAfterMem) {
+                val dbVal = dbMap[line]
+                if (!dbVal.isNullOrBlank() && !isPoisonedTranslation(line, dbVal, targetLang)) {
+                    memoryCache["$targetLang:$line"] = dbVal
+                    result[line] = dbVal
+                } else {
+                    missingAfterDb.add(line)
+                }
+            }
+        } catch (_: Exception) {
+            missingAfterDb.addAll(missingAfterMem)
+        }
+        if (missingAfterDb.isEmpty()) return@withContext result
+
         if (llmKey.isNotBlank() && llmUrl.isNotBlank()) {
-            val llmResult = ConcurrentHashMap<String, String>()
             val langName = when {
                 targetLang.startsWith("id") || targetLang.startsWith("in") -> "id"
                 targetLang.startsWith("zh") -> "zh-CN"
@@ -569,14 +645,12 @@ object TranslationService {
             val systemInstruction = if (llmPrompt.isNotBlank()) llmPrompt.trim() else defaultSystem
 
             val llmSemaphore = Semaphore(concurrency.coerceIn(1, 5))
-            val chunks = unique.chunked(25)
-            var allSucceeded = true
+            val chunks = missingAfterDb.chunked(25)
+            val newEntities = java.util.Collections.synchronizedList(mutableListOf<TranslationCacheEntity>())
 
             coroutineScope {
                 chunks.map { chunk ->
                     async(Dispatchers.IO) {
-                        if (!allSucceeded) return@async
-
                         val userPrompt = chunk.mapIndexed { idx, s -> "[$idx] $s" }.joinToString("\n")
                         val response = llmSemaphore.withPermit {
                             if (llmUrl.contains("anthropic.com", ignoreCase = true)) {
@@ -586,13 +660,10 @@ object TranslationService {
                             }
                         }
 
-                        if (response.isNullOrBlank()) {
-                            allSucceeded = false
-                            return@async
-                        }
+                        if (response.isNullOrBlank()) return@async
 
                         val parsed = mutableMapOf<Int, String>()
-                        val lineRegex = Regex("^\\[(\\d+)\\]\\s*(.+)$")
+                        val lineRegex = Regex("^\\[\\[?(\\d+)\\]\\]?\\s*(.+)$")
                         for (rawLine in response.lines()) {
                             val m = lineRegex.find(rawLine.trim())
                             if (m != null) {
@@ -604,35 +675,47 @@ object TranslationService {
                             }
                         }
 
-                        if (parsed.size < chunk.size / 2) {
-                            allSucceeded = false
-                            return@async
-                        }
-
                         for (i in chunk.indices) {
+                            val src = chunk[i]
                             val tr = parsed[i]
                             if (!tr.isNullOrBlank()) {
                                 val cleaned = if (targetLang.startsWith("id") || targetLang.startsWith("in")) {
                                     IndonesianPostFilter.refineIndonesian(tr)
                                 } else tr
-                                llmResult[chunk[i]] = cleaned
+                                if (!isPoisonedTranslation(src, cleaned, targetLang)) {
+                                    result[src] = cleaned
+                                    memoryCache["$targetLang:$src"] = cleaned
+                                    newEntities.add(
+                                        TranslationCacheEntity(
+                                            sourceText = src,
+                                            targetLang = targetLang,
+                                            translatedText = cleaned
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
                 }.awaitAll()
             }
 
-            if (allSucceeded && llmResult.isNotEmpty()) {
-                val missing = unique.filter { !llmResult.containsKey(it) }
-                if (missing.isNotEmpty()) {
-                    llmResult.putAll(translateBatch(missing, targetLang, provider, isSubtitleMode = true))
-                }
-                return@withContext llmResult
+            if (newEntities.isNotEmpty()) {
+                try {
+                    cacheDao?.insertTranslations(newEntities.toList())
+                } catch (_: Exception) {}
             }
+
+            val remaining = missingAfterDb.filter { !result.containsKey(it) }
+            if (remaining.isEmpty()) return@withContext result
+
+            // Fallback hanya untuk baris yang gagal/ditolak NSFW oleh LLM
+            result.putAll(translateBatch(remaining, targetLang, provider, isSubtitleMode = true))
+            return@withContext result
         }
 
-        // Auto-fallback ke Google Translate + Smart Glossary jika LLM kosong / gagal / ditolak NSFW
-        translateBatch(unique, targetLang, provider, isSubtitleMode = true)
+        // Auto-fallback ke web translator + Smart Glossary jika LLM tidak terkonfigurasi
+        result.putAll(translateBatch(missingAfterDb, targetLang, provider, isSubtitleMode = true))
+        result
     }
 
     private suspend fun translateViaLlmSingle(
@@ -753,15 +836,19 @@ object TranslationService {
                 .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
 
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
+            llmClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    emitError("LLM Claude HTTP ${resp.code}")
+                    return null
+                }
                 val body = resp.body?.string() ?: return null
                 val json = JSONObject(body)
                 val contentArray = json.optJSONArray("content") ?: return null
                 if (contentArray.length() == 0) return null
                 contentArray.getJSONObject(0).optString("text")?.trim()
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            emitError("LLM Claude gagal: ${e.javaClass.simpleName}")
             null
         }
     }
@@ -797,15 +884,19 @@ object TranslationService {
                 .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
 
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
+            llmClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    emitError("LLM API HTTP ${resp.code}")
+                    return null
+                }
                 val body = resp.body?.string() ?: return null
                 val json = JSONObject(body)
                 val choices = json.optJSONArray("choices") ?: return null
                 if (choices.length() == 0) return null
                 choices.getJSONObject(0).optJSONObject("message")?.optString("content")?.trim()
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            emitError("LLM API gagal: ${e.javaClass.simpleName}")
             null
         }
     }
@@ -864,7 +955,7 @@ object TranslationService {
                 .get()
                 .build()
 
-            client.newCall(req).execute().use { resp ->
+            webClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
                     lastNetworkError = null
                     parseGoogleWebResponse(resp.body?.string())
@@ -893,7 +984,7 @@ object TranslationService {
                 .post(formBody)
                 .build()
 
-            client.newCall(req).execute().use { resp ->
+            webClient.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
                     lastNetworkError = null
                     parseGoogleWebResponse(resp.body?.string())
@@ -957,7 +1048,7 @@ object TranslationService {
                 .header("User-Agent", USER_AGENT)
                 .build()
 
-            client.newCall(req).execute().use { resp ->
+            webClient.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
                 val body = resp.body?.string() ?: return null
                 val json = JSONObject(body)
@@ -989,7 +1080,7 @@ object TranslationService {
                 .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
 
-            client.newCall(req).execute().use { resp ->
+            webClient.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
                 val body = resp.body?.string() ?: return null
                 val array = JSONArray(body)
@@ -1014,7 +1105,7 @@ object TranslationService {
                 .header("User-Agent", USER_AGENT)
                 .build()
 
-            client.newCall(req).execute().use { resp ->
+            webClient.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
                 val body = resp.body?.string() ?: return null
                 val json = JSONObject(body)

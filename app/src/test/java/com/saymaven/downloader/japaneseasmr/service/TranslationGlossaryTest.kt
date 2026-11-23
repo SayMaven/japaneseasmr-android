@@ -156,4 +156,19 @@ class TranslationGlossaryTest {
         assertTrue("Must keep .mp3 extension, got '$result'", result.endsWith(".mp3"))
         assertTrue("Must translate body, got '$result'", result.contains("Pembersihan Telinga", ignoreCase = true))
     }
+
+    @Test
+    fun testForLlmPreservesNaturalSlangWhileCleaningFuseji() {
+        val jaInput = "おち○ぽシコシコして"
+        val forLlm = JapaneseAsmrGlossary.preProcessJapanese(jaInput, forLlm = true)
+        assertTrue("LLM mode must keep natural slang シコシコ", forLlm.contains("シコシコ"))
+        assertFalse("LLM mode must remove fuseji ○", forLlm.contains("○"))
+
+        val cnInput = "小穴好舒服"
+        val cnForLlm = ChineseAsmrGlossary.preProcessChinese(cnInput, forLlm = true)
+        assertEquals(cnInput, cnForLlm)
+
+        val cnForWeb = ChineseAsmrGlossary.preProcessChinese(cnInput, forLlm = false)
+        assertFalse("Web mode should avoid stiff medical term 女性阴道", cnForWeb.contains("女性阴道"))
+    }
 }

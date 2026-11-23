@@ -9,13 +9,15 @@ package com.saymaven.downloader.japaneseasmr.service.glossary
 object IndonesianPostFilter {
 
     private val REFINEMENTS = listOf(
-        // Kata Ganti Formal ke Santai (Bisikan Intim ASMR)
+        // Kata Ganti & Gaya Santai (Bisikan Intim ASMR)
         Regex("\\bAnda\\b") to "kamu",
         Regex("\\banda\\b") to "kamu",
         Regex("\\bSaya\\b") to "aku",
         Regex("\\bsaya\\b") to "aku",
         Regex("\\bBeliau\\b") to "dia",
         Regex("\\bbeliau\\b") to "dia",
+        Regex("\\bApakah\\s+kamu\\b", RegexOption.IGNORE_CASE) to "Apa kamu",
+        Regex("\\bTerima\\s+kasih\\s+banyak\\b", RegexOption.IGNORE_CASE) to "Makasih banyak",
 
         // Frasa Kaku Desahan & Kenikmatan (Mencegah "Aku pergi")
         Regex("\\b(?:aku|saya)\\s+akan\\s+pergi\\b", RegexOption.IGNORE_CASE) to "aku mau keluar!",
