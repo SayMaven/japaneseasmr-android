@@ -73,11 +73,15 @@ object TranslationService {
         memoryCache.clear()
     }
 
-    suspend fun clearAllCache() {
+    suspend fun clearAllCache(context: Context? = null) {
         memoryCache.clear()
         try {
             withContext(Dispatchers.IO) {
                 cacheDao?.clearAll()
+                if (context != null) {
+                    val db = AsmrDatabase.getDatabase(context.applicationContext)
+                    db.historyDao().clearAllTranslations()
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()

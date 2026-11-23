@@ -504,7 +504,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun clearAllTranslationCache(onComplete: (() -> Unit)? = null) = viewModelScope.launch {
-        TranslationService.clearAllCache()
+        TranslationService.clearAllCache(getApplication())
         onComplete?.invoke()
     }
 
