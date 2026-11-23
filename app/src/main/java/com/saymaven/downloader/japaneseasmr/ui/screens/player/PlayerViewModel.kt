@@ -2447,33 +2447,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 val provider = TranslationService.getActiveProvider(getApplication())
 
-                coroutineScope {
-                    val titleDeferred = async(Dispatchers.IO) {
-                        TranslationService.translateText(rawTitle, targetLang, provider)
-                    }
-                    val currentChaps = _currentChapters.value
-                    val chapsDeferred = if (currentChaps.isNotEmpty()) {
-                        async(Dispatchers.IO) {
-                            translateChaptersBatch(currentChaps, targetLang, provider)
+                kotlinx.coroutines.withTimeoutOrNull(25_000L) {
+                    coroutineScope {
+                        val titleDeferred = async(Dispatchers.IO) {
+                            TranslationService.translateText(rawTitle, targetLang, provider)
                         }
-                    } else null
+                        val currentChaps = _currentChapters.value
+                        val chapsDeferred = if (currentChaps.isNotEmpty()) {
+                            async(Dispatchers.IO) {
+                                translateChaptersBatch(currentChaps, targetLang, provider)
+                            }
+                        } else null
 
-                    val translatedTitleRes = titleDeferred.await()
-                    _translatedTitle.value = translatedTitleRes
+                        val translatedTitleRes = titleDeferred.await()
+                        _translatedTitle.value = translatedTitleRes
 
-                    val translatedChapsList = chapsDeferred?.await() ?: emptyList()
-                    if (translatedChapsList.isNotEmpty()) {
-                        _translatedChapters.value = translatedChapsList
-                    }
+                        val translatedChapsList = chapsDeferred?.await() ?: emptyList()
+                        if (translatedChapsList.isNotEmpty()) {
+                            _translatedChapters.value = translatedChapsList
+                        }
 
-                    lastTranslatedKey = currentKey
+                        lastTranslatedKey = currentKey
 
-                    val chapsJson = if (translatedChapsList.isNotEmpty()) {
-                        ChapterItem.toJsonArray(translatedChapsList)
-                    } else history?.translatedChaptersJson
+                        val chapsJson = if (translatedChapsList.isNotEmpty()) {
+                            ChapterItem.toJsonArray(translatedChapsList)
+                        } else history?.translatedChaptersJson
 
-                    withContext(Dispatchers.IO) {
-                        historyDao.updateTranslations(targetRjid, translatedTitleRes, chapsJson)
+                        withContext(Dispatchers.IO) {
+                            historyDao.updateTranslations(targetRjid, translatedTitleRes, chapsJson)
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -2948,47 +2950,50 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         viewModelScope.launch {
             _isTranslatingLyrics.value = true
-            val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-            val llmUrl = prefs.llmApiUrlFlow.first()
-            val llmKey = prefs.llmApiKeyFlow.first()
-            val llmModel = prefs.llmModelFlow.first()
-            val llmPrompt = prefs.llmPromptFlow.first()
-            val concurrency = prefs.llmConcurrencyFlow.first()
-            val autoSave = prefs.autoSaveTranslatedLyricsFlow.first()
+            try {
+                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
+                val llmUrl = prefs.llmApiUrlFlow.first()
+                val llmKey = prefs.llmApiKeyFlow.first()
+                val llmModel = prefs.llmModelFlow.first()
+                val llmPrompt = prefs.llmPromptFlow.first()
+                val concurrency = prefs.llmConcurrencyFlow.first()
+                val autoSave = prefs.autoSaveTranslatedLyricsFlow.first()
 
-            val texts = current.map { it.text }
-            val provider = TranslationService.getActiveProvider(getApplication())
-            val translatedMap = TranslationService.translateLyricsNaturally(
-                lines = texts,
-                targetLang = targetLang,
-                llmUrl = llmUrl,
-                llmKey = llmKey,
-                llmModel = llmModel,
-                llmPrompt = llmPrompt,
-                concurrency = concurrency,
-                provider = provider
-            )
+                val texts = current.map { it.text }
+                val provider = TranslationService.getActiveProvider(getApplication())
+                val translatedMap = TranslationService.translateLyricsNaturally(
+                    lines = texts,
+                    targetLang = targetLang,
+                    llmUrl = llmUrl,
+                    llmKey = llmKey,
+                    llmModel = llmModel,
+                    llmPrompt = llmPrompt,
+                    concurrency = concurrency,
+                    provider = provider
+                )
 
-            _currentLyrics.value = current.map { line ->
-                line.copy(translatedText = translatedMap[line.text.trim()] ?: translatedMap[line.text])
-            }
-            _isLyricsTranslated.value = true
-            _isTranslatingLyrics.value = false
-
-            if (autoSave && translatedMap.isNotEmpty()) {
-                withContext(Dispatchers.IO) {
-                    try {
-                        val dao = AsmrDatabase.getDatabase(getApplication()).translationCacheDao()
-                        val entities = translatedMap.map { (src, tr) ->
-                            com.saymaven.downloader.japaneseasmr.data.local.entity.TranslationCacheEntity(
-                                sourceText = src,
-                                targetLang = targetLang,
-                                translatedText = tr
-                            )
-                        }
-                        dao.insertTranslations(entities)
-                    } catch (_: Exception) {}
+                _currentLyrics.value = current.map { line ->
+                    line.copy(translatedText = translatedMap[line.text.trim()] ?: translatedMap[line.text])
                 }
+                _isLyricsTranslated.value = true
+
+                if (autoSave && translatedMap.isNotEmpty()) {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val dao = AsmrDatabase.getDatabase(getApplication()).translationCacheDao()
+                            val entities = translatedMap.map { (src, tr) ->
+                                com.saymaven.downloader.japaneseasmr.data.local.entity.TranslationCacheEntity(
+                                    sourceText = src,
+                                    targetLang = targetLang,
+                                    translatedText = tr
+                                )
+                            }
+                            dao.insertTranslations(entities)
+                        } catch (_: Exception) {}
+                    }
+                }
+            } finally {
+                _isTranslatingLyrics.value = false
             }
         }
     }

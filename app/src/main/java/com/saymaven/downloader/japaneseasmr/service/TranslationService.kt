@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Dispatcher
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
@@ -47,16 +48,26 @@ object TranslationService {
     private val memoryCache = ConcurrentHashMap<String, String>()
     private val cacheClearedListeners = java.util.Collections.synchronizedList(mutableListOf<() -> Unit>())
 
-    private val networkSemaphore = Semaphore(8)
+    // Jalur cepat terpisah untuk klik tunggal agar tidak pernah antre di belakang batch massal
+    private val singleTextSemaphore = Semaphore(4)
+    private val batchSemaphore = Semaphore(6)
+
+    @Volatile
+    var googleRateLimitUntilMs: Long = 0L
+        private set
+
+    @Volatile
+    var lastNetworkError: String? = null
+        private set
 
     private val client = OkHttpClient.Builder()
         .dispatcher(Dispatcher().apply {
             maxRequests = 64
             maxRequestsPerHost = 32
         })
-        .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
-        .callTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(3, TimeUnit.SECONDS)
+        .readTimeout(4, TimeUnit.SECONDS)
+        .callTimeout(6, TimeUnit.SECONDS)
         .build()
 
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
@@ -279,13 +290,15 @@ object TranslationService {
 
         val normalizedTl = normalizeTargetLang(effectiveTargetLang)
 
-        // 3. Panggil Provider Aktif via Network Semaphore
-        val rawOnline = networkSemaphore.withPermit {
-            when (effectiveProvider.lowercase()) {
-                "microsoft" -> translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
-                "youdao" -> translateViaYoudaoWeb(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
-                "llm" -> translateViaLlmSingle(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
-                else -> translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+        // 3. Panggil Provider Aktif via Fast-Lane Semaphore dengan batas waktu keras 10 detik
+        val rawOnline = withTimeoutOrNull(10_000L) {
+            singleTextSemaphore.withPermit {
+                when (effectiveProvider.lowercase()) {
+                    "microsoft" -> translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                    "youdao" -> translateViaYoudaoWeb(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                    "llm" -> translateViaLlmSingle(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                    else -> translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                }
             }
         }
 
@@ -398,83 +411,94 @@ object TranslationService {
                 val (jaItems, zhItems) = toTranslateOnline.partition { detectSourceLanguage(it) == "ja" }
                 val chunkPairs = jaItems.chunked(15).map { it to "ja" } + zhItems.chunked(15).map { it to "zh-CN" }
 
-                coroutineScope {
-                    chunkPairs.map { (chunk, sourceLang) ->
-                        async(Dispatchers.IO) {
-                            // Pre-process chunk di Dispatchers.Default
-                            val preparedChunk = withContext(Dispatchers.Default) {
-                                chunk.map { item ->
-                                    val pre = if (sourceLang == "ja") {
-                                        JapaneseAsmrGlossary.preProcessJapanese(item)
-                                    } else {
-                                        ChineseAsmrGlossary.preProcessChinese(item)
-                                    }
-                                    // Escape tag kurung siku ganda yang mungkin ada di teks sumber
-                                    pre.replace("[[", "⟦").replace("]]", "⟧").replace('\n', ' ').trim().ifEmpty { item }
-                                }
-                            }
-
-                            // Susun paket tag bernomor [[0]] Teks 0\n[[1]] Teks 1
-                            val taggedPayload = preparedChunk.mapIndexed { idx, str -> "[[$idx]] $str" }.joinToString("\n")
-
-                            val batchResponse = networkSemaphore.withPermit {
-                                when (effectiveProvider.lowercase()) {
-                                    "microsoft" -> translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
-                                    "youdao" -> translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
-                                    else -> translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
-                                }
-                            }
-
-                            // Ekstrak hasil via Regex deterministik (mendukung bracket ASCII, fullwidth, dan spasi)
-                            val parsedMap = mutableMapOf<Int, String>()
-                            if (!batchResponse.isNullOrBlank()) {
-                                val tagRegex = Regex("""(?:\[\[|［［|\[\s*\[)(\d+)(?:\]\]|］］|\]\s*\])\s*([\s\S]*?)(?=(?:\[\[|［［|\[\s*\[)\d+(?:\]\]|］］|\]\s*\])|$)""")
-                                val matches = tagRegex.findAll(batchResponse)
-                                for (m in matches) {
-                                    val idx = m.groupValues[1].toIntOrNull()
-                                    val body = m.groupValues[2].trim()
-                                    if (idx != null && body.isNotEmpty()) {
-                                        parsedMap[idx] = body
+                withTimeoutOrNull(25_000L) {
+                    coroutineScope {
+                        chunkPairs.map { (chunk, sourceLang) ->
+                            async(Dispatchers.IO) {
+                                // Pre-process chunk di Dispatchers.Default
+                                val preparedChunk = withContext(Dispatchers.Default) {
+                                    chunk.map { item ->
+                                        val pre = if (sourceLang == "ja") {
+                                            JapaneseAsmrGlossary.preProcessJapanese(item)
+                                        } else {
+                                            ChineseAsmrGlossary.preProcessChinese(item)
+                                        }
+                                        // Escape tag kurung siku ganda yang mungkin ada di teks sumber
+                                        pre.replace("[[", "⟦").replace("]]", "⟧").replace('\n', ' ').trim().ifEmpty { item }
                                     }
                                 }
-                            }
 
-                            // Jika parsing berhasil untuk chunk
-                            if (parsedMap.size == chunk.size) {
+                                // Susun paket tag bernomor [[0]] Teks 0\n[[1]] Teks 1
+                                val taggedPayload = preparedChunk.mapIndexed { idx, str -> "[[$idx]] $str" }.joinToString("\n")
+
+                                val batchResponse = batchSemaphore.withPermit {
+                                    when (effectiveProvider.lowercase()) {
+                                        "microsoft" -> translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
+                                        "youdao" -> translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
+                                        else -> translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
+                                    }
+                                }
+
+                                // Ekstrak hasil via Regex deterministik (mendukung bracket ASCII, fullwidth, dan spasi)
+                                val parsedMap = mutableMapOf<Int, String>()
+                                if (!batchResponse.isNullOrBlank()) {
+                                    val tagRegex = Regex("""(?:\[\[|［［|\[\s*\[)(\d+)(?:\]\]|］］|\]\s*\])\s*([\s\S]*?)(?=(?:\[\[|［［|\[\s*\[)\d+(?:\]\]|］］|\]\s*\])|$)""")
+                                    val matches = tagRegex.findAll(batchResponse)
+                                    for (m in matches) {
+                                        val idx = m.groupValues[1].toIntOrNull()
+                                        val body = m.groupValues[2].trim()
+                                        if (idx != null && body.isNotEmpty()) {
+                                            parsedMap[idx] = body
+                                        }
+                                    }
+                                }
+
+                                // Simpan semua item yang berhasil di-parse (jangan buang hasil parsial!)
+                                val missingIndices = mutableListOf<Int>()
                                 for (i in chunk.indices) {
                                     val src = chunk[i]
-                                    val rawTr = parsedMap[i]?.replace("⟦", "[[")?.replace("⟧", "]]") ?: src
-                                    val finalTr = if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) {
-                                        IndonesianPostFilter.refineIndonesian(rawTr)
-                                    } else rawTr
+                                    val rawParsed = parsedMap[i]
+                                    if (!rawParsed.isNullOrBlank()) {
+                                        val rawTr = rawParsed.replace("⟦", "[[").replace("⟧", "]]")
+                                        val finalTr = if (effectiveTargetLang.startsWith("id") || effectiveTargetLang.startsWith("in")) {
+                                            IndonesianPostFilter.refineIndonesian(rawTr)
+                                        } else rawTr
 
-                                    if (finalTr.isNotBlank() && finalTr != src) {
-                                        result[src] = finalTr
-                                        memoryCache["$effectiveTargetLang:$src"] = finalTr
-                                        newEntities.add(
-                                            TranslationCacheEntity(
-                                                sourceText = src,
-                                                targetLang = effectiveTargetLang,
-                                                translatedText = finalTr
+                                        if (finalTr.isNotBlank() && !isPoisonedTranslation(src, finalTr, effectiveTargetLang)) {
+                                            result[src] = finalTr
+                                            memoryCache["$effectiveTargetLang:$src"] = finalTr
+                                            newEntities.add(
+                                                TranslationCacheEntity(
+                                                    sourceText = src,
+                                                    targetLang = effectiveTargetLang,
+                                                    translatedText = finalTr
+                                                )
                                             )
-                                        )
+                                        } else {
+                                            missingIndices.add(i)
+                                        }
+                                    } else {
+                                        missingIndices.add(i)
                                     }
                                 }
-                            } else {
-                                // Fallback bertahap: jika ada format delimiter yang rusak, fallback secara paralel
-                                coroutineScope {
-                                    chunk.map { src ->
-                                        async(Dispatchers.IO) {
-                                            val tr = translateText(src, effectiveTargetLang, effectiveProvider)
-                                            if (tr.isNotBlank() && tr != src) {
-                                                result[src] = tr
+
+                                // Fallback HANYA untuk item yang benar-benar gagal/hilang, dan hentikan jika Google sedang rate-limited
+                                if (missingIndices.isNotEmpty() && System.currentTimeMillis() >= googleRateLimitUntilMs) {
+                                    coroutineScope {
+                                        missingIndices.take(15).map { idx ->
+                                            val src = chunk[idx]
+                                            async(Dispatchers.IO) {
+                                                val tr = translateText(src, effectiveTargetLang, effectiveProvider)
+                                                if (tr.isNotBlank() && tr != src) {
+                                                    result[src] = tr
+                                                }
                                             }
-                                        }
-                                    }.awaitAll()
+                                        }.awaitAll()
+                                    }
                                 }
                             }
-                        }
-                    }.awaitAll()
+                        }.awaitAll()
+                    }
                 }
             }
 
@@ -762,6 +786,10 @@ object TranslationService {
     }
 
     private fun translateViaGoogleWeb(text: String, tl: String, sl: String = "auto"): String? {
+        if (System.currentTimeMillis() < googleRateLimitUntilMs) {
+            return null
+        }
+
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return ""
 
@@ -772,35 +800,32 @@ object TranslationService {
         }
 
         // 1. Jika payload pendek/sedang (<= 1200 chars encoded): prioritaskan GET translate.googleapis.com gtx
-        //    (paling stabil, tidak memotong tag [[idx]], latensi ~150ms)
         if (encoded.length <= 1200) {
             val gtxUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t&q=$encoded"
             tryGet(gtxUrl)?.let { return it }
+            if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
 
             if (sl != "auto") {
                 val gtxAutoUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t&q=$encoded"
                 tryGet(gtxAutoUrl)?.let { return it }
+                if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
             }
 
             if (trimmed.length <= 500) {
                 val clients5Url = "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=$sl&tl=$tl&q=$encoded"
                 tryGet(clients5Url)?.let { return it }
+                if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
             }
         }
 
         // 2. Untuk payload batch panjang (> 1200 chars) atau fallback jika GET gagal: POST FormBody ke gtx
         val postUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t"
         tryPost(postUrl, trimmed)?.let { return it }
+        if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
 
         if (sl != "auto") {
             val postAutoUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t"
             tryPost(postAutoUrl, trimmed)?.let { return it }
-        }
-
-        // 3. Fallback GET gtx terakhir jika panjang masih wajar
-        if (encoded.length in 1201..2500) {
-            val gtxUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t&q=$encoded"
-            tryGet(gtxUrl)?.let { return it }
         }
 
         return null
@@ -816,10 +841,18 @@ object TranslationService {
 
             client.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
+                    lastNetworkError = null
                     parseGoogleWebResponse(resp.body?.string())
-                } else null
+                } else {
+                    if (resp.code == 429 || resp.code == 403) {
+                        googleRateLimitUntilMs = System.currentTimeMillis() + 15_000L
+                    }
+                    lastNetworkError = "HTTP ${resp.code}"
+                    null
+                }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            lastNetworkError = e.javaClass.simpleName
             null
         }
     }
@@ -837,10 +870,18 @@ object TranslationService {
 
             client.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
+                    lastNetworkError = null
                     parseGoogleWebResponse(resp.body?.string())
-                } else null
+                } else {
+                    if (resp.code == 429 || resp.code == 403) {
+                        googleRateLimitUntilMs = System.currentTimeMillis() + 15_000L
+                    }
+                    lastNetworkError = "HTTP ${resp.code}"
+                    null
+                }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            lastNetworkError = e.javaClass.simpleName
             null
         }
     }
