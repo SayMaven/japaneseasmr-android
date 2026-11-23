@@ -8,6 +8,8 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.TranslationCacheEn
 import com.saymaven.downloader.japaneseasmr.service.glossary.ChineseAsmrGlossary
 import com.saymaven.downloader.japaneseasmr.service.glossary.IndonesianPostFilter
 import com.saymaven.downloader.japaneseasmr.service.glossary.JapaneseAsmrGlossary
+import com.saymaven.downloader.japaneseasmr.service.translation.LlmTranslationClient
+import com.saymaven.downloader.japaneseasmr.service.translation.WebTranslationProviders
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -56,13 +58,14 @@ object TranslationService {
     private val singleTextSemaphore = Semaphore(4)
     private val batchSemaphore = Semaphore(6)
 
-    @Volatile
-    var googleRateLimitUntilMs: Long = 0L
-        private set
+    val googleRateLimitUntilMs: Long
+        get() = WebTranslationProviders.googleRateLimitUntilMs
+
+    val lastNetworkError: String?
+        get() = _lastLocalError ?: WebTranslationProviders.lastNetworkError
 
     @Volatile
-    var lastNetworkError: String? = null
-        private set
+    private var _lastLocalError: String? = null
 
     private val _translationErrorEvents = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val translationErrorEvents: SharedFlow<String> = _translationErrorEvents.asSharedFlow()
@@ -71,7 +74,7 @@ object TranslationService {
     private var lastErrorEmitMs: Long = 0L
 
     private fun emitError(message: String) {
-        lastNetworkError = message
+        _lastLocalError = message
         val now = System.currentTimeMillis()
         if (now - lastErrorEmitMs >= 3_500L) {
             lastErrorEmitMs = now
@@ -80,32 +83,9 @@ object TranslationService {
     }
 
     fun resetRateLimit() {
-        googleRateLimitUntilMs = 0L
-        lastNetworkError = null
+        _lastLocalError = null
+        WebTranslationProviders.resetRateLimit()
     }
-
-    private val webClient = OkHttpClient.Builder()
-        .dispatcher(Dispatcher().apply {
-            maxRequests = 32
-            maxRequestsPerHost = 12
-        })
-        .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(6, TimeUnit.SECONDS)
-        .callTimeout(10, TimeUnit.SECONDS)
-        .build()
-
-    private val llmClient = OkHttpClient.Builder()
-        .dispatcher(Dispatcher().apply {
-            maxRequests = 16
-            maxRequestsPerHost = 8
-        })
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(35, TimeUnit.SECONDS)
-        .callTimeout(45, TimeUnit.SECONDS)
-        .build()
-
-    private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-    private const val EDGE_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0"
 
     fun init(dao: TranslationCacheDao) {
         this.cacheDao = dao
@@ -367,10 +347,10 @@ object TranslationService {
         val rawOnline = withTimeoutOrNull(timeoutMs) {
             singleTextSemaphore.withPermit {
                 when (effectiveProvider.lowercase()) {
-                    "microsoft" -> translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
-                    "youdao" -> translateViaYoudaoWeb(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
-                    "llm" -> translateViaLlmSingle(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
-                    else -> translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                    "microsoft" -> WebTranslationProviders.translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: WebTranslationProviders.translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                    "youdao" -> WebTranslationProviders.translateViaYoudaoWeb(preProcessed, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: WebTranslationProviders.translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                    "llm" -> translateViaLlmSingle(preProcessed, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: WebTranslationProviders.translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                    else -> WebTranslationProviders.translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: WebTranslationProviders.translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
                 }
             }
         }
@@ -523,9 +503,9 @@ object TranslationService {
 
                                 val batchResponse = batchSemaphore.withPermit {
                                     when (effectiveProvider.lowercase()) {
-                                        "microsoft" -> translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
-                                        "youdao" -> translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
-                                        else -> translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
+                                        "microsoft" -> WebTranslationProviders.translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
+                                        "youdao" -> WebTranslationProviders.translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
+                                        else -> WebTranslationProviders.translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
                                     }
                                 }
 
@@ -548,9 +528,9 @@ object TranslationService {
                                     val plainPayload = preparedChunk.joinToString("\n")
                                     val plainResponse = batchSemaphore.withPermit {
                                         when (effectiveProvider.lowercase()) {
-                                            "microsoft" -> translateViaMicrosoftEdge(plainPayload, normalizedTl) ?: translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
-                                            "youdao" -> translateViaYoudaoWeb(plainPayload, normalizedTl) ?: translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
-                                            else -> translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
+                                            "microsoft" -> WebTranslationProviders.translateViaMicrosoftEdge(plainPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
+                                            "youdao" -> WebTranslationProviders.translateViaYoudaoWeb(plainPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
+                                            else -> WebTranslationProviders.translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
                                         }
                                     }
                                     val respLines = plainResponse?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
@@ -705,9 +685,9 @@ object TranslationService {
                         val userPrompt = chunk.mapIndexed { idx, s -> "[$idx] $s" }.joinToString("\n")
                         val response = llmSemaphore.withPermit {
                             if (llmUrl.contains("anthropic.com", ignoreCase = true)) {
-                                callClaudeAnthropic(llmKey, llmModel.ifBlank { "claude-haiku-5-5" }, systemInstruction, userPrompt)
+                                LlmTranslationClient.callClaudeAnthropic(llmKey, llmModel.ifBlank { "claude-haiku-5-5" }, systemInstruction, userPrompt, ::emitError)
                             } else {
-                                callOpenAiCompatibleLlm(llmUrl, llmKey, llmModel.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, userPrompt)
+                                LlmTranslationClient.callOpenAiCompatibleLlm(llmUrl, llmKey, llmModel.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, userPrompt, ::emitError)
                             }
                         }
 
@@ -788,9 +768,9 @@ object TranslationService {
         val systemInstruction = if (config.prompt.isNotBlank()) config.prompt.trim() else defaultSystem
 
         val res = if (config.url.contains("anthropic.com", ignoreCase = true)) {
-            callClaudeAnthropic(config.key, config.model.ifBlank { "claude-haiku-5-5" }, systemInstruction, text)
+            LlmTranslationClient.callClaudeAnthropic(config.key, config.model.ifBlank { "claude-haiku-5-5" }, systemInstruction, text, ::emitError)
         } else {
-            callOpenAiCompatibleLlm(config.url, config.key, config.model.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, text)
+            LlmTranslationClient.callOpenAiCompatibleLlm(config.url, config.key, config.model.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, text, ::emitError)
         }
 
         return res?.trim()?.takeIf { it.isNotBlank() }
@@ -824,9 +804,9 @@ object TranslationService {
                     val userPrompt = chunk.mapIndexed { idx, s -> "[[$idx]] $s" }.joinToString("\n")
                     val response = llmSemaphore.withPermit {
                         if (config.url.contains("anthropic.com", ignoreCase = true)) {
-                            callClaudeAnthropic(config.key, config.model.ifBlank { "claude-haiku-5-5" }, systemInstruction, userPrompt)
+                            LlmTranslationClient.callClaudeAnthropic(config.key, config.model.ifBlank { "claude-haiku-5-5" }, systemInstruction, userPrompt, ::emitError)
                         } else {
-                            callOpenAiCompatibleLlm(config.url, config.key, config.model.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, userPrompt)
+                            LlmTranslationClient.callOpenAiCompatibleLlm(config.url, config.key, config.model.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, userPrompt, ::emitError)
                         }
                     }
 
@@ -859,317 +839,7 @@ object TranslationService {
         return llmResult
     }
 
-    private fun callClaudeAnthropic(
-        apiKey: String,
-        model: String,
-        systemPrompt: String,
-        userPrompt: String
-    ): String? {
-        return try {
-            val endpoint = "https://api.anthropic.com/v1/messages"
-            val payload = JSONObject().apply {
-                put("model", model)
-                put("max_tokens", 4096)
-                put("system", systemPrompt)
-                put("messages", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("content", userPrompt)
-                    })
-                })
-            }
-
-            val req = Request.Builder()
-                .url(endpoint)
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", "2023-06-01")
-                .header("content-type", "application/json")
-                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-                .build()
-
-            llmClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    emitError("LLM Claude HTTP ${resp.code}")
-                    return null
-                }
-                val body = resp.body?.string() ?: return null
-                val json = JSONObject(body)
-                val contentArray = json.optJSONArray("content") ?: return null
-                if (contentArray.length() == 0) return null
-                contentArray.getJSONObject(0).optString("text")?.trim()
-            }
-        } catch (e: Exception) {
-            emitError("LLM Claude gagal: ${e.javaClass.simpleName}")
-            null
-        }
-    }
-
-    private fun callOpenAiCompatibleLlm(
-        baseUrl: String,
-        apiKey: String,
-        model: String,
-        systemPrompt: String,
-        userPrompt: String
-    ): String? {
-        return try {
-            val endpoint = baseUrl.trimEnd('/') + if (baseUrl.trimEnd('/').endsWith("/chat/completions")) "" else "/chat/completions"
-            val messages = JSONArray().apply {
-                put(JSONObject().apply {
-                    put("role", "system")
-                    put("content", systemPrompt)
-                })
-                put(JSONObject().apply {
-                    put("role", "user")
-                    put("content", userPrompt)
-                })
-            }
-            val payload = JSONObject().apply {
-                put("model", model)
-                put("messages", messages)
-                put("temperature", 0.3)
-            }
-            val req = Request.Builder()
-                .url(endpoint)
-                .header("Authorization", "Bearer $apiKey")
-                .header("Content-Type", "application/json")
-                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-                .build()
-
-            llmClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    emitError("LLM API HTTP ${resp.code}")
-                    return null
-                }
-                val body = resp.body?.string() ?: return null
-                val json = JSONObject(body)
-                val choices = json.optJSONArray("choices") ?: return null
-                if (choices.length() == 0) return null
-                choices.getJSONObject(0).optJSONObject("message")?.optString("content")?.trim()
-            }
-        } catch (e: Exception) {
-            emitError("LLM API gagal: ${e.javaClass.simpleName}")
-            null
-        }
-    }
-
-    private fun translateViaGoogleWeb(text: String, tl: String, sl: String = "auto"): String? {
-        if (System.currentTimeMillis() < googleRateLimitUntilMs) {
-            return null
-        }
-
-        val trimmed = text.trim()
-        if (trimmed.isEmpty()) return ""
-
-        val encoded = try {
-            URLEncoder.encode(trimmed, "UTF-8")
-        } catch (_: Exception) {
-            return null
-        }
-
-        // 1. Jika payload pendek/sedang (<= 1200 chars encoded): prioritaskan GET translate.googleapis.com gtx
-        if (encoded.length <= 1200) {
-            val gtxUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t&q=$encoded"
-            tryGet(gtxUrl)?.let { return it }
-            if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
-
-            if (sl != "auto") {
-                val gtxAutoUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t&q=$encoded"
-                tryGet(gtxAutoUrl)?.let { return it }
-                if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
-            }
-
-            if (trimmed.length <= 500) {
-                val clients5Url = "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=$sl&tl=$tl&q=$encoded"
-                tryGet(clients5Url)?.let { return it }
-                if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
-            }
-        }
-
-        // 2. Untuk payload batch panjang (> 1200 chars) atau fallback jika GET gagal: POST FormBody ke gtx
-        val postUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t"
-        tryPost(postUrl, trimmed)?.let { return it }
-        if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
-
-        if (sl != "auto") {
-            val postAutoUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t"
-            tryPost(postAutoUrl, trimmed)?.let { return it }
-        }
-
-        return null
-    }
-
-    private fun tryGet(url: String): String? {
-        return try {
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", USER_AGENT)
-                .get()
-                .build()
-
-            webClient.newCall(req).execute().use { resp ->
-                if (resp.isSuccessful) {
-                    lastNetworkError = null
-                    parseGoogleWebResponse(resp.body?.string())
-                } else {
-                    if (resp.code == 429 || resp.code == 403) {
-                        googleRateLimitUntilMs = System.currentTimeMillis() + 15_000L
-                    }
-                    lastNetworkError = "HTTP ${resp.code}"
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            lastNetworkError = e.javaClass.simpleName
-            null
-        }
-    }
-
-    private fun tryPost(url: String, text: String): String? {
-        return try {
-            val formBody = FormBody.Builder()
-                .add("q", text)
-                .build()
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", USER_AGENT)
-                .post(formBody)
-                .build()
-
-            webClient.newCall(req).execute().use { resp ->
-                if (resp.isSuccessful) {
-                    lastNetworkError = null
-                    parseGoogleWebResponse(resp.body?.string())
-                } else {
-                    if (resp.code == 429 || resp.code == 403) {
-                        googleRateLimitUntilMs = System.currentTimeMillis() + 15_000L
-                    }
-                    lastNetworkError = "HTTP ${resp.code}"
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            lastNetworkError = e.javaClass.simpleName
-            null
-        }
-    }
-
-    fun parseGoogleWebResponse(body: String?): String? {
-        if (body.isNullOrBlank()) return null
-        return try {
-            val array = JSONArray(body)
-            // 1. Format clients5.google.com: ["translated text 1", "translated text 2", ...]
-            val firstStr = array.optString(0, null)
-            if (firstStr != null && array.optJSONArray(0) == null) {
-                val sb = StringBuilder()
-                for (i in 0 until array.length()) {
-                    val s = array.optString(i)
-                    if (!s.isNullOrBlank()) sb.append(s)
-                }
-                val res = sb.toString().trim()
-                return if (res.isNotBlank()) cleanHtmlEntities(res) else null
-            }
-
-            // 2. Format single?client=gtx: [[["translated", "source", ...]], ...]
-            val parts = array.optJSONArray(0) ?: return null
-            val sb = StringBuilder()
-            for (i in 0 until parts.length()) {
-                val item = parts.optJSONArray(i)
-                val segment = item?.optString(0)
-                if (!segment.isNullOrBlank()) {
-                    sb.append(segment)
-                }
-            }
-            val res = sb.toString().trim()
-            if (res.isNotBlank()) cleanHtmlEntities(res) else null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun translateViaMyMemory(text: String, targetLang: String, sourceLang: String = "ja"): String? {
-        if (text.length > 400) return null
-        return try {
-            val encoded = URLEncoder.encode(text, "UTF-8")
-            val tl = if (targetLang.startsWith("id") || targetLang.startsWith("in")) "id" else targetLang
-            val sl = if (sourceLang.startsWith("zh")) "zh" else "ja"
-            val langPair = "$sl|$tl"
-            val url = "https://api.mymemory.translated.net/get?q=$encoded&langpair=$langPair"
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", USER_AGENT)
-                .build()
-
-            webClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val body = resp.body?.string() ?: return null
-                val json = JSONObject(body)
-                val status = json.optInt("responseStatus", 0)
-                if (status == 200) {
-                    val resData = json.optJSONObject("responseData")
-                    val trans = resData?.optString("translatedText")?.trim()
-                    if (!trans.isNullOrBlank() && !trans.contains("MYMEMORY WARNING")) {
-                        cleanHtmlEntities(trans)
-                    } else null
-                } else null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun translateViaMicrosoftEdge(text: String, tl: String): String? {
-        return try {
-            val target = if (tl.startsWith("zh")) "zh-Hans" else tl
-            val url = "https://api-edge.cognitive.microsofttranslator.com/translate?from=auto&to=$target&api-version=3.0"
-            val payload = JSONArray().apply {
-                put(JSONObject().apply { put("Text", text) })
-            }
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", EDGE_USER_AGENT)
-                .header("Content-Type", "application/json")
-                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-                .build()
-
-            webClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val body = resp.body?.string() ?: return null
-                val array = JSONArray(body)
-                if (array.length() == 0) return null
-                val translations = array.getJSONObject(0).optJSONArray("translations") ?: return null
-                if (translations.length() == 0) return null
-                val trans = translations.getJSONObject(0).optString("text")?.trim()
-                if (!trans.isNullOrBlank()) cleanHtmlEntities(trans) else null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun translateViaYoudaoWeb(text: String, tl: String): String? {
-        return try {
-            val encoded = URLEncoder.encode(text, "UTF-8")
-            val target = if (tl.startsWith("id")) "id" else tl
-            val url = "https://aidemo.youdao.com/trans?q=$encoded&from=auto&to=$target"
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", USER_AGENT)
-                .build()
-
-            webClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val body = resp.body?.string() ?: return null
-                val json = JSONObject(body)
-                val transArray = json.optJSONArray("translation")
-                if (transArray != null && transArray.length() > 0) {
-                    val res = transArray.optString(0)
-                    if (!res.isNullOrBlank()) cleanHtmlEntities(res) else null
-                } else null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
+    fun parseGoogleWebResponse(body: String?): String? = WebTranslationProviders.parseGoogleWebResponse(body)
 
     private fun normalizeTargetLang(targetLang: String): String {
         val lower = targetLang.lowercase()
@@ -1180,14 +850,5 @@ object TranslationService {
             lower.startsWith("en") -> "en"
             else -> lower
         }
-    }
-
-    private fun cleanHtmlEntities(text: String): String {
-        return text
-            .replace("&quot;", "\"")
-            .replace("&#39;", "'")
-            .replace("&amp;", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
     }
 }
