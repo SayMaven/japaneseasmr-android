@@ -37,6 +37,8 @@ import com.saymaven.downloader.japaneseasmr.data.remote.TrackDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.lyrics.LyricLine
 import com.saymaven.downloader.japaneseasmr.service.lyrics.LyricsParser
 import com.saymaven.downloader.japaneseasmr.service.lyrics.SubtitleSource
+import com.saymaven.downloader.japaneseasmr.ui.screens.player.delegates.PlayerLyricsDelegate
+import com.saymaven.downloader.japaneseasmr.ui.screens.player.delegates.PlayerTranslationDelegate
 import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import com.saymaven.downloader.japaneseasmr.service.ChapterDiscoveryService
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
@@ -392,24 +394,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Audio Gain Flow
     val audioGainDb = prefs.audioGainDbFlow.stateIn(viewModelScope, SharingStarted.Lazily, prefs.getInitialAudioGainDb())
 
-    // Lyrics & Floating Lyrics State
-    private val _currentLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
-    val currentLyrics = _currentLyrics.asStateFlow()
+    // Lyrics & Floating Lyrics Delegates
+    private val lyricsDelegate by lazy {
+        PlayerLyricsDelegate(
+            appContext = getApplication(),
+            scope = viewModelScope,
+            prefs = prefs,
+            historyDao = historyDao,
+            getPlayer = { player },
+            getCurrentRjId = { _currentRjId.value },
+            getCurrentTitle = { _currentTitle.value },
+            getCurrentChapters = { _currentChapters.value },
+            getIsOnlineStreaming = { _isOnlineStreaming.value },
+            getIsVirtualAlbum = { isCurrentVirtualAlbum },
+            getCurrentStreamTrackTitle = { _currentStreamTrackTitle.value },
+            setCurrentStreamTrackTitle = { _currentStreamTrackTitle.value = it },
+            getCurrentAlbumHistory = { currentAlbumHistory }
+        )
+    }
 
-    private val _activeLyricIndex = MutableStateFlow(-1)
-    val activeLyricIndex = _activeLyricIndex.asStateFlow()
-
-    private val _availableSubtitles = MutableStateFlow<List<SubtitleSource>>(emptyList())
-    val availableSubtitles = _availableSubtitles.asStateFlow()
-
-    private val _selectedSubtitleSource = MutableStateFlow<SubtitleSource?>(null)
-    val selectedSubtitleSource = _selectedSubtitleSource.asStateFlow()
-
-    private val _isLyricsTranslated = MutableStateFlow(false)
-    val isLyricsTranslated = _isLyricsTranslated.asStateFlow()
-
-    private val _isTranslatingLyrics = MutableStateFlow(false)
-    val isTranslatingLyrics = _isTranslatingLyrics.asStateFlow()
+    val currentLyrics: StateFlow<List<LyricLine>> get() = lyricsDelegate.currentLyrics
+    val activeLyricIndex: StateFlow<Int> get() = lyricsDelegate.activeLyricIndex
+    val availableSubtitles: StateFlow<List<SubtitleSource>> get() = lyricsDelegate.availableSubtitles
+    val selectedSubtitleSource: StateFlow<SubtitleSource?> get() = lyricsDelegate.selectedSubtitleSource
+    val isLyricsTranslated: StateFlow<Boolean> get() = lyricsDelegate.isLyricsTranslated
+    val isTranslatingLyrics: StateFlow<Boolean> get() = lyricsDelegate.isTranslatingLyrics
 
     val floatingLyricsEnabled = prefs.floatingLyricsEnabledFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
     val floatingLyricsFontSize = prefs.floatingLyricsFontSizeFlow.stateIn(viewModelScope, SharingStarted.Lazily, 14f)
@@ -418,12 +427,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val floatingLyricsShowTranslation = prefs.floatingLyricsShowTranslationFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
     val floatingLyricsDisplayMode = prefs.floatingLyricsDisplayModeFlow.stateIn(viewModelScope, SharingStarted.Lazily, "BOTH")
     val floatingLyricsLocked = prefs.floatingLyricsLockedFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
-
-    private var lyricsJob: Job? = null
-    private var translationJob: Job? = null
-    private var lastTranslatedKey: String? = null
-    private val workTreeCache = mutableMapOf<String, List<AsmrOneFileNode>>()
-    private val subtitleTextCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     private val _currentArtist = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_artist", "-") ?: "-" else "-")
     val currentArtist = _currentArtist.asStateFlow()
@@ -463,25 +466,33 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _isLoadingChapters = MutableStateFlow(false)
     val isLoadingChapters = _isLoadingChapters.asStateFlow()
 
-    // Translation States
-    private val _isTranslationActive = MutableStateFlow(false)
-    val isTranslationActive = _isTranslationActive.asStateFlow()
+    // Translation Delegate
+    private val translationDelegate by lazy {
+        PlayerTranslationDelegate(
+            appContext = getApplication(),
+            scope = viewModelScope,
+            prefs = prefs,
+            sp = sp,
+            historyDao = historyDao,
+            getCurrentRjId = { _currentRjId.value },
+            getCurrentTitle = { _currentTitle.value },
+            getCurrentChapters = { _currentChapters.value },
+            getIsOnlineStreaming = { _isOnlineStreaming.value },
+            onClearPlaylistEntityTranslations = {
+                val current = _playlist.value
+                if (current.isNotEmpty()) {
+                    _playlist.value = current.map { it.copy(translatedTitle = null, translatedChaptersJson = null) }
+                }
+            }
+        )
+    }
 
-    // Status terjemahan khusus daftar/header Koleksi Lokal (terpisah dari terjemahan pemutar)
-    private val _isPlaylistTranslationActive = MutableStateFlow(false)
-    val isPlaylistTranslationActive = _isPlaylistTranslationActive.asStateFlow()
-
-    private val _isTranslating = MutableStateFlow(false)
-    val isTranslating = _isTranslating.asStateFlow()
-
-    private val _translatedTitle = MutableStateFlow<String?>(null)
-    val translatedTitle = _translatedTitle.asStateFlow()
-
-    private val _translatedChapters = MutableStateFlow<List<ChapterItem>>(emptyList())
-    val translatedChapters = _translatedChapters.asStateFlow()
-
-    private val _playlistTranslatedTitles = MutableStateFlow<Map<String, String>>(emptyMap())
-    val playlistTranslatedTitles = _playlistTranslatedTitles.asStateFlow()
+    val isTranslationActive: StateFlow<Boolean> get() = translationDelegate.isTranslationActive
+    val isPlaylistTranslationActive: StateFlow<Boolean> get() = translationDelegate.isPlaylistTranslationActive
+    val isTranslating: StateFlow<Boolean> get() = translationDelegate.isTranslating
+    val translatedTitle: StateFlow<String?> get() = translationDelegate.translatedTitle
+    val translatedChapters: StateFlow<List<ChapterItem>> get() = translationDelegate.translatedChapters
+    val playlistTranslatedTitles: StateFlow<Map<String, String>> get() = translationDelegate.playlistTranslatedTitles
 
     val activeChapterIndex = combine(_currentPosition, _currentChapters) { pos, chapters ->
         if (chapters.isEmpty()) -1
@@ -746,17 +757,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         saveFastCachedPlaylist(sorted)
 
         // Preload judul terjemahan yang sudah tersimpan di database Room
-        val preloadedTranslations = mutableMapOf<String, String>()
-        for (item in sorted) {
-            if (!item.translatedTitle.isNullOrBlank()) {
-                preloadedTranslations[item.rjid] = item.translatedTitle
-            }
-        }
-        if (preloadedTranslations.isNotEmpty()) {
-            val merged = _playlistTranslatedTitles.value.toMutableMap()
-            merged.putAll(preloadedTranslations)
-            _playlistTranslatedTitles.value = merged
-        }
+        translationDelegate.preloadFromHistory(sorted)
 
         // Otomatis lengkapi metadata karya lokal yang belum memiliki tag/usia
         autoEnrichIncompleteMetadata(sorted)
@@ -911,42 +912,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun observeTranslationPreference() {
-        viewModelScope.launch {
-            prefs.autoTranslatePlayerFlow.distinctUntilChanged().collect { autoActive ->
-                _isTranslationActive.value = autoActive
-                if (autoActive) {
-                    if (!_currentRjId.value.isNullOrBlank()) {
-                        loadOrFetchTranslations(_currentRjId.value)
-                    }
-                } else {
-                    _translatedTitle.value = null
-                    _translatedChapters.value = emptyList()
-                }
-            }
-        }
-        viewModelScope.launch {
-            prefs.autoTranslateListsFlow.distinctUntilChanged().collect { autoActive ->
-                _isPlaylistTranslationActive.value = autoActive
-                if (!autoActive) {
-                    _playlistTranslatedTitles.value = emptyMap()
-                }
-            }
-        }
-        viewModelScope.launch {
-            var isFirstLang = true
-            prefs.translationLanguageFlow.distinctUntilChanged().collect { _ ->
-                if (isFirstLang) {
-                    isFirstLang = false
-                    return@collect
-                }
-                if (_isPlaylistTranslationActive.value) {
-                    _playlistTranslatedTitles.value = emptyMap()
-                }
-                if (_isTranslationActive.value && !_currentRjId.value.isNullOrBlank()) {
-                    loadOrFetchTranslations(_currentRjId.value, forceOnline = true)
-                }
-            }
-        }
+        translationDelegate.observePreferences()
     }
 
     // Ultra-Fast In-Memory Reorder (0 disk I/O, 0 IPC calls during drag)
@@ -1117,7 +1083,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     _repeatMode.value = prefs.repeatModeFlow.first()
                     _shuffleMode.value = prefs.shuffleModeFlow.first()
-                    if (_isTranslationActive.value) {
+                    if (translationDelegate.isTranslationActive.value) {
                         loadOrFetchTranslations(history.rjid)
                     }
 
@@ -1331,11 +1297,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             }
                             if (prevRj != cleanId && cleanId.isNotBlank() && !cleanId.startsWith("http") && !cleanId.contains('/')) {
                                 loadChaptersForCurrentTrack(cleanId)
-                                if (_isTranslationActive.value) {
+                                if (translationDelegate.isTranslationActive.value) {
                                     loadOrFetchTranslations(cleanId)
                                 } else {
-                                    _translatedTitle.value = null
-                                    _translatedChapters.value = emptyList()
+                                    translationDelegate.resetPlayerTranslations()
                                 }
                             }
                             mediaItem.mediaMetadata.let { meta ->
@@ -1699,11 +1664,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _currentCoverUrl.value = finalCover
                 preloadCoverArtInMemory(finalCover)
                 loadChaptersForCurrentTrack(history.rjid)
-                if (_isTranslationActive.value) {
+                if (translationDelegate.isTranslationActive.value) {
                     loadOrFetchTranslations(history.rjid)
                 } else {
-                    _translatedTitle.value = null
-                    _translatedChapters.value = emptyList()
+                    translationDelegate.resetPlayerTranslations()
                 }
 
                 p.setMediaItems(listOf(singleMediaItem), 0, startPositionMs)
@@ -1763,9 +1727,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
             _currentChapters.value = chapters
             _duration.value = accumulatedMs
-            _translatedTitle.value = null
-            _translatedChapters.value = emptyList()
-            if (_isTranslationActive.value) {
+            translationDelegate.resetPlayerTranslations()
+            if (translationDelegate.isTranslationActive.value) {
                 loadOrFetchTranslations(rjid, forceOnline = true)
             }
             _audioSpecs.value = "44.1kHz | 16bits | STREAM"
@@ -2271,291 +2234,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun clearInMemoryTranslations() {
-        _playlistTranslatedTitles.value = emptyMap()
-        _translatedTitle.value = null
-        _translatedChapters.value = emptyList()
-        lastTranslatedKey = null
-        val current = _playlist.value
-        if (current.isNotEmpty()) {
-            _playlist.value = current.map { it.copy(translatedTitle = null, translatedChaptersJson = null) }
-        }
-    }
+    fun clearInMemoryTranslations() = translationDelegate.clearInMemoryTranslations()
 
-    /** Toggle terjemahan pemutar (judul + bab) saja; tidak memengaruhi daftar Koleksi Lokal. */
-    fun toggleTranslation(context: Context? = null) {
-        val next = !_isTranslationActive.value
-        _isTranslationActive.value = next
-        viewModelScope.launch {
-            if (next) {
-                if (!_currentRjId.value.isNullOrBlank()) {
-                    loadOrFetchTranslations(_currentRjId.value, forceOnline = _isOnlineStreaming.value)
-                }
-            } else {
-                _translatedTitle.value = null
-                _translatedChapters.value = emptyList()
-            }
-        }
-    }
+    fun toggleTranslation(context: Context? = null) = translationDelegate.toggleTranslation()
 
-    /** Toggle terjemahan judul pada header Koleksi Lokal saja; tidak memengaruhi pemutar. */
-    fun togglePlaylistTranslation() {
-        val next = !_isPlaylistTranslationActive.value
-        _isPlaylistTranslationActive.value = next
-        if (!next) {
-            pageTranslateJob?.cancel()
-            _playlistTranslatedTitles.value = emptyMap()
-        }
-    }
-
-    private var pageTranslateJob: kotlinx.coroutines.Job? = null
+    fun togglePlaylistTranslation() = translationDelegate.togglePlaylistTranslation()
 
     fun translateCurrentPageTitles(
         items: List<com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity>,
         forceRefresh: Boolean = false
-    ) {
-        if (items.isEmpty()) return
-        pageTranslateJob?.cancel()
-        pageTranslateJob = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-                val provider = TranslationService.getActiveProvider(getApplication())
-
-                val lastLang = sp.getString("last_playlist_trans_lang", null)
-                val langChanged = lastLang != targetLang
-                if (langChanged) {
-                    sp.edit().putString("last_playlist_trans_lang", targetLang).apply()
-                    if (lastLang != null) {
-                        historyDao.clearAllTranslations()
-                        clearInMemoryTranslations()
-                    }
-                }
-
-                val effectiveForce = forceRefresh || langChanged
-                val currentMap = _playlistTranslatedTitles.value.toMutableMap()
-
-                // Pertama, isi dari DB History jika sudah ada terjemahan valid (0ms, tanpa network)
-                val needOnline = mutableListOf<com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity>()
-                for (item in items) {
-                    if (!effectiveForce && !TranslationService.isPoisonedTranslation(item.title, item.translatedTitle, targetLang)) {
-                        currentMap[item.rjid] = item.translatedTitle!!
-                    } else if (effectiveForce || currentMap[item.rjid].isNullOrBlank()) {
-                        needOnline.add(item)
-                    }
-                }
-                if (currentMap.isNotEmpty()) {
-                    _playlistTranslatedTitles.value = currentMap.toMap()
-                }
-                if (needOnline.isEmpty()) return@launch
-
-                val titles = needOnline.map { it.title }
-                val batchResult = TranslationService.translateBatch(titles, targetLang, provider)
-                val updatedMap = _playlistTranslatedTitles.value.toMutableMap()
-
-                needOnline.forEach { item ->
-                    val tr = batchResult[item.title]
-                    if (!tr.isNullOrBlank() && !TranslationService.isPoisonedTranslation(item.title, tr, targetLang)) {
-                        updatedMap[item.rjid] = tr
-                        if (item.translatedTitle != tr) {
-                            historyDao.updateTranslations(item.rjid, tr, item.translatedChaptersJson)
-                        }
-                    }
-                }
-                _playlistTranslatedTitles.value = updatedMap.toMap()
-            } catch (_: kotlinx.coroutines.CancellationException) {
-                // Dibatalkan normal saat scroll cepat
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
+    ) = translationDelegate.translateCurrentPageTitles(items, forceRefresh)
 
     fun translateCustomPlaylistTitles(
         items: List<com.saymaven.downloader.japaneseasmr.data.local.entity.PlaylistItemEntity>,
         forceRefresh: Boolean = false
-    ) {
-        if (!_isPlaylistTranslationActive.value || items.isEmpty()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-            val provider = TranslationService.getActiveProvider(getApplication())
-            val currentMap = _playlistTranslatedTitles.value.toMutableMap()
-
-            val needTranslation = if (forceRefresh) items else items.filter { currentMap[it.rjid].isNullOrBlank() }
-            if (needTranslation.isEmpty()) return@launch
-
-            val titles = needTranslation.map { it.title }
-            val batchResult = TranslationService.translateBatch(titles, targetLang, provider)
-            items.forEach { item ->
-                val tr = batchResult[item.title]
-                if (!tr.isNullOrBlank()) {
-                    currentMap[item.rjid] = tr
-                }
-            }
-            _playlistTranslatedTitles.value = currentMap
-        }
-    }
+    ) = translationDelegate.translateCustomPlaylistTitles(items, forceRefresh)
 
     fun translatePlaylistTitles(targetLang: String = TranslationService.getActiveTargetLanguage(getApplication())) {
         translateCurrentPageTitles(_playlist.value.take(40))
     }
 
-    fun loadOrFetchTranslations(targetRjid: String? = _currentRjId.value, forceOnline: Boolean = false) {
-        if (targetRjid.isNullOrBlank()) {
-            _translatedTitle.value = null
-            _translatedChapters.value = emptyList()
-            return
-        }
-
-        translationJob?.cancel()
-        translationJob = viewModelScope.launch {
-            try {
-                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-                val currentKey = "$targetRjid:$targetLang:${_currentChapters.value.size}"
-
-                if (!forceOnline &&
-                    lastTranslatedKey == currentKey &&
-                    !_translatedTitle.value.isNullOrBlank() &&
-                    (_currentChapters.value.isEmpty() || _translatedChapters.value.size == _currentChapters.value.size)
-                ) {
-                    return@launch
-                }
-
-                val history = if (_isOnlineStreaming.value) null else withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
-
-                val rawTitle = (history?.title ?: _currentTitle.value)
-                    .replace("\\[$targetRjid\\]".toRegex(RegexOption.IGNORE_CASE), "")
-                    .trim()
-
-                // 1. Cek cache DB jika tidak forceOnline dan bukan stream online (pastikan bukan teks asli/beracun)
-                val hasValidTitle = history != null && !TranslationService.isPoisonedTranslation(rawTitle, history.translatedTitle, targetLang)
-                val currentChaps = _currentChapters.value
-                val parsedChaps = if (history != null && !history.translatedChaptersJson.isNullOrBlank()) {
-                    ChapterItem.fromJsonArray(history.translatedChaptersJson)
-                } else emptyList()
-                val hasValidChapters = currentChaps.isEmpty() || (
-                    parsedChaps.size == currentChaps.size &&
-                    !parsedChaps.indices.all { TranslationService.isPoisonedTranslation(currentChaps[it].title, parsedChaps[it].title, targetLang) }
-                )
-
-                if (!forceOnline && hasValidTitle && hasValidChapters) {
-                    _translatedTitle.value = history!!.translatedTitle
-                    if (parsedChaps.isNotEmpty()) {
-                        _translatedChapters.value = parsedChaps
-                    }
-                    lastTranslatedKey = currentKey
-                    return@launch
-                }
-                if (hasValidTitle) {
-                    _translatedTitle.value = history!!.translatedTitle
-                }
-
-                _isTranslating.value = true
-
-                val provider = TranslationService.getActiveProvider(getApplication())
-
-                kotlinx.coroutines.withTimeoutOrNull(45_000L) {
-                    coroutineScope {
-                        val titleDeferred = if (!forceOnline && hasValidTitle) null else async(Dispatchers.IO) {
-                            TranslationService.translateText(rawTitle, targetLang, provider)
-                        }
-                        val chapsDeferred = if (currentChaps.isNotEmpty() && (forceOnline || !hasValidChapters)) {
-                            async(Dispatchers.IO) {
-                                translateChaptersBatch(currentChaps, targetLang, provider)
-                            }
-                        } else null
-
-                        val translatedTitleRes = titleDeferred?.await() ?: history?.translatedTitle ?: rawTitle
-                        val validTitle = !TranslationService.isPoisonedTranslation(rawTitle, translatedTitleRes, targetLang)
-                        if (validTitle) {
-                            _translatedTitle.value = translatedTitleRes
-                        }
-
-                        val translatedChapsList = chapsDeferred?.await() ?: parsedChaps
-                        val validChapters = translatedChapsList.isNotEmpty() &&
-                            translatedChapsList.indices.any { i ->
-                                i < currentChaps.size && !TranslationService.isPoisonedTranslation(currentChaps[i].title, translatedChapsList[i].title, targetLang)
-                            }
-                        if (validChapters) {
-                            _translatedChapters.value = translatedChapsList
-                        }
-
-                        if (validTitle || validChapters) {
-                            lastTranslatedKey = currentKey
-                            val titleToSave = if (validTitle) translatedTitleRes else history?.translatedTitle
-                            val chapsJson = if (validChapters) {
-                                ChapterItem.toJsonArray(translatedChapsList)
-                            } else history?.translatedChaptersJson
-
-                            withContext(Dispatchers.IO) {
-                                historyDao.updateTranslations(targetRjid, titleToSave, chapsJson)
-                            }
-                        } else {
-                            _isTranslationActive.value = false
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                _isTranslating.value = false
-            }
-        }
-    }
-
-    private suspend fun translateChaptersBatch(
-        chapters: List<ChapterItem>,
-        targetLang: String,
-        provider: String = TranslationService.getActiveProvider(getApplication())
-    ): List<ChapterItem> = withContext(Dispatchers.IO) {
-        if (chapters.isEmpty()) return@withContext emptyList()
-        val titles = chapters.map { it.title }
-        val translatedMap = TranslationService.translateBatch(titles, targetLang, provider)
-        chapters.map { orig ->
-            orig.copy(title = translatedMap[orig.title] ?: orig.title)
-        }
-    }
+    fun loadOrFetchTranslations(targetRjid: String? = _currentRjId.value, forceOnline: Boolean = false) =
+        translationDelegate.loadOrFetchTranslations(targetRjid, forceOnline)
 
     private fun checkTranslateChaptersIfNeeded(
         targetRjid: String,
         chapters: List<ChapterItem>,
         forceOnline: Boolean = false
-    ) {
-        if (!_isTranslationActive.value || chapters.isEmpty()) return
-        viewModelScope.launch {
-            _isTranslating.value = true
-            try {
-                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-                val history = if (_isOnlineStreaming.value || forceOnline) null else withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
-                if (!forceOnline && !history?.translatedChaptersJson.isNullOrBlank()) {
-                    val parsed = ChapterItem.fromJsonArray(history!!.translatedChaptersJson)
-                    if (parsed.size == chapters.size) {
-                        val isAllPoisoned = parsed.indices.all {
-                            TranslationService.isPoisonedTranslation(chapters[it].title, parsed[it].title, targetLang)
-                        }
-                        if (!isAllPoisoned) {
-                            _translatedChapters.value = parsed
-                            lastTranslatedKey = "$targetRjid:$targetLang:${chapters.size}"
-                            return@launch
-                        }
-                    }
-                }
-                val translatedChapsList = translateChaptersBatch(chapters, targetLang)
-                _translatedChapters.value = translatedChapsList
-                lastTranslatedKey = "$targetRjid:$targetLang:${chapters.size}"
-                withContext(Dispatchers.IO) {
-                    historyDao.updateTranslations(
-                        targetRjid,
-                        _translatedTitle.value ?: history?.translatedTitle,
-                        ChapterItem.toJsonArray(translatedChapsList)
-                    )
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                _isTranslating.value = false
-            }
-        }
-    }
+    ) = translationDelegate.checkTranslateChaptersIfNeeded(targetRjid, chapters, forceOnline)
 
     private fun saveCacheSynchronously() {
         val autoResume = sp.getBoolean("setting_auto_resume", true)
@@ -2609,14 +2315,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         _currentPosition.value = p.currentPosition.coerceAtLeast(0L)
                         _duration.value = p.duration.coerceAtLeast(0L)
                     }
-                    val lyrics = _currentLyrics.value
-                    if (lyrics.isNotEmpty()) {
-                        val trackPosMs = p.currentPosition.coerceAtLeast(0L)
-                        val idx = LyricsParser.findActiveIndex(lyrics, trackPosMs)
-                        if (_activeLyricIndex.value != idx) {
-                            _activeLyricIndex.value = idx
-                        }
-                    }
+                    lyricsDelegate.updateActiveLyricForPosition(p.currentPosition.coerceAtLeast(0L))
                     saveCacheSynchronously()
                 }
                 delay(350)
@@ -2934,296 +2633,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         p.seekTo(line.startMs.coerceAtLeast(0L))
     }
 
-    fun selectSubtitleSource(source: SubtitleSource) {
-        _selectedSubtitleSource.value = source
-        _isLyricsTranslated.value = false
-        lyricsJob?.cancel()
-        lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-            val content = fetchSubtitleContent(source)
-            val parsed = if (!content.isNullOrBlank()) LyricsParser.parse(content, source.format) else emptyList()
-            _currentLyrics.value = parsed
-            _activeLyricIndex.value = -1
-        }
-    }
+    fun selectSubtitleSource(source: SubtitleSource) = lyricsDelegate.selectSubtitleSource(source)
 
-    fun toggleLyricsTranslation() {
-        val current = _currentLyrics.value
-        if (current.isEmpty()) return
+    fun toggleLyricsTranslation() = lyricsDelegate.toggleLyricsTranslation()
 
-        if (_isLyricsTranslated.value) {
-            _isLyricsTranslated.value = false
-            return
-        }
-
-        translateLyricsDirectly()
-    }
-
-    private fun translateLyricsDirectly() {
-        val current = _currentLyrics.value
-        if (current.isEmpty()) return
-
-        if (current.all { !it.translatedText.isNullOrBlank() }) {
-            _isLyricsTranslated.value = true
-            return
-        }
-
-        viewModelScope.launch {
-            _isTranslatingLyrics.value = true
-            try {
-                val targetLang = TranslationService.getActiveTargetLanguage(getApplication())
-                val llmUrl = prefs.llmApiUrlFlow.first()
-                val llmKey = prefs.llmApiKeyFlow.first()
-                val llmModel = prefs.llmModelFlow.first()
-                val llmPrompt = prefs.llmPromptFlow.first()
-                val concurrency = prefs.llmConcurrencyFlow.first()
-                val autoSave = prefs.autoSaveTranslatedLyricsFlow.first()
-
-                val texts = current.filter { it.translatedText.isNullOrBlank() }.map { it.text }
-                val provider = TranslationService.getActiveProvider(getApplication())
-                val translatedMap = TranslationService.translateLyricsNaturally(
-                    lines = texts,
-                    targetLang = targetLang,
-                    llmUrl = llmUrl,
-                    llmKey = llmKey,
-                    llmModel = llmModel,
-                    llmPrompt = llmPrompt,
-                    concurrency = concurrency,
-                    provider = provider
-                )
-
-                if (translatedMap.isEmpty()) {
-                    _isLyricsTranslated.value = false
-                    return@launch
-                }
-
-                _currentLyrics.value = current.map { line ->
-                    val existing = line.translatedText
-                    val newlyTranslated = translatedMap[line.text.trim()] ?: translatedMap[line.text]
-                    line.copy(translatedText = if (!existing.isNullOrBlank()) existing else newlyTranslated)
-                }
-                _isLyricsTranslated.value = _currentLyrics.value.any { !it.translatedText.isNullOrBlank() }
-
-                if (autoSave && translatedMap.isNotEmpty()) {
-                    withContext(Dispatchers.IO) {
-                        try {
-                            val dao = AsmrDatabase.getDatabase(getApplication()).translationCacheDao()
-                            val entities = translatedMap.map { (src, tr) ->
-                                com.saymaven.downloader.japaneseasmr.data.local.entity.TranslationCacheEntity(
-                                    sourceText = src,
-                                    targetLang = targetLang,
-                                    translatedText = tr
-                                )
-                            }
-                            dao.insertTranslations(entities)
-                        } catch (_: Exception) {}
-                    }
-                }
-            } finally {
-                _isTranslatingLyrics.value = false
-            }
-        }
-    }
-
-    private suspend fun autoTranslateLyricsIfEnabled() {
-        val autoTranslate = prefs.autoTranslateLyricsFlow.first()
-        if (autoTranslate && _currentLyrics.value.isNotEmpty() && !_isLyricsTranslated.value) {
-            translateLyricsDirectly()
-        }
-    }
-
-    fun loadLyricsForCurrentTrack() {
-        lyricsJob?.cancel()
-        lyricsJob = viewModelScope.launch(Dispatchers.IO) {
-            val curIdx = withContext(Dispatchers.Main) { player?.currentMediaItemIndex ?: 0 }
-            val trackName = if (_isOnlineStreaming.value) {
-                val chapTitle = _currentChapters.value.getOrNull(curIdx)?.title
-                if (!chapTitle.isNullOrBlank()) {
-                    _currentStreamTrackTitle.value = chapTitle
-                    chapTitle
-                } else {
-                    _currentStreamTrackTitle.value ?: _currentTitle.value
-                }
-            } else {
-                val p = withContext(Dispatchers.Main) { player?.currentMediaItem?.mediaMetadata?.title?.toString() }
-                p ?: _currentTitle.value
-            }
-
-            val sources = mutableListOf<SubtitleSource>()
-            var resolvedLocalAudioFile: File? = null
-            var resolvedHistory: HistoryEntity? = null
-
-            if (_isOnlineStreaming.value) {
-                val rj = _currentRjId.value ?: ""
-                if (rj.isNotBlank()) {
-                    val tree = workTreeCache[rj] ?: AsmrOneApiService.getWorkFileTree(rj).getOrNull()?.also {
-                        workTreeCache[rj] = it
-                    } ?: emptyList()
-                    collectRemoteSubtitles(tree, sources)
-                }
-            } else {
-                val mediaPath = withContext(Dispatchers.Main) { player?.currentMediaItem?.mediaId }
-                val rj = _currentRjId.value
-                resolvedHistory = if (!rj.isNullOrBlank()) historyDao.getHistoryById(rj) else null
-                resolvedLocalAudioFile = when {
-                    !mediaPath.isNullOrBlank() && File(mediaPath).exists() -> File(mediaPath)
-                    !resolvedHistory?.localFilePath.isNullOrBlank() && File(resolvedHistory!!.localFilePath).exists() -> File(resolvedHistory.localFilePath)
-                    else -> null
-                }
-
-                val searchDir = resolvedLocalAudioFile?.parentFile ?: currentAlbumHistory?.localFilePath?.let { File(it) }?.let {
-                    if (it.isDirectory) it else it.parentFile
-                }
-                if (searchDir != null && searchDir.exists()) {
-                    val allLocal = mutableListOf<SubtitleSource>()
-                    collectLocalSubtitles(searchDir, allLocal)
-                    if (!isCurrentVirtualAlbum && resolvedLocalAudioFile != null && resolvedLocalAudioFile.isFile) {
-                        val baseName = resolvedLocalAudioFile.nameWithoutExtension.lowercase()
-                        val rjLow = (rj ?: "").lowercase()
-                        sources.addAll(
-                            allLocal.filter { src ->
-                                val fName = File(src.pathOrUrl).nameWithoutExtension.lowercase()
-                                fName == baseName || (rjLow.isNotBlank() && fName.contains(rjLow))
-                            }
-                        )
-                    } else {
-                        sources.addAll(allLocal)
-                    }
-                }
-
-                // Auto-backfill from asmr.one for already-downloaded works that don't have local .vtt yet
-                if (sources.isEmpty()) {
-                    val lookupRj = (resolvedHistory?.linkedRjId?.takeIf { it.isNotBlank() } ?: rj).orEmpty()
-                    if (lookupRj.isNotBlank()) {
-                        val tree = workTreeCache[lookupRj] ?: AsmrOneApiService.getWorkFileTree(lookupRj).getOrNull()?.also {
-                            workTreeCache[lookupRj] = it
-                        } ?: emptyList()
-                        val remoteSubs = mutableListOf<SubtitleSource>()
-                        collectRemoteSubtitles(tree, remoteSubs)
-                        if (remoteSubs.isNotEmpty()) {
-                            if (isCurrentVirtualAlbum) {
-                                sources.addAll(remoteSubs)
-                            } else {
-                                val chaps = _currentChapters.value.ifEmpty {
-                                    ChapterItem.fromJsonArray(resolvedHistory?.chaptersJson)
-                                }
-                                val mergedLyrics = LyricsParser.buildMergedWorkLyrics(
-                                    rjid = lookupRj,
-                                    chapters = chaps,
-                                    remoteSources = remoteSubs
-                                ) { src -> fetchSubtitleContent(src) }
-                                if (mergedLyrics.isNotEmpty()) {
-                                    val savedVtt = resolvedLocalAudioFile?.takeIf { it.isFile }?.let { audioFile ->
-                                        runCatching {
-                                            val vttFile = File(audioFile.parentFile, "${audioFile.nameWithoutExtension}.vtt")
-                                            vttFile.writeText(LyricsParser.toWebVtt(mergedLyrics), Charsets.UTF_8)
-                                            vttFile
-                                        }.getOrNull()
-                                    }
-                                    val subSrc = if (savedVtt != null) {
-                                        SubtitleSource(savedVtt.name, savedVtt.absolutePath, "vtt", isRemote = false)
-                                    } else {
-                                        remoteSubs.first()
-                                    }
-                                    _availableSubtitles.value = listOf(subSrc)
-                                    _selectedSubtitleSource.value = subSrc
-                                    _currentLyrics.value = mergedLyrics
-                                    _isLyricsTranslated.value = false
-                                    _activeLyricIndex.value = -1
-                                    autoTranslateLyricsIfEnabled()
-                                    return@launch
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            _availableSubtitles.value = sources
-            if (sources.isEmpty()) {
-                _selectedSubtitleSource.value = null
-                _currentLyrics.value = emptyList()
-                _activeLyricIndex.value = -1
-                return@launch
-            }
-
-            val best = LyricsParser.matchBestSubtitle(sources, trackName, curIdx)
-            if (best == null) {
-                _selectedSubtitleSource.value = null
-                _currentLyrics.value = emptyList()
-                _activeLyricIndex.value = -1
-                return@launch
-            }
-            if (best.pathOrUrl == _selectedSubtitleSource.value?.pathOrUrl && _currentLyrics.value.isNotEmpty()) {
-                return@launch
-            }
-            _selectedSubtitleSource.value = best
-            val content = fetchSubtitleContent(best)
-            val parsed = if (!content.isNullOrBlank()) LyricsParser.parse(content, best.format) else emptyList()
-            _currentLyrics.value = parsed
-            _isLyricsTranslated.value = false
-            _activeLyricIndex.value = -1
-            autoTranslateLyricsIfEnabled()
-        }
-    }
-
-    private fun collectRemoteSubtitles(nodes: List<AsmrOneFileNode>, out: MutableList<SubtitleSource>) {
-        val exts = setOf("vtt", "lrc", "srt")
-        for (node in nodes) {
-            if (node.type == "folder") {
-                collectRemoteSubtitles(node.children, out)
-            } else {
-                val ext = node.title.substringAfterLast('.', "").lowercase()
-                if (ext in exts && node.streamUrl.isNotBlank()) {
-                    out.add(SubtitleSource(title = node.title, pathOrUrl = node.streamUrl, format = ext, isRemote = true))
-                }
-            }
-        }
-    }
-
-    private fun collectLocalSubtitles(dir: File, out: MutableList<SubtitleSource>) {
-        val exts = setOf("vtt", "lrc", "srt")
-        dir.walkTopDown().maxDepth(3).forEach { file ->
-            if (file.isFile) {
-                val ext = file.extension.lowercase()
-                if (ext in exts) {
-                    out.add(SubtitleSource(title = file.name, pathOrUrl = file.absolutePath, format = ext, isRemote = false))
-                }
-            }
-        }
-    }
-
-    private fun pickBestSubtitleForTrack(sources: List<SubtitleSource>, trackTitle: String): SubtitleSource {
-        fun cleanName(s: String): String = s.lowercase()
-            .replace(Regex("\\.(mp3|wav|flac|m4a|opus|aac|vtt|lrc|srt)$"), "")
-            .replace(Regex("\\s+"), "")
-        val target = cleanName(trackTitle)
-        return sources.maxByOrNull { src ->
-            val cand = cleanName(src.title)
-            var score = 0
-            if (cand == target) score += 100
-            else if (target.isNotEmpty() && (cand.contains(target) || target.contains(cand))) score += 60
-            if (src.format == "vtt") score += 10
-            else if (src.format == "lrc") score += 5
-            score
-        } ?: sources.first()
-    }
-
-    private suspend fun fetchSubtitleContent(source: SubtitleSource): String? {
-        subtitleTextCache[source.pathOrUrl]?.let { return it }
-        return try {
-            val content = if (!source.isRemote) {
-                File(source.pathOrUrl).readText(Charsets.UTF_8)
-            } else {
-                AsmrOneApiService.fetchRawText(source.pathOrUrl)
-            }
-            if (!content.isNullOrBlank()) {
-                subtitleTextCache[source.pathOrUrl] = content
-            }
-            content
-        } catch (_: Exception) {
-            null
-        }
-    }
+    fun loadLyricsForCurrentTrack() = lyricsDelegate.loadLyricsForCurrentTrack()
 
     override fun onCleared() {
         sleepTimerJob?.cancel()
