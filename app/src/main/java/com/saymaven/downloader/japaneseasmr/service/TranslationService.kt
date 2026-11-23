@@ -45,15 +45,15 @@ object TranslationService {
     private val memoryCache = ConcurrentHashMap<String, String>()
     private val cacheClearedListeners = java.util.Collections.synchronizedList(mutableListOf<() -> Unit>())
 
-    private val networkSemaphore = Semaphore(3)
+    private val networkSemaphore = Semaphore(6)
 
     private val client = OkHttpClient.Builder()
         .dispatcher(Dispatcher().apply {
-            maxRequests = 32
-            maxRequestsPerHost = 16
+            maxRequests = 64
+            maxRequestsPerHost = 32
         })
-        .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
         .build()
 
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
@@ -232,10 +232,10 @@ object TranslationService {
         // 3. Panggil Provider Aktif via Network Semaphore
         val rawOnline = networkSemaphore.withPermit {
             when (effectiveProvider.lowercase()) {
-                "microsoft" -> translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl)
-                "youdao" -> translateViaYoudaoWeb(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl)
-                "llm" -> translateViaLlmSingle(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl)
-                else -> translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl)
+                "microsoft" -> translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                "youdao" -> translateViaYoudaoWeb(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                "llm" -> translateViaLlmSingle(preProcessed, normalizedTl) ?: translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
+                else -> translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: translateViaMyMemory(preProcessed, normalizedTl, detectedSl)
             }
         }
 
@@ -774,6 +774,36 @@ object TranslationService {
             }
             val res = sb.toString().trim()
             if (res.isNotBlank()) cleanHtmlEntities(res) else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun translateViaMyMemory(text: String, targetLang: String, sourceLang: String = "ja"): String? {
+        return try {
+            val encoded = URLEncoder.encode(text, "UTF-8")
+            val tl = if (targetLang.startsWith("id") || targetLang.startsWith("in")) "id" else targetLang
+            val sl = if (sourceLang.startsWith("zh")) "zh" else "ja"
+            val langPair = "$sl|$tl"
+            val url = "https://api.mymemory.translated.net/get?q=$encoded&langpair=$langPair"
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                val json = JSONObject(body)
+                val status = json.optInt("responseStatus", 0)
+                if (status == 200) {
+                    val resData = json.optJSONObject("responseData")
+                    val trans = resData?.optString("translatedText")?.trim()
+                    if (!trans.isNullOrBlank() && !trans.contains("MYMEMORY WARNING")) {
+                        cleanHtmlEntities(trans)
+                    } else null
+                } else null
+            }
         } catch (_: Exception) {
             null
         }

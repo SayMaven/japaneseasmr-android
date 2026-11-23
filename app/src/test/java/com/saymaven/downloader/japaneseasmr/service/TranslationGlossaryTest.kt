@@ -77,4 +77,27 @@ class TranslationGlossaryTest {
         assertTrue("Pure Chinese title must trigger Chinese preprocessor", ChineseAsmrGlossary.containsChinese(cnTitle))
         org.junit.Assert.assertEquals("zh-CN", TranslationService.detectSourceLanguage(cnTitle))
     }
+
+    @Test
+    fun testLiveGoogleTranslation() = kotlinx.coroutines.runBlocking {
+        val result = TranslationService.translateText("こんにちは", "id", "google")
+        println("LIVE TRANSLATION RESULT: '$result'")
+        assertTrue("Translation should not be blank", result.isNotBlank())
+        assertTrue("Translation should be Halo", result.contains("Halo", ignoreCase = true) || result.contains("Selamat", ignoreCase = true))
+
+        val batchInput = listOf(
+            "【4泊5日 / ハーレムナース】勃起不全で入院したら夜勤ナースに再会",
+            "全裸土下座～泣きながら必死に土下座するJKをわからせ調教～",
+            "プロローグ",
+            "エピローグ"
+        )
+        val batchRes = TranslationService.translateBatch(batchInput, "id", "google")
+        println("LIVE BATCH RESULT: $batchRes")
+        org.junit.Assert.assertEquals(4, batchRes.size)
+        for (item in batchInput) {
+            val tr = batchRes[item]
+            println("TRANSLATION OF '$item': '$tr'")
+            assertFalse("Must not return original text as translation", tr.isNullOrBlank() || tr == item)
+        }
+    }
 }

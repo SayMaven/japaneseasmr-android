@@ -241,13 +241,13 @@ fun AsmrOneWorkDetailScreen(
 
                     IconButton(
                         onClick = {
-                            if (!isTitleTranslated && translatedTitleText == null) {
+                            if (!isTitleTranslated && (translatedTitleText == null || translatedTitleText == work.title)) {
                                 coroutineScope.launch {
                                     isTranslating = true
                                     val targetLang = TranslationService.getActiveTargetLanguage(context)
                                     val provider = TranslationService.getActiveProvider(context)
                                     val translated = TranslationService.translateText(work.title, targetLang, provider)
-                                    if (translated.isNotBlank()) {
+                                    if (translated.isNotBlank() && translated != work.title) {
                                         translatedTitleText = translated
                                         isTitleTranslated = true
                                     }

@@ -2305,11 +2305,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             val effectiveForce = forceRefresh || langChanged
-            val needTranslation = if (effectiveForce) items else items.filter { it.translatedTitle.isNullOrBlank() }
+            val needTranslation = if (effectiveForce) items else items.filter { it.translatedTitle.isNullOrBlank() || it.translatedTitle == it.title }
             if (needTranslation.isEmpty()) {
                 val currentMap = _playlistTranslatedTitles.value.toMutableMap()
                 items.forEach { item ->
-                    if (!item.translatedTitle.isNullOrBlank()) {
+                    if (!item.translatedTitle.isNullOrBlank() && item.translatedTitle != item.title) {
                         currentMap[item.rjid] = item.translatedTitle
                     }
                 }
@@ -2386,8 +2386,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 val history = if (_isOnlineStreaming.value) null else withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }
 
-                // 1. Cek cache DB jika tidak forceOnline dan bukan stream online
-                if (!forceOnline && history != null && !history.translatedTitle.isNullOrBlank()) {
+                val rawTitle = (history?.title ?: _currentTitle.value)
+                    .replace("\\[$targetRjid\\]".toRegex(RegexOption.IGNORE_CASE), "")
+                    .trim()
+
+                // 1. Cek cache DB jika tidak forceOnline dan bukan stream online (pastikan bukan teks asli yang gagal)
+                if (!forceOnline && history != null && !history.translatedTitle.isNullOrBlank() && history.translatedTitle != rawTitle) {
                     _translatedTitle.value = history.translatedTitle
                     if (!history.translatedChaptersJson.isNullOrBlank()) {
                         val parsed = ChapterItem.fromJsonArray(history.translatedChaptersJson)
@@ -2398,11 +2402,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
 
                 _isTranslating.value = true
-
-                // Terjemahkan Judul Karya
-                val rawTitle = (history?.title ?: _currentTitle.value)
-                    .replace("\\[$targetRjid\\]".toRegex(RegexOption.IGNORE_CASE), "")
-                    .trim()
 
                 val provider = TranslationService.getActiveProvider(getApplication())
                 val translatedTitleRes = withContext(Dispatchers.IO) {
@@ -2462,9 +2461,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (!forceOnline && !history?.translatedChaptersJson.isNullOrBlank()) {
                     val parsed = ChapterItem.fromJsonArray(history!!.translatedChaptersJson)
                     if (parsed.size == chapters.size) {
-                        _translatedChapters.value = parsed
-                        lastTranslatedKey = "$targetRjid:$targetLang:${chapters.size}"
-                        return@launch
+                        val isAllIdentical = parsed.indices.all { parsed[it].title == chapters[it].title }
+                        if (!isAllIdentical) {
+                            _translatedChapters.value = parsed
+                            lastTranslatedKey = "$targetRjid:$targetLang:${chapters.size}"
+                            return@launch
+                        }
                     }
                 }
                 val translatedChapsList = translateChaptersBatch(chapters, targetLang)

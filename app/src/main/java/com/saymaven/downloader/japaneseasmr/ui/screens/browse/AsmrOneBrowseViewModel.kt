@@ -383,14 +383,17 @@ class AsmrOneBrowseViewModel(application: Application) : AndroidViewModel(applic
             if (targetLang == "ja") return@launch
 
             val currentMap = if (forceRefresh) mutableMapOf() else _translatedTitles.value.toMutableMap()
-            val worksToTranslate = if (forceRefresh) _works.value else _works.value.filter { it.rjid !in currentMap }
+            val worksToTranslate = if (forceRefresh) _works.value else _works.value.filter { 
+                val existing = currentMap[it.rjid]
+                existing.isNullOrBlank() || existing == it.title
+            }
             if (worksToTranslate.isEmpty()) return@launch
 
             val titles = worksToTranslate.map { it.title }
             val batchResults = TranslationService.translateBatch(titles, targetLang, provider)
             for (w in worksToTranslate) {
                 val tr = batchResults[w.title]
-                if (!tr.isNullOrBlank()) {
+                if (!tr.isNullOrBlank() && tr != w.title) {
                     currentMap[w.rjid] = tr
                 }
             }
