@@ -100,4 +100,17 @@ class TranslationGlossaryTest {
             assertFalse("Must not return original text as translation", tr.isNullOrBlank() || tr == item)
         }
     }
+
+    @Test
+    fun testParseGoogleWebResponse_bothFormats() {
+        // Format 1: clients5.google.com JSON string array
+        val clients5Json = "[\"Halo dunia\"]"
+        val parsed1 = TranslationService.parseGoogleWebResponse(clients5Json)
+        assertEquals("Halo dunia", parsed1)
+
+        // Format 2: translate.googleapis.com gtx multi-dimensional array
+        val gtxJson = "[[[\"Halo dunia\",\"こんにちは世界\",null,null,10]],null,\"ja\"]"
+        val parsed2 = TranslationService.parseGoogleWebResponse(gtxJson)
+        assertEquals("Halo dunia", parsed2)
+    }
 }

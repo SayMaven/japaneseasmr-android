@@ -45,15 +45,16 @@ object TranslationService {
     private val memoryCache = ConcurrentHashMap<String, String>()
     private val cacheClearedListeners = java.util.Collections.synchronizedList(mutableListOf<() -> Unit>())
 
-    private val networkSemaphore = Semaphore(6)
+    private val networkSemaphore = Semaphore(8)
 
     private val client = OkHttpClient.Builder()
         .dispatcher(Dispatcher().apply {
             maxRequests = 64
             maxRequestsPerHost = 32
         })
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(4, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .callTimeout(8, TimeUnit.SECONDS)
         .build()
 
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
@@ -409,12 +410,16 @@ object TranslationService {
                                     }
                                 }
                             } else {
-                                // Fallback bertahap: jika ada format delimiter yang rusak, fallback ke chunk kecil
-                                for (src in chunk) {
-                                    val tr = translateText(src, effectiveTargetLang, effectiveProvider)
-                                    if (tr.isNotBlank()) {
-                                        result[src] = tr
-                                    }
+                                // Fallback bertahap: jika ada format delimiter yang rusak, fallback secara paralel
+                                coroutineScope {
+                                    chunk.map { src ->
+                                        async(Dispatchers.IO) {
+                                            val tr = translateText(src, effectiveTargetLang, effectiveProvider)
+                                            if (tr.isNotBlank() && tr != src) {
+                                                result[src] = tr
+                                            }
+                                        }
+                                    }.awaitAll()
                                 }
                             }
                         }
@@ -705,18 +710,53 @@ object TranslationService {
     }
 
     private fun translateViaGoogleWeb(text: String, tl: String, sl: String = "auto"): String? {
-        val clients = listOf("dict-chrome-ex", "gtx")
-        for (clientType in clients) {
-            val res = tryGoogleWeb(text, tl, sl, clientType)
-            if (!res.isNullOrBlank()) return res
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return ""
+
+        val encoded = try {
+            URLEncoder.encode(trimmed, "UTF-8")
+        } catch (_: Exception) {
+            return null
         }
+
+        // Endpoint 1: clients5.google.com (Super cepat ~100ms via Google Chrome Extension CDN)
+        val clients5Url = "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=$sl&tl=$tl&q=$encoded"
+        val r1 = tryGet(clients5Url)
+        if (!r1.isNullOrBlank()) return r1
+
+        // Endpoint 2: translate.googleapis.com single?client=gtx via GET (~150-250ms)
+        val gtxUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t&q=$encoded"
+        val r2 = tryGet(gtxUrl)
+        if (!r2.isNullOrBlank()) return r2
+
+        // Endpoint 3: Fallback POST FormBody jika teks panjang atau GET dibatasi
+        val postUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t"
+        val r3 = tryPost(postUrl, trimmed)
+        if (!r3.isNullOrBlank()) return r3
+
         return null
     }
 
-    private fun tryGoogleWeb(text: String, tl: String, sl: String, clientType: String): String? {
-        val url = "https://translate.googleapis.com/translate_a/single?client=$clientType&sl=$sl&tl=$tl&dt=t"
-        // 1. Coba via POST FormBody OkHttp (bebas batas panjang karakter URL)
-        val postResult = try {
+    private fun tryGet(url: String): String? {
+        return try {
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .get()
+                .build()
+
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    parseGoogleWebResponse(resp.body?.string())
+                } else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun tryPost(url: String, text: String): String? {
+        return try {
             val formBody = FormBody.Builder()
                 .add("q", text)
                 .build()
@@ -728,30 +768,7 @@ object TranslationService {
 
             client.newCall(req).execute().use { resp ->
                 if (resp.isSuccessful) {
-                    val body = resp.body?.string()
-                    parseGoogleWebResponse(body)
-                } else null
-            }
-        } catch (_: Exception) {
-            null
-        }
-
-        if (!postResult.isNullOrBlank()) return postResult
-
-        // 2. Fallback via GET jika POST gagal
-        return try {
-            val encoded = URLEncoder.encode(text, "UTF-8")
-            val getUrl = "$url&q=$encoded"
-            val req = Request.Builder()
-                .url(getUrl)
-                .header("User-Agent", USER_AGENT)
-                .get()
-                .build()
-
-            client.newCall(req).execute().use { resp ->
-                if (resp.isSuccessful) {
-                    val body = resp.body?.string()
-                    parseGoogleWebResponse(body)
+                    parseGoogleWebResponse(resp.body?.string())
                 } else null
             }
         } catch (_: Exception) {
@@ -759,10 +776,23 @@ object TranslationService {
         }
     }
 
-    private fun parseGoogleWebResponse(body: String?): String? {
+    fun parseGoogleWebResponse(body: String?): String? {
         if (body.isNullOrBlank()) return null
         return try {
             val array = JSONArray(body)
+            // 1. Format clients5.google.com: ["translated text 1", "translated text 2", ...]
+            val firstStr = array.optString(0, null)
+            if (firstStr != null && array.optJSONArray(0) == null) {
+                val sb = StringBuilder()
+                for (i in 0 until array.length()) {
+                    val s = array.optString(i)
+                    if (!s.isNullOrBlank()) sb.append(s)
+                }
+                val res = sb.toString().trim()
+                return if (res.isNotBlank()) cleanHtmlEntities(res) else null
+            }
+
+            // 2. Format single?client=gtx: [[["translated", "source", ...]], ...]
             val parts = array.optJSONArray(0) ?: return null
             val sb = StringBuilder()
             for (i in 0 until parts.length()) {

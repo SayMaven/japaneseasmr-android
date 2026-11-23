@@ -46,7 +46,9 @@ import com.saymaven.downloader.japaneseasmr.service.TranslationService
 import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import com.saymaven.downloader.japaneseasmr.util.AgeRatingHelper
@@ -2425,27 +2427,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _isTranslating.value = true
 
                 val provider = TranslationService.getActiveProvider(getApplication())
-                val translatedTitleRes = withContext(Dispatchers.IO) {
-                    TranslationService.translateText(rawTitle, targetLang, provider)
-                }
-                _translatedTitle.value = translatedTitleRes
 
-                // Terjemahkan Daftar Bab jika sudah ada
-                val currentChaps = _currentChapters.value
-                val translatedChapsList = if (currentChaps.isNotEmpty()) {
-                    translateChaptersBatch(currentChaps, targetLang, provider).also {
-                        _translatedChapters.value = it
+                coroutineScope {
+                    val titleDeferred = async(Dispatchers.IO) {
+                        TranslationService.translateText(rawTitle, targetLang, provider)
                     }
-                } else emptyList()
+                    val currentChaps = _currentChapters.value
+                    val chapsDeferred = if (currentChaps.isNotEmpty()) {
+                        async(Dispatchers.IO) {
+                            translateChaptersBatch(currentChaps, targetLang, provider)
+                        }
+                    } else null
 
-                lastTranslatedKey = currentKey
+                    val translatedTitleRes = titleDeferred.await()
+                    _translatedTitle.value = translatedTitleRes
 
-                val chapsJson = if (translatedChapsList.isNotEmpty()) {
-                    ChapterItem.toJsonArray(translatedChapsList)
-                } else history?.translatedChaptersJson
+                    val translatedChapsList = chapsDeferred?.await() ?: emptyList()
+                    if (translatedChapsList.isNotEmpty()) {
+                        _translatedChapters.value = translatedChapsList
+                    }
 
-                withContext(Dispatchers.IO) {
-                    historyDao.updateTranslations(targetRjid, translatedTitleRes, chapsJson)
+                    lastTranslatedKey = currentKey
+
+                    val chapsJson = if (translatedChapsList.isNotEmpty()) {
+                        ChapterItem.toJsonArray(translatedChapsList)
+                    } else history?.translatedChaptersJson
+
+                    withContext(Dispatchers.IO) {
+                        historyDao.updateTranslations(targetRjid, translatedTitleRes, chapsJson)
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
