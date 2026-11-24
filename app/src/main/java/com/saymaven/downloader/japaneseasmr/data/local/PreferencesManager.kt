@@ -717,14 +717,14 @@ class PreferencesManager(private val context: Context) {
     }
 
     // Floating Lyrics Settings
-    val floatingLyricsEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_ENABLED] ?: false }
+    val floatingLyricsEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_ENABLED] ?: true }
     val floatingLyricsFontSizeFlow: Flow<Float> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_FONT_SIZE] ?: 14f }
     val floatingLyricsOpacityFlow: Flow<Float> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_OPACITY] ?: 0.90f }
     val floatingLyricsCornerRadiusFlow: Flow<Float> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_CORNER_RADIUS] ?: 16f }
     val floatingLyricsShowTranslationFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] ?: true }
     val floatingLyricsDisplayModeFlow: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[KEY_FLOATING_LYRICS_DISPLAY_MODE]
-            ?: if (prefs[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] == false) "ORIGINAL_ONLY" else "BOTH"
+            ?: if (prefs[KEY_FLOATING_LYRICS_SHOW_TRANSLATION] == false) "ORIGINAL_ONLY" else "TRANSLATION_ONLY"
     }.distinctUntilChanged()
     val floatingLyricsLockedFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_FLOATING_LYRICS_LOCKED] ?: false }
 

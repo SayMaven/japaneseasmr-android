@@ -71,7 +71,7 @@ fun FloatingLyricsSettingsScreen(
                         viewModel.setFloatingLyricsFontSize(14f)
                         viewModel.setFloatingLyricsOpacity(0.90f)
                         viewModel.setFloatingLyricsCornerRadius(16f)
-                        viewModel.setFloatingLyricsDisplayMode("BOTH")
+                        viewModel.setFloatingLyricsDisplayMode("TRANSLATION_ONLY")
                         viewModel.setFloatingLyricsLocked(false)
                     }) {
                         Icon(Icons.Default.Restore, contentDescription = stringResource(R.string.settings_restore_defaults))

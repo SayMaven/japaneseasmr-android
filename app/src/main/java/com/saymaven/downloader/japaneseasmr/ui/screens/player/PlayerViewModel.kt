@@ -441,12 +441,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val isLyricsTranslated: StateFlow<Boolean> get() = lyricsDelegate.isLyricsTranslated
     val isTranslatingLyrics: StateFlow<Boolean> get() = lyricsDelegate.isTranslatingLyrics
 
-    val floatingLyricsEnabled = prefs.floatingLyricsEnabledFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val floatingLyricsEnabled = prefs.floatingLyricsEnabledFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
     val floatingLyricsFontSize = prefs.floatingLyricsFontSizeFlow.stateIn(viewModelScope, SharingStarted.Lazily, 14f)
     val floatingLyricsOpacity = prefs.floatingLyricsOpacityFlow.stateIn(viewModelScope, SharingStarted.Lazily, 0.90f)
     val floatingLyricsCornerRadius = prefs.floatingLyricsCornerRadiusFlow.stateIn(viewModelScope, SharingStarted.Lazily, 16f)
     val floatingLyricsShowTranslation = prefs.floatingLyricsShowTranslationFlow.stateIn(viewModelScope, SharingStarted.Lazily, true)
-    val floatingLyricsDisplayMode = prefs.floatingLyricsDisplayModeFlow.stateIn(viewModelScope, SharingStarted.Lazily, "BOTH")
+    val floatingLyricsDisplayMode = prefs.floatingLyricsDisplayModeFlow.stateIn(viewModelScope, SharingStarted.Lazily, "TRANSLATION_ONLY")
     val floatingLyricsLocked = prefs.floatingLyricsLockedFlow.stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     private val _currentArtist = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_artist", "-") ?: "-" else "-")

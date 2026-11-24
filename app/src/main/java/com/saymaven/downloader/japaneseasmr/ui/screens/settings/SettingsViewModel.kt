@@ -549,12 +549,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     // Floating Lyrics
-    val floatingLyricsEnabled = preferencesManager.floatingLyricsEnabledFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val floatingLyricsEnabled = preferencesManager.floatingLyricsEnabledFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val floatingLyricsFontSize = preferencesManager.floatingLyricsFontSizeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 14f)
     val floatingLyricsOpacity = preferencesManager.floatingLyricsOpacityFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.90f)
     val floatingLyricsCornerRadius = preferencesManager.floatingLyricsCornerRadiusFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16f)
     val floatingLyricsShowTranslation = preferencesManager.floatingLyricsShowTranslationFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    val floatingLyricsDisplayMode = preferencesManager.floatingLyricsDisplayModeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "BOTH")
+    val floatingLyricsDisplayMode = preferencesManager.floatingLyricsDisplayModeFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        "TRANSLATION_ONLY"
+    )
     val floatingLyricsLocked = preferencesManager.floatingLyricsLockedFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun setFloatingLyricsEnabled(enabled: Boolean) = viewModelScope.launch { preferencesManager.setFloatingLyricsEnabled(enabled) }

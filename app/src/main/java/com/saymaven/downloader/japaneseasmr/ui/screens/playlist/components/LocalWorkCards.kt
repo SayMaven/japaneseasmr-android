@@ -195,12 +195,13 @@ fun LocalWorkPinterestCard(
                             .padding(6.dp)
                             .align(Alignment.BottomStart)
                     ) {
-                        Text(
-                            text = "SUB",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        Icon(
+                            imageVector = Icons.Default.ClosedCaption,
+                            contentDescription = "Subtitle",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .size(15.dp)
                         )
                     }
                 }
@@ -578,12 +579,13 @@ fun LocalWorkListViewItem(
                         color = Color(0xFF2E7D32).copy(alpha = 0.88f),
                         modifier = Modifier.align(Alignment.BottomStart)
                     ) {
-                        Text(
-                            text = "SUB",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        Icon(
+                            imageVector = Icons.Default.ClosedCaption,
+                            contentDescription = "Subtitle",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .size(15.dp)
                         )
                     }
                 }
