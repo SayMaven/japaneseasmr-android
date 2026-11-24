@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -176,8 +177,11 @@ dependencies {
     // Jaudiotagger
     implementation(libs.jaudiotagger)
 
-    // Coroutines
+    // Coroutines & Serialization & DI (Koin)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
 
     // Testing
     testImplementation(libs.junit)

@@ -38,6 +38,7 @@ import com.saymaven.downloader.japaneseasmr.service.lyrics.LyricLine
 import com.saymaven.downloader.japaneseasmr.service.lyrics.LyricsParser
 import com.saymaven.downloader.japaneseasmr.service.lyrics.SubtitleSource
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.delegates.PlayerLyricsDelegate
+import com.saymaven.downloader.japaneseasmr.ui.screens.player.delegates.PlayerPlaylistDelegate
 import com.saymaven.downloader.japaneseasmr.ui.screens.player.delegates.PlayerTranslationDelegate
 import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import com.saymaven.downloader.japaneseasmr.service.ChapterDiscoveryService
@@ -410,6 +411,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             getCurrentStreamTrackTitle = { _currentStreamTrackTitle.value },
             setCurrentStreamTrackTitle = { _currentStreamTrackTitle.value = it },
             getCurrentAlbumHistory = { currentAlbumHistory }
+        )
+    }
+
+    private val playlistDelegate by lazy {
+        PlayerPlaylistDelegate(
+            scope = viewModelScope,
+            prefs = prefs,
+            historyDao = historyDao,
+            playlistDao = playlistDao,
+            onPlayLocalTrack = { local -> playLocalTrack(local) },
+            onPlayOnlineWork = { rjid, workTitle, cv, coverUrl, tracks ->
+                playOnlineWork(
+                    rjid = rjid,
+                    workTitle = workTitle,
+                    cv = cv,
+                    coverUrl = coverUrl,
+                    tracks = tracks
+                )
+            }
         )
     }
 
@@ -2509,25 +2529,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     // --- Playlist Management (Room v6) ---
 
-    fun createPlaylist(name: String, onCreated: (Long) -> Unit = {}) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val entity = UserPlaylistEntity(name = name.trim())
-            val id = playlistDao.insertPlaylist(entity)
-            withContext(Dispatchers.Main) { onCreated(id) }
-        }
-    }
+    fun createPlaylist(name: String, onCreated: (Long) -> Unit = {}) =
+        playlistDelegate.createPlaylist(name, onCreated)
 
-    fun renamePlaylist(id: Long, newName: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            playlistDao.updatePlaylistName(id, newName.trim())
-        }
-    }
+    fun renamePlaylist(id: Long, newName: String) =
+        playlistDelegate.renamePlaylist(id, newName)
 
-    fun deletePlaylist(playlist: UserPlaylistEntity) {
-        viewModelScope.launch(Dispatchers.IO) {
-            playlistDao.deletePlaylist(playlist)
-        }
-    }
+    fun deletePlaylist(playlist: UserPlaylistEntity) =
+        playlistDelegate.deletePlaylist(playlist)
 
     fun addWorkToPlaylist(
         playlistId: Long,
@@ -2536,59 +2545,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         coverUrl: String? = null,
         circle: String? = null,
         cv: String? = null
-    ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val item = PlaylistItemEntity(
-                playlistId = playlistId,
-                rjid = rjid,
-                title = title,
-                coverUrl = coverUrl ?: "",
-                circle = circle ?: "-",
-                cv = cv ?: "-"
-            )
-            playlistDao.insertItem(item)
-        }
-    }
+    ) = playlistDelegate.addWorkToPlaylist(playlistId, rjid, title, coverUrl, circle, cv)
 
-    fun removeWorkFromPlaylist(playlistId: Long, rjid: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            playlistDao.removeItem(playlistId, rjid)
-        }
-    }
+    fun removeWorkFromPlaylist(playlistId: Long, rjid: String) =
+        playlistDelegate.removeWorkFromPlaylist(playlistId, rjid)
 
-    suspend fun getPlaylistIdsForWork(rjid: String): List<Long> = withContext(Dispatchers.IO) {
-        playlistDao.getPlaylistIdsForItem(rjid)
-    }
+    suspend fun getPlaylistIdsForWork(rjid: String): List<Long> =
+        playlistDelegate.getPlaylistIdsForWork(rjid)
 
-    fun getItemsForPlaylist(playlistId: Long): kotlinx.coroutines.flow.Flow<List<PlaylistItemEntity>> {
-        return playlistDao.getItemsForPlaylist(playlistId)
-    }
+    fun getItemsForPlaylist(playlistId: Long): kotlinx.coroutines.flow.Flow<List<PlaylistItemEntity>> =
+        playlistDelegate.getItemsForPlaylist(playlistId)
 
-    fun playPlaylistItem(item: PlaylistItemEntity) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val local = historyDao.findByRjOrLinkedRj(item.rjid)
-            if (local != null) {
-                withContext(Dispatchers.Main) {
-                    playLocalTrack(local)
-                }
-            } else {
-                val priority = prefs.audioFormatPriorityFlow.first()
-                val tracksRes = com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService.getWorkTracks(item.rjid, priority)
-                val tracks = tracksRes.getOrNull() ?: emptyList()
-                if (tracks.isNotEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        playOnlineWork(
-                            rjid = item.rjid,
-                            workTitle = item.title,
-                            cv = item.cv,
-                            coverUrl = item.coverUrl,
-                            tracks = tracks
-                        )
-                    }
-                }
-            }
-        }
-    }
+    fun playPlaylistItem(item: PlaylistItemEntity) =
+        playlistDelegate.playPlaylistItem(item)
 
     // --- Audio Gain & Privacy Mode ---
 

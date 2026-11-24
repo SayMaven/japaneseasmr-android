@@ -10,8 +10,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
+import org.koin.androidx.viewmodel.ext.android.viewModel
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -39,6 +39,7 @@ import com.saymaven.downloader.japaneseasmr.ui.components.FloatingVolumeHud
 import com.saymaven.downloader.japaneseasmr.ui.components.FloatingLyricsBar
 import com.saymaven.downloader.japaneseasmr.ui.components.MiniPlayer
 import com.saymaven.downloader.japaneseasmr.ui.components.NavTab
+import com.saymaven.downloader.japaneseasmr.ui.navigation.AppRoute
 import com.saymaven.downloader.japaneseasmr.util.NetworkMonitor
 import com.saymaven.downloader.japaneseasmr.ui.screens.history.HistoryScreen
 import com.saymaven.downloader.japaneseasmr.ui.screens.history.HistoryViewModel
@@ -80,11 +81,11 @@ class MainActivity : ComponentActivity() {
         var isColdLaunch: Boolean = true
     }
 
-    private val queueViewModel: QueueViewModel by viewModels()
-    private val historyViewModel: HistoryViewModel by viewModels()
-    private val playerViewModel: PlayerViewModel by viewModels()
-    private val settingsViewModel: SettingsViewModel by viewModels()
-    private val browseViewModel: AsmrOneBrowseViewModel by viewModels()
+    private val queueViewModel: QueueViewModel by viewModel()
+    private val historyViewModel: HistoryViewModel by viewModel()
+    private val playerViewModel: PlayerViewModel by viewModel()
+    private val settingsViewModel: SettingsViewModel by viewModel()
+    private val browseViewModel: AsmrOneBrowseViewModel by viewModel()
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -147,6 +148,14 @@ class MainActivity : ComponentActivity() {
                 }
                 var currentTab by remember { mutableStateOf(initialTab) }
                 var isPlayerExpanded by rememberSaveable { mutableStateOf(false) }
+                val isExpandedWidth = LocalConfiguration.current.screenWidthDp >= 600
+                val currentRoute: AppRoute = remember(currentTab, selectedWork, isPlayerExpanded) {
+                    when {
+                        isPlayerExpanded -> AppRoute.Player
+                        selectedWork != null -> AppRoute.WorkDetail(selectedWork!!.id.toLong())
+                        else -> AppRoute.fromNavTab(currentTab)
+                    }
+                }
                 val visitedTabs = remember { mutableStateListOf(initialTab) }
                 LaunchedEffect(currentTab) {
                     activeTab = currentTab
@@ -334,28 +343,58 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
-                                BottomNavBar(
-                                    currentTab = currentTab,
-                                    onTabSelected = { tab ->
-                                        if (tab != currentTab) {
-                                            browseViewModel.selectWork(null)
+                                if (!isExpandedWidth) {
+                                    BottomNavBar(
+                                        currentTab = currentTab,
+                                        onTabSelected = { tab ->
+                                            if (tab != currentTab) {
+                                                browseViewModel.selectWork(null)
+                                            }
+                                            if (!visitedTabs.contains(tab)) {
+                                                visitedTabs.add(tab)
+                                            }
+                                            currentTab = tab
                                         }
-                                        if (!visitedTabs.contains(tab)) {
-                                            visitedTabs.add(tab)
-                                        }
-                                        currentTab = tab
-                                    }
-                                )
+                                    )
+                                }
                             }
                         }
                     ) { innerPadding ->
                         val isOnline by remember { NetworkMonitor.getInstance(this@MainActivity).isOnline }.collectAsState()
 
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(innerPadding)
                         ) {
+                            if (isExpandedWidth) {
+                                NavigationRail(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ) {
+                                    listOf(NavTab.HOME, NavTab.BROWSE, NavTab.QUEUE, NavTab.HISTORY, NavTab.SETTINGS).forEach { tab ->
+                                        val labelText = stringResource(tab.titleRes)
+                                        NavigationRailItem(
+                                            selected = currentRoute == AppRoute.fromNavTab(tab),
+                                            onClick = {
+                                                if (tab != currentTab) {
+                                                    browseViewModel.selectWork(null)
+                                                }
+                                                if (!visitedTabs.contains(tab)) {
+                                                    visitedTabs.add(tab)
+                                                }
+                                                currentTab = tab
+                                            },
+                                            icon = { Icon(tab.icon, contentDescription = labelText) },
+                                            label = { Text(labelText) }
+                                        )
+                                    }
+                                }
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                            ) {
                             AnimatedVisibility(visible = !isOnline) {
                                 androidx.compose.material3.Surface(
                                     color = MaterialTheme.colorScheme.errorContainer,
@@ -535,6 +574,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenPlayer = { isPlayerExpanded = true }
                             )
                         }
+                        } // end Row
                     }
                 }
 

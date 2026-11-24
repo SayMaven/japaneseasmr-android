@@ -8,10 +8,13 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.saymaven.downloader.japaneseasmr.di.appModule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
+import org.koin.android.ext.koin.androidContext
+import org.koin.core.context.startKoin
 
 class JapaneseAsmrApp : Application(), ImageLoaderFactory {
 
@@ -29,6 +32,10 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        startKoin {
+            androidContext(this@JapaneseAsmrApp)
+            modules(appModule)
+        }
         CoroutineScope(Dispatchers.IO).launch {
             createNotificationChannels()
             com.saymaven.downloader.japaneseasmr.service.TranslationService.init(this@JapaneseAsmrApp)
