@@ -470,11 +470,16 @@ class PreferencesManager(private val context: Context) {
     val privacyBlurNotifFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_BLUR_NOTIF] ?: true }.distinctUntilChanged()
     val privacyBlurInAppFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_BLUR_INAPP] ?: false }.distinctUntilChanged()
     val privacyMaskTitleFlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PRIVACY_MASK_TITLE] ?: true }.distinctUntilChanged()
-    val privacyCustomMaskFlow: Flow<String> = context.dataStore.data.map { it[KEY_PRIVACY_CUSTOM_MASK] ?: "Audio Relaksasi" }.distinctUntilChanged()
+    val privacyCustomMaskFlow: Flow<String> = context.dataStore.data.map {
+        it[KEY_PRIVACY_CUSTOM_MASK] ?: context.getString(com.saymaven.downloader.japaneseasmr.R.string.settings_privacy_custom_mask_default)
+    }.distinctUntilChanged()
 
     fun getInitialPrivacyEnabled(): Boolean = fastSp.getBoolean("cached_privacy_enabled", false)
     fun getInitialPrivacyMaskTitle(): Boolean = fastSp.getBoolean("cached_privacy_mask_title", true)
-    fun getInitialPrivacyCustomMask(): String = fastSp.getString("cached_privacy_custom_mask", "Audio Relaksasi") ?: "Audio Relaksasi"
+    fun getInitialPrivacyCustomMask(): String {
+        val defaultMask = context.getString(com.saymaven.downloader.japaneseasmr.R.string.settings_privacy_custom_mask_default)
+        return fastSp.getString("cached_privacy_custom_mask", defaultMask) ?: defaultMask
+    }
     fun getInitialPrivacyBlurNotif(): Boolean = fastSp.getBoolean("cached_privacy_blur_notif", true)
     fun getInitialPrivacyBlurInApp(): Boolean = fastSp.getBoolean("cached_privacy_blur_inapp", false)
 

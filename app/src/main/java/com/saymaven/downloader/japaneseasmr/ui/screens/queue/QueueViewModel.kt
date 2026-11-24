@@ -244,7 +244,7 @@ class QueueViewModel : ViewModel() {
                 val isPreviewTarget = (_previewWork.value?.rjid == id)
                 DownloadQueueItem(
                     rjid = id,
-                    title = if (isPreviewTarget) _previewWork.value!!.title else "Memuat info...",
+                    title = if (isPreviewTarget) _previewWork.value!!.title else "",
                     cv = if (isPreviewTarget) _previewWork.value!!.cv else "-",
                     circle = if (isPreviewTarget) _previewWork.value!!.circle else "-",
                     genre = if (isPreviewTarget) _previewWork.value!!.genre else "-",
@@ -273,7 +273,7 @@ class QueueViewModel : ViewModel() {
                         val isPreviewTarget = (_previewWork.value?.rjid == id)
                         DownloadQueueItem(
                             rjid = id,
-                            title = if (isPreviewTarget) _previewWork.value!!.title else "Memuat info...",
+                            title = if (isPreviewTarget) _previewWork.value!!.title else "",
                             cv = if (isPreviewTarget) _previewWork.value!!.cv else "-",
                             circle = if (isPreviewTarget) _previewWork.value!!.circle else "-",
                             genre = if (isPreviewTarget) _previewWork.value!!.genre else "-",

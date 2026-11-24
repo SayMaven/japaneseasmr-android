@@ -61,10 +61,10 @@ fun LanguageAndTranslationSettingsScreen(
     )
 
     val providers = listOf(
-        "google" to ("Google Translate" to "100% Gratis, Cepat, Stabil, Tanpa API Key (Disarankan)"),
-        "microsoft" to ("Microsoft Translator (Bing)" to "Mesin Microsoft Edge (otomatis fallback ke Google jika dibatasi)"),
-        "youdao" to ("Youdao Translator" to "Kosa kata Asia Timur (otomatis fallback ke Google jika dibatasi)"),
-        "llm" to ("LLM Translation (AI)" to "Diterjemahkan via Claude, Gemini, DeepSeek, dll.")
+        "google" to ("Google Translate" to stringResource(R.string.settings_provider_google_desc)),
+        "microsoft" to ("Microsoft Translator (Bing)" to stringResource(R.string.settings_provider_microsoft_desc)),
+        "youdao" to ("Youdao Translator" to stringResource(R.string.settings_provider_youdao_desc)),
+        "llm" to ("LLM Translation (AI)" to stringResource(R.string.settings_provider_llm_desc))
     )
 
     Scaffold(

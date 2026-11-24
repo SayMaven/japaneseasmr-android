@@ -359,7 +359,16 @@
     <string name="settings_manage_storage_cancel_btn">許可せずに続行</string>
 
     <!-- Changelog v1.4.3 -->
-    <string name="settings_changelog_v143_title">バージョン 1.4.3（最新）</string>
+    <string name="settings_changelog_v200_title">バージョン 2.0.0（最新）</string>
+    <string name="settings_changelog_v200_item1">• UI全面刷新 &amp; ASMR探索: Pinterest風グリッド/リスト、KikoFlu準拠ソート、複数タグ絞り込み、全年齢セーフモード、対話型ファイルツリー、オンライン直接ストリーミングに対応。</string>
+    <string name="settings_changelog_v200_item2">• カスタムプレイリスト &amp; 混在キュー: オフライン・オンライン両対応のRoom v6プレイリストで、Next/Previous・シャッフル・リピート・自動再生がプレイリスト内でシームレスに動作。</string>
+    <string name="settings_changelog_v200_item3">• 字幕・フローティング歌詞 &amp; 多プロバイダー翻訳: .vtt/.lrc/.srt対応、フローティング歌詞バー標準ON（翻訳モード）、ASMR専門用語集、HTTP 429時のclients5/MyMemory自動切替、LLM翻訳に対応。</string>
+    <string name="settings_changelog_v200_item4">• ゲイン増幅(dB)・プライバシーモード・結合ダウンロード: ExoPlayerとOboe/USB DACのdB増幅、カバーぼかし＆タイトルマスク、単一結合/フォルダ保存切替、メタデータ自動補完を搭載。</string>
+    <string name="settings_changelog_v200_item5">• OKLCHカラーシステム &amp; キャッシュ管理: 12種の知覚パレット(明/暗)＋Material You、200MB〜10GBのキャッシュ上限設定と自動クリーン(既定OFF)、JSONバックアップ＆復元に対応。</string>
+    <string name="settings_changelog_v200_item6">• ローカルコレクション・履歴・バッジ改善: ヘッダー検索バー、履歴ページネーションとコンパクトCVチップ、Explorer風フォルダ表示、CC字幕アイコン、再生ボタン並び替えに対応。</string>
+    <string name="settings_changelog_v200_item7">• 主な不具合修正: VJ/BJ作品ID解決、本編フォルダ優先のチャプター選択（販促/回想を除外）、トラック別カバー分離、4言語UIの完全ローカライズ。</string>
+    <string name="settings_changelog_v200_item8">• セキュリティ・設計・品質向上: AES-256-GCMによるLLMキー暗号化、Koin DI、適応型NavigationRail、Detekt、単体/マイグレーションテスト、R8最適化を実施。</string>
+    <string name="settings_changelog_v143_title">バージョン 1.4.3</string>
     <string name="settings_changelog_v143_item1">• SDカード完全対応: MANAGE_EXTERNAL_STORAGE権限により、MicroSDカード上の作品を制限なく認識・インポート可能に。</string>
     <string name="settings_changelog_v143_item2">• SDカードインポートの検出修正: SDカード選択時に音声ファイルが0件と認識される問題を完全に解消。</string>
     <string name="settings_changelog_v143_item3">• SDカード音源のネイティブC++再生: USB DAC ExclusiveおよびOboeによる高音質ダイレクト再生に対応。</string>
@@ -635,4 +644,47 @@
     <string name="playlist_badge_online">ONLINE</string>
     <string name="browse_action_view_detail">作品詳細を表示</string>
     <string name="error_wma_codec_unsupported">この作品はWMA形式（レガシーWindows形式）であり、本端末にはネイティブWMAデコーダーがありません。PCでの再生をおすすめします。</string>
+
+    <!-- Localization Audit Additions -->
+    <string name="settings_provider_google_desc">完全無料・高速・安定・APIキー不要（推奨）</string>
+    <string name="settings_provider_microsoft_desc">Microsoft Edgeエンジン（制限時はGoogleへ自動フォールバック）</string>
+    <string name="settings_provider_youdao_desc">東アジア語彙向け（制限時はGoogleへ自動フォールバック）</string>
+    <string name="settings_provider_llm_desc">Claude・Gemini・DeepSeekなどで翻訳</string>
+    <string name="settings_llm_presets_title">クイックテンプレート (Presets)</string>
+    <string name="settings_llm_presets_desc">プロバイダーを選択すると、エンドポイントURLとデフォルトモデルが自動入力されます。</string>
+    <string name="settings_llm_concurrency_title">同時リクエスト数</string>
+    <string name="settings_llm_concurrency_count">%1$d 件同時リクエスト</string>
+    <string name="settings_format_mp3_se">MP3 (SEあり)</string>
+    <string name="settings_format_mp3">MP3 (標準 320k)</string>
+    <string name="settings_format_flac">FLAC (ロスレス Hi-Res)</string>
+    <string name="settings_format_wav">WAV (非圧縮 PCM)</string>
+    <string name="settings_cache_title">キャッシュ管理</string>
+    <string name="settings_cache_auto_clean_on">自動クリーン有効</string>
+    <string name="settings_cache_auto_clean_off">自動クリーン無効</string>
+    <string name="settings_cache_summary_line">使用中: %1$s • 上限: %2$s (%3$s)</string>
+    <string name="settings_cache_limit_label">キャッシュサイズ上限</string>
+    <string name="settings_cache_auto_clean_title">自動クリーンアップ</string>
+    <string name="settings_cache_auto_clean_desc">有効時、上限の80%%まで古いキャッシュファイルを削除します（履歴とプレイリストは保護されます）</string>
+    <string name="settings_cache_current_size">現在のキャッシュサイズ</string>
+    <string name="settings_cache_limit_badge">上限: %1$s</string>
+    <string name="settings_cache_clear_btn">キャッシュを消去</string>
+    <string name="settings_cache_clear_translation_btn">翻訳キャッシュを消去</string>
+    <string name="settings_backup_section_title">バックアップと復元</string>
+    <string name="settings_backup_export_title">バックアップをエクスポート (プレイリスト &amp; 履歴)</string>
+    <string name="settings_backup_export_desc">プレイリスト・項目・履歴をJSONファイルに保存します（Download/JapaneseASMR/japaneseasmr_backup_auto.jsonにも自動バックアップ）</string>
+    <string name="settings_backup_import_title">バックアップを復元 (JSONインポート)</string>
+    <string name="settings_backup_import_desc">既存データを上書きせずにJSONバックアップからプレイリストと履歴を統合します</string>
+    <string name="settings_backup_export_success">プレイリストと履歴のバックアップをエクスポートしました</string>
+    <string name="settings_backup_export_failed">バックアップのエクスポートに失敗: %1$s</string>
+    <string name="settings_backup_import_success">復元完了: プレイリスト %1$d 件、項目 %2$d 件、履歴 %3$d 件</string>
+    <string name="settings_backup_import_failed">バックアップの復元に失敗: %1$s</string>
+    <string name="history_filter_all_count">すべて (%1$d)</string>
+    <string name="history_filter_present_count">利用可能 (%1$d)</string>
+    <string name="history_filter_missing_count">ファイル不明 (%1$d)</string>
+    <string name="queue_loading_info">情報を読み込み中...</string>
+    <string name="settings_update_check_failed">アップデートの確認に失敗しました</string>
+    <string name="settings_update_download_failed">アップデートファイルのダウンロードに失敗しました</string>
+    <string name="settings_update_install_failed">APKインストーラーの起動に失敗しました</string>
+    <string name="player_no_track_playing">再生中の音声はありません</string>
+    <string name="player_work_not_found_dlsite">作品 %1$s はDLsiteで見つかりませんでした</string>
 </resources>

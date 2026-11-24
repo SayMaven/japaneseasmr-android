@@ -371,7 +371,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    private val _currentTitle = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_title", "Belum ada lagu yang diputar") ?: "Belum ada lagu yang diputar" else "Belum ada lagu yang diputar")
+    private val defaultEmptyTitle: String
+        get() = getApplication<Application>().getString(com.saymaven.downloader.japaneseasmr.R.string.player_no_track_playing)
+
+    private val _currentTitle = MutableStateFlow(
+        if (isAutoResumeActive) sp.getString("cached_title", defaultEmptyTitle) ?: defaultEmptyTitle
+        else defaultEmptyTitle
+    )
     val currentTitle = _currentTitle.asStateFlow()
 
     private val _currentStreamTrackTitle = MutableStateFlow<String?>(null)
@@ -1066,7 +1072,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val autoResume = prefs.autoResumeFlow.first()
             if (!autoResume) {
                 _currentRjId.value = null
-                _currentTitle.value = "Belum ada lagu yang diputar"
+                _currentTitle.value = defaultEmptyTitle
                 _currentArtist.value = "-"
                 _currentCoverUrl.value = null
                 _currentPosition.value = 0L
@@ -2477,7 +2483,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             if (meta == null || (meta.title.isBlank() && meta.cv.isBlank())) {
-                onResult(false, "Karya $targetRj tidak ditemukan di DLsite")
+                onResult(
+                    false,
+                    getApplication<Application>().getString(
+                        com.saymaven.downloader.japaneseasmr.R.string.player_work_not_found_dlsite,
+                        targetRj
+                    )
+                )
                 return@launch
             }
 

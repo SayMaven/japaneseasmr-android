@@ -56,12 +56,13 @@ fun AudioFormatSettingsScreen(
         list
     }
 
+    @Composable
     fun getFormatLabel(formatKey: String): String {
         return when (formatKey.lowercase()) {
-            "mp3_se" -> "MP3 (SE あり)"
-            "mp3" -> "MP3 (Standard 320k)"
-            "flac" -> "FLAC (Lossless Hi-Res)"
-            "wav" -> "WAV (Uncompressed PCM)"
+            "mp3_se" -> stringResource(R.string.settings_format_mp3_se)
+            "mp3" -> stringResource(R.string.settings_format_mp3)
+            "flac" -> stringResource(R.string.settings_format_flac)
+            "wav" -> stringResource(R.string.settings_format_wav)
             "m4a", "aac" -> "M4A / AAC"
             "opus" -> "Opus"
             else -> formatKey.uppercase()

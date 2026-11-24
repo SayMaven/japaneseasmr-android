@@ -404,20 +404,35 @@ private fun HistoryStatusFilterRow(
         FilterChip(
             selected = selected == HistoryStatusFilter.ALL,
             onClick = { onSelect(HistoryStatusFilter.ALL) },
-            label = { Text("Semua ($totalCount)", style = MaterialTheme.typography.labelMedium) },
+            label = {
+                Text(
+                    stringResource(R.string.history_filter_all_count, totalCount),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            },
             shape = RoundedCornerShape(10.dp)
         )
         FilterChip(
             selected = selected == HistoryStatusFilter.PRESENT,
             onClick = { onSelect(HistoryStatusFilter.PRESENT) },
-            label = { Text("Tersedia ($presentCount)", style = MaterialTheme.typography.labelMedium) },
+            label = {
+                Text(
+                    stringResource(R.string.history_filter_present_count, presentCount),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            },
             leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(15.dp)) },
             shape = RoundedCornerShape(10.dp)
         )
         FilterChip(
             selected = selected == HistoryStatusFilter.MISSING,
             onClick = { onSelect(HistoryStatusFilter.MISSING) },
-            label = { Text("File Hilang ($missingCount)", style = MaterialTheme.typography.labelMedium) },
+            label = {
+                Text(
+                    stringResource(R.string.history_filter_missing_count, missingCount),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            },
             leadingIcon = { Icon(Icons.Default.WarningAmber, contentDescription = null, modifier = Modifier.size(15.dp)) },
             shape = RoundedCornerShape(10.dp)
         )

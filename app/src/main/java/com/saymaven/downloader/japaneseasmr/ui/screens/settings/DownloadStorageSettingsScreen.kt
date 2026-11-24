@@ -89,8 +89,8 @@ fun DownloadStorageSettingsScreen(
         if (uri != null) {
             viewModel.exportBackup(uri) { res ->
                 val msg = res.fold(
-                    onSuccess = { "Backup playlist & riwayat berhasil diekspor" },
-                    onFailure = { "Gagal ekspor backup: ${it.message}" }
+                    onSuccess = { context.getString(R.string.settings_backup_export_success) },
+                    onFailure = { context.getString(R.string.settings_backup_export_failed, it.message ?: "") }
                 )
                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             }
@@ -104,9 +104,14 @@ fun DownloadStorageSettingsScreen(
             viewModel.importBackup(uri) { res ->
                 val msg = res.fold(
                     onSuccess = {
-                        "Restore selesai: ${it.playlistsRestored} playlist, ${it.itemsRestored} item, ${it.historyRestored} riwayat"
+                        context.getString(
+                            R.string.settings_backup_import_success,
+                            it.playlistsRestored,
+                            it.itemsRestored,
+                            it.historyRestored
+                        )
                     },
-                    onFailure = { "Gagal restore backup: ${it.message}" }
+                    onFailure = { context.getString(R.string.settings_backup_import_failed, it.message ?: "") }
                 )
                 Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
             }
@@ -202,14 +207,17 @@ fun DownloadStorageSettingsScreen(
                         showCacheDialog = true
                     },
                     headlineContent = {
-                        Text("Manajemen Cache", fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.settings_cache_title), fontWeight = FontWeight.SemiBold)
                     },
                     supportingContent = {
                         val usedText = CacheManager.formatSize(cacheSizeBytes)
                         val limitText = CacheManager.formatLimitLabel(cacheLimitMb)
-                        val autoText = if (cacheAutoClean) "Auto-Clean Aktif" else "Auto-Clean Mati"
+                        val autoText = stringResource(
+                            if (cacheAutoClean) R.string.settings_cache_auto_clean_on
+                            else R.string.settings_cache_auto_clean_off
+                        )
                         Text(
-                            text = "Terpakai: $usedText • Batas: $limitText ($autoText)",
+                            text = stringResource(R.string.settings_cache_summary_line, usedText, limitText, autoText),
                             style = MaterialTheme.typography.bodySmall
                         )
                     },
@@ -367,7 +375,7 @@ fun DownloadStorageSettingsScreen(
 
             // 3. Backup & Restore Playlist & History
             SettingsCategoryHeader(
-                title = "Backup & Restore Data",
+                title = stringResource(R.string.settings_backup_section_title),
                 icon = Icons.Default.Backup
             )
 
@@ -381,12 +389,11 @@ fun DownloadStorageSettingsScreen(
                             exportBackupLauncher.launch("JapaneseASMR-Backup.json")
                         },
                         headlineContent = {
-                            Text("Ekspor Backup (Playlist & Riwayat)", fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.settings_backup_export_title), fontWeight = FontWeight.SemiBold)
                         },
                         supportingContent = {
                             Text(
-                                "Simpan daftar playlist, item, dan riwayat ke file JSON " +
-                                    "(juga otomatis dicadangkan di Download/JapaneseASMR/japaneseasmr_backup_auto.json)",
+                                stringResource(R.string.settings_backup_export_desc),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         },
@@ -402,11 +409,11 @@ fun DownloadStorageSettingsScreen(
                             importBackupLauncher.launch(arrayOf("application/json", "*/*"))
                         },
                         headlineContent = {
-                            Text("Pulihkan Backup (Import JSON)", fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.settings_backup_import_title), fontWeight = FontWeight.SemiBold)
                         },
                         supportingContent = {
                             Text(
-                                "Gabungkan playlist & riwayat dari file backup JSON tanpa menimpa data yang sudah ada",
+                                stringResource(R.string.settings_backup_import_desc),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         },
@@ -520,7 +527,7 @@ private fun CacheManagementDialog(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Text("Manajemen Cache", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.settings_cache_title), fontWeight = FontWeight.Bold)
             }
         },
         text = {
@@ -538,7 +545,7 @@ private fun CacheManagementDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Batas Ukuran Cache",
+                            stringResource(R.string.settings_cache_limit_label),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
@@ -574,12 +581,12 @@ private fun CacheManagementDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                             Text(
-                                "Auto-Clean Otomatis",
+                                stringResource(R.string.settings_cache_auto_clean_title),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Jika aktif, cache file terlama dihapus hingga 80% batas (riwayat & playlist tetap aman)",
+                                text = stringResource(R.string.settings_cache_auto_clean_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -621,12 +628,12 @@ private fun CacheSizeSummaryCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Ukuran Cache Saat Ini",
+                    text = stringResource(R.string.settings_cache_current_size),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Batas: ${CacheManager.formatLimitLabel(cacheLimitMb)}",
+                    text = stringResource(R.string.settings_cache_limit_badge, CacheManager.formatLimitLabel(cacheLimitMb)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -672,7 +679,7 @@ private fun CacheDialogActions(
             ) {
                 Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Bersihkan Cache")
+                Text(stringResource(R.string.settings_cache_clear_btn))
             }
             OutlinedButton(
                 onClick = onDismiss,
@@ -690,7 +697,7 @@ private fun CacheDialogActions(
         ) {
             Icon(Icons.Default.Translate, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Hapus Cache Terjemahan")
+            Text(stringResource(R.string.settings_cache_clear_translation_btn))
         }
     }
 }

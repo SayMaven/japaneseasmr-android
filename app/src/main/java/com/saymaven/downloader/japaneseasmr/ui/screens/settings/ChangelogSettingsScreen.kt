@@ -56,6 +56,22 @@ fun ChangelogSettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // v2.0.0
+            ChangelogVersionCard(
+                versionTitle = stringResource(R.string.settings_changelog_v200_title),
+                items = listOf(
+                    stringResource(R.string.settings_changelog_v200_item1),
+                    stringResource(R.string.settings_changelog_v200_item2),
+                    stringResource(R.string.settings_changelog_v200_item3),
+                    stringResource(R.string.settings_changelog_v200_item4),
+                    stringResource(R.string.settings_changelog_v200_item5),
+                    stringResource(R.string.settings_changelog_v200_item6),
+                    stringResource(R.string.settings_changelog_v200_item7),
+                    stringResource(R.string.settings_changelog_v200_item8)
+                ),
+                isLatest = true
+            )
+
             // v1.4.3
             ChangelogVersionCard(
                 versionTitle = stringResource(R.string.settings_changelog_v143_title),
@@ -64,8 +80,7 @@ fun ChangelogSettingsScreen(
                     stringResource(R.string.settings_changelog_v143_item2),
                     stringResource(R.string.settings_changelog_v143_item3),
                     stringResource(R.string.settings_changelog_v143_item4)
-                ),
-                isLatest = true
+                )
             )
 
             // v1.4.2

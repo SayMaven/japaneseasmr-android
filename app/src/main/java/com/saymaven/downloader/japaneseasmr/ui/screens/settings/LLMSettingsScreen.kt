@@ -161,13 +161,13 @@ fun LLMSettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Template Cepat (Presets)",
+                        text = stringResource(R.string.settings_llm_presets_title),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "Pilih provider untuk mengisi endpoint URL dan model default secara otomatis.",
+                        text = stringResource(R.string.settings_llm_presets_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -249,13 +249,13 @@ fun LLMSettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Konkurensi Request",
+                            text = stringResource(R.string.settings_llm_concurrency_title),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "$concurrency request serentak",
+                            text = stringResource(R.string.settings_llm_concurrency_count, concurrency),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -263,7 +263,7 @@ fun LLMSettingsScreen(
                     }
 
                     Text(
-                        text = "Setel slider ke 1-2 jika menggunakan API Key gratis (Free Tier) agar tidak terkena batas request per menit (HTTP 429). Gunakan 3-5 jika menggunakan akun API berbayar dengan batas request tinggi.",
+                        text = stringResource(R.string.settings_llm_concurrency_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -372,7 +372,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     _updateUiState.value = UpdateUiState.NoUpdateAvailable(BuildConfig.VERSION_NAME)
                 }
             }.onFailure { err ->
-                _updateUiState.value = UpdateUiState.Error(err.message ?: "Gagal memeriksa pembaruan")
+                val fallback = getApplication<Application>().getString(
+                    com.saymaven.downloader.japaneseasmr.R.string.settings_update_check_failed
+                )
+                _updateUiState.value = UpdateUiState.Error(err.message ?: fallback)
             }
         }
     }
@@ -391,7 +394,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             result.onSuccess { apkFile ->
                 _updateUiState.value = UpdateUiState.ReadyToInstall(apkFile)
             }.onFailure { err ->
-                _updateUiState.value = UpdateUiState.Error(err.message ?: "Gagal mengunduh berkas pembaruan")
+                val fallback = getApplication<Application>().getString(
+                    com.saymaven.downloader.japaneseasmr.R.string.settings_update_download_failed
+                )
+                _updateUiState.value = UpdateUiState.Error(err.message ?: fallback)
             }
         }
     }
@@ -403,7 +409,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
         val res = UpdateManager.installApk(context, apkFile)
         if (res.isFailure) {
-            _updateUiState.value = UpdateUiState.Error(res.exceptionOrNull()?.message ?: "Gagal memulai pemasangan APK")
+            val fallback = getApplication<Application>().getString(
+                com.saymaven.downloader.japaneseasmr.R.string.settings_update_install_failed
+            )
+            _updateUiState.value = UpdateUiState.Error(res.exceptionOrNull()?.message ?: fallback)
         }
     }
 

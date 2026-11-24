@@ -472,7 +472,7 @@ fun SettingsScreen(
                                 IconButton(onClick = { folderToRemove = dirStr }) {
                                     Icon(
                                         Icons.Default.DeleteOutline,
-                                        contentDescription = "Hapus",
+                                        contentDescription = stringResource(R.string.action_delete),
                                         tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                                     )
                                 }

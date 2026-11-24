@@ -359,7 +359,16 @@
     <string name="settings_manage_storage_cancel_btn">暂不授权并继续</string>
 
     <!-- Changelog v1.4.3 -->
-    <string name="settings_changelog_v143_title">版本 1.4.3（最新）</string>
+    <string name="settings_changelog_v200_title">版本 2.0.0（最新）</string>
+    <string name="settings_changelog_v200_item1">• 全面UI重制与ASMR浏览: Pinterest风格网格/列表、KikoFlu同步排序、多标签筛选、全年龄安全模式、交互式文件树以及在线音频直接串流播放。</string>
+    <string name="settings_changelog_v200_item2">• 自定义播放列表与混合队列: 基于Room v6的播放列表同时支持离线与在线作品，可在列表内无缝使用上一曲/下一曲、随机、循环与自动连播。</string>
+    <string name="settings_changelog_v200_item3">• 同步字幕、悬浮歌词与多引擎翻译: 支持.vtt/.lrc/.srt字幕、默认开启翻译模式悬浮歌词栏、ASMR专业术语表、HTTP 429自动切换clients5/MyMemory以及自定义LLM翻译。</string>
+    <string name="settings_changelog_v200_item4">• 音频增益(dB)、隐私模式与合并下载: 支持ExoPlayer与Oboe/USB DAC增益放大、封面模糊与标题遮罩、合并单文件/分目录下载模式及元数据自动补全。</string>
+    <string name="settings_changelog_v200_item5">• OKLCH色彩系统与缓存管理: 12套明暗感知调色板与Material You支持、200MB–10GB缓存上限与可选自动清理（默认关闭），以及JSON备份与恢复。</string>
+    <string name="settings_changelog_v200_item6">• 本地收藏、历史记录与卡片徽章: 顶栏搜索框、历史记录分页与紧凑CV标签、资源管理器风格文件夹缩略图、CC字幕图标及播放器按钮排序。</string>
+    <string name="settings_changelog_v200_item7">• 关键问题修复: 修复VJ/BJ作品ID映射、章节优先选取本篇目录（排除贩促/回想）、单曲封面串图问题，并补全4语言UI本地化。</string>
+    <string name="settings_changelog_v200_item8">• 安全、架构与质量加固: AES-256-GCM加密存储LLM密钥、Koin依赖注入、自适应NavigationRail、Detekt静态检查、单元/迁移测试及R8发布优化。</string>
+    <string name="settings_changelog_v143_title">版本 1.4.3</string>
     <string name="settings_changelog_v143_item1">• 完美支持SD卡与外部存储: 引入 MANAGE_EXTERNAL_STORAGE 权限，畅通无阻访问 MicroSD 卡文件。</string>
     <string name="settings_changelog_v143_item2">• 修复SD卡导入0文件问题: 彻底解决在 SD 卡中选择音频文件夹时提示“0个文件检测到”的缺陷。</string>
     <string name="settings_changelog_v143_item3">• SD卡原生C++音频流式播放: USB DAC独占模式与Oboe支持直接读取并播放SD卡音频。</string>
@@ -635,4 +644,47 @@
     <string name="playlist_badge_online">ONLINE</string>
     <string name="browse_action_view_detail">查看作品详情</string>
     <string name="error_wma_codec_unsupported">此作品为WMA格式（传统Windows格式），当前设备无内置WMA解码器。建议通过电脑播放。</string>
+
+    <!-- Localization Audit Additions -->
+    <string name="settings_provider_google_desc">100%免费、快速、稳定、无需API密钥（推荐）</string>
+    <string name="settings_provider_microsoft_desc">Microsoft Edge引擎（受限时自动回退至Google）</string>
+    <string name="settings_provider_youdao_desc">东亚词汇优化（受限时自动回退至Google）</string>
+    <string name="settings_provider_llm_desc">通过 Claude、Gemini、DeepSeek 等大模型翻译</string>
+    <string name="settings_llm_presets_title">快捷模板 (Presets)</string>
+    <string name="settings_llm_presets_desc">选择服务商即可自动填充接口 URL 与默认模型。</string>
+    <string name="settings_llm_concurrency_title">请求并发数</string>
+    <string name="settings_llm_concurrency_count">%1$d 个并发请求</string>
+    <string name="settings_format_mp3_se">MP3 (含音效 SE)</string>
+    <string name="settings_format_mp3">MP3 (标准 320k)</string>
+    <string name="settings_format_flac">FLAC (无损 Hi-Res)</string>
+    <string name="settings_format_wav">WAV (无压缩 PCM)</string>
+    <string name="settings_cache_title">缓存管理</string>
+    <string name="settings_cache_auto_clean_on">自动清理已开启</string>
+    <string name="settings_cache_auto_clean_off">自动清理已关闭</string>
+    <string name="settings_cache_summary_line">已用: %1$s • 上限: %2$s (%3$s)</string>
+    <string name="settings_cache_limit_label">缓存大小上限</string>
+    <string name="settings_cache_auto_clean_title">自动清理</string>
+    <string name="settings_cache_auto_clean_desc">开启后将自动清理最旧缓存文件至上限的 80%%（历史记录与播放列表保持安全）</string>
+    <string name="settings_cache_current_size">当前缓存大小</string>
+    <string name="settings_cache_limit_badge">上限: %1$s</string>
+    <string name="settings_cache_clear_btn">清理缓存</string>
+    <string name="settings_cache_clear_translation_btn">清除翻译缓存</string>
+    <string name="settings_backup_section_title">备份与恢复数据</string>
+    <string name="settings_backup_export_title">导出备份 (播放列表与历史)</string>
+    <string name="settings_backup_export_desc">将播放列表、条目和历史记录保存为 JSON 文件（同时自动备份至 Download/JapaneseASMR/japaneseasmr_backup_auto.json）</string>
+    <string name="settings_backup_import_title">恢复备份 (导入 JSON)</string>
+    <string name="settings_backup_import_desc">从 JSON 备份文件合并播放列表与历史记录，不会覆盖现有数据</string>
+    <string name="settings_backup_export_success">播放列表与历史记录备份导出成功</string>
+    <string name="settings_backup_export_failed">导出备份失败: %1$s</string>
+    <string name="settings_backup_import_success">恢复完成: %1$d 个播放列表，%2$d 个条目，%3$d 条历史</string>
+    <string name="settings_backup_import_failed">恢复备份失败: %1$s</string>
+    <string name="history_filter_all_count">全部 (%1$d)</string>
+    <string name="history_filter_present_count">可用 (%1$d)</string>
+    <string name="history_filter_missing_count">文件丢失 (%1$d)</string>
+    <string name="queue_loading_info">正在加载信息...</string>
+    <string name="settings_update_check_failed">检查更新失败</string>
+    <string name="settings_update_download_failed">下载更新文件失败</string>
+    <string name="settings_update_install_failed">启动 APK 安装器失败</string>
+    <string name="player_no_track_playing">当前没有播放音频</string>
+    <string name="player_work_not_found_dlsite">在 DLsite 未找到作品 %1$s</string>
 </resources>
