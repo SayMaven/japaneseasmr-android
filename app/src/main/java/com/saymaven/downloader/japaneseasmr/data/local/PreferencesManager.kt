@@ -6,9 +6,12 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
+import com.saymaven.downloader.japaneseasmr.util.SecurePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
@@ -182,9 +185,13 @@ class PreferencesManager(private val context: Context) {
         fun getFastCachedLlmConfig(context: Context): FastLlmConfig {
             return try {
                 val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+                val legacyKey = sp.getString("cached_llm_key", "") ?: ""
+                if (legacyKey.isNotBlank() && SecurePreferences.migratePlaintextKeyIfNeeded(context, legacyKey)) {
+                    sp.edit().remove("cached_llm_key").apply()
+                }
                 FastLlmConfig(
                     url = sp.getString("cached_llm_url", "") ?: "",
-                    key = sp.getString("cached_llm_key", "") ?: "",
+                    key = SecurePreferences.getLlmApiKey(context),
                     model = sp.getString("cached_llm_model", "claude-haiku-5-5") ?: "claude-haiku-5-5",
                     prompt = sp.getString("cached_llm_prompt", DEFAULT_LLM_PROMPT) ?: DEFAULT_LLM_PROMPT,
                     concurrency = sp.getInt("cached_llm_concurrency", 2).coerceIn(1, 5)
@@ -608,7 +615,9 @@ class PreferencesManager(private val context: Context) {
 
     // LLM Settings
     val llmApiUrlFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_API_URL] ?: "" }
-    val llmApiKeyFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_API_KEY] ?: "" }
+    val llmApiKeyFlow: Flow<String> = SecurePreferences.llmApiKeyFlow(context).onStart {
+        migrateLegacyLlmKeyIfNeeded()
+    }
     val llmModelFlow: Flow<String> = context.dataStore.data.map { it[KEY_LLM_MODEL] ?: "claude-haiku-5-5" }
     val llmPromptFlow: Flow<String> = context.dataStore.data.map {
         val p = it[KEY_LLM_PROMPT]
@@ -616,11 +625,30 @@ class PreferencesManager(private val context: Context) {
     }
     val llmConcurrencyFlow: Flow<Int> = context.dataStore.data.map { (it[KEY_LLM_CONCURRENCY] ?: 2).coerceIn(1, 5) }
 
+    private suspend fun migrateLegacyLlmKeyIfNeeded() {
+        try {
+            val prefs = context.dataStore.data.first()
+            val legacyDataStoreKey = prefs[KEY_LLM_API_KEY]
+            if (!legacyDataStoreKey.isNullOrBlank() &&
+                SecurePreferences.migratePlaintextKeyIfNeeded(context, legacyDataStoreKey)
+            ) {
+                context.dataStore.edit { it.remove(KEY_LLM_API_KEY) }
+            }
+            val legacyFastKey = fastSp.getString("cached_llm_key", null)
+            if (!legacyFastKey.isNullOrBlank() &&
+                SecurePreferences.migratePlaintextKeyIfNeeded(context, legacyFastKey)
+            ) {
+                fastSp.edit().remove("cached_llm_key").apply()
+            }
+        } catch (_: Exception) {}
+    }
+
     suspend fun setLlmConfig(url: String, key: String, model: String, prompt: String, concurrency: Int = 2) {
+        SecurePreferences.setLlmApiKey(context, key)
         try {
             fastSp.edit()
                 .putString("cached_llm_url", url)
-                .putString("cached_llm_key", key)
+                .remove("cached_llm_key")
                 .putString("cached_llm_model", model)
                 .putString("cached_llm_prompt", prompt)
                 .putInt("cached_llm_concurrency", concurrency.coerceIn(1, 5))
@@ -628,7 +656,7 @@ class PreferencesManager(private val context: Context) {
         } catch (_: Exception) {}
         context.dataStore.edit {
             it[KEY_LLM_API_URL] = url
-            it[KEY_LLM_API_KEY] = key
+            it.remove(KEY_LLM_API_KEY)
             it[KEY_LLM_MODEL] = model
             it[KEY_LLM_PROMPT] = prompt
             it[KEY_LLM_CONCURRENCY] = concurrency.coerceIn(1, 5)
