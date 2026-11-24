@@ -11,6 +11,7 @@ import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.data.model.UpdateInfo
 import com.saymaven.downloader.japaneseasmr.service.BackupManager
 import com.saymaven.downloader.japaneseasmr.service.BackupRestoreResult
+import com.saymaven.downloader.japaneseasmr.service.CacheManager
 import com.saymaven.downloader.japaneseasmr.service.ImportPreviewData
 import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import com.saymaven.downloader.japaneseasmr.service.TranslationService
@@ -573,6 +574,48 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun importBackup(uri: android.net.Uri, onResult: (Result<BackupRestoreResult>) -> Unit) = viewModelScope.launch {
         val result = BackupManager.importFromUri(getApplication(), uri)
         onResult(result)
+    }
+
+    // Cache Management
+    private val _cacheSizeBytes = MutableStateFlow(0L)
+    val cacheSizeBytes = _cacheSizeBytes.asStateFlow()
+
+    val cacheLimitMb = preferencesManager.cacheLimitMbFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        preferencesManager.getInitialCacheLimitMb()
+    )
+
+    val cacheAutoClean = preferencesManager.cacheAutoCleanFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        preferencesManager.getInitialCacheAutoClean()
+    )
+
+    fun refreshCacheSize() = viewModelScope.launch {
+        _cacheSizeBytes.value = CacheManager.calculateCacheSizeBytes(getApplication())
+    }
+
+    fun setCacheLimitMb(limitMb: Int) = viewModelScope.launch {
+        preferencesManager.setCacheLimitMb(limitMb)
+        if (cacheAutoClean.value) {
+            CacheManager.enforceAutoCleanIfNeeded(getApplication(), limitMb, true)
+            _cacheSizeBytes.value = CacheManager.calculateCacheSizeBytes(getApplication())
+        }
+    }
+
+    fun setCacheAutoClean(enabled: Boolean) = viewModelScope.launch {
+        preferencesManager.setCacheAutoClean(enabled)
+        if (enabled) {
+            CacheManager.enforceAutoCleanIfNeeded(getApplication(), cacheLimitMb.value, true)
+            _cacheSizeBytes.value = CacheManager.calculateCacheSizeBytes(getApplication())
+        }
+    }
+
+    fun clearAppCache(onComplete: (Long) -> Unit = {}) = viewModelScope.launch {
+        val freed = CacheManager.clearAppCache(getApplication())
+        _cacheSizeBytes.value = CacheManager.calculateCacheSizeBytes(getApplication())
+        onComplete(freed)
     }
 }
 

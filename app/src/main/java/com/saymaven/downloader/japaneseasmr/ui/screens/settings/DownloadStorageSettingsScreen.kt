@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
+import com.saymaven.downloader.japaneseasmr.service.CacheManager
 import com.saymaven.downloader.japaneseasmr.service.DownloadService
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,8 +47,16 @@ fun DownloadStorageSettingsScreen(
     val useDetailedFilename by viewModel.useDetailedFilename.collectAsState()
     val createCueSheet by viewModel.createCueSheet.collectAsState()
     val mergeDownloadedAudio by viewModel.mergeDownloadedAudio.collectAsState()
+    val cacheSizeBytes by viewModel.cacheSizeBytes.collectAsState()
+    val cacheLimitMb by viewModel.cacheLimitMb.collectAsState()
+    val cacheAutoClean by viewModel.cacheAutoClean.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshCacheSize()
+    }
 
     var showManageStorageDialog by remember { mutableStateOf(false) }
+    var showCacheDialog by remember { mutableStateOf(false) }
     var pendingPickerAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     fun checkStoragePermissionAndLaunch(action: () -> Unit) {
@@ -181,6 +191,37 @@ fun DownloadStorageSettingsScreen(
                         FilledTonalButton(onClick = { checkStoragePermissionAndLaunch { dirPickerLauncher.launch(null) } }) {
                             Text(stringResource(R.string.action_change))
                         }
+                    }
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                ListItem(
+                    modifier = Modifier.clickable {
+                        viewModel.refreshCacheSize()
+                        showCacheDialog = true
+                    },
+                    headlineContent = {
+                        Text("Manajemen Cache", fontWeight = FontWeight.SemiBold)
+                    },
+                    supportingContent = {
+                        val usedText = CacheManager.formatSize(cacheSizeBytes)
+                        val limitText = CacheManager.formatLimitLabel(cacheLimitMb)
+                        val autoText = if (cacheAutoClean) "Auto-Clean Aktif" else "Auto-Clean Mati"
+                        Text(
+                            text = "Terpakai: $usedText • Batas: $limitText ($autoText)",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    leadingContent = {
+                        Icon(Icons.Default.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 )
             }
@@ -416,5 +457,240 @@ fun DownloadStorageSettingsScreen(
                 }
             }
         )
+    }
+
+    if (showCacheDialog) {
+        CacheManagementDialog(
+            cacheSizeBytes = cacheSizeBytes,
+            cacheLimitMb = cacheLimitMb,
+            autoCleanEnabled = cacheAutoClean,
+            onLimitChange = { viewModel.setCacheLimitMb(it) },
+            onAutoCleanChange = { viewModel.setCacheAutoClean(it) },
+            onClearCache = {
+                viewModel.clearAppCache { freed ->
+                    Toast.makeText(
+                        context,
+                        "Cache dibersihkan (${CacheManager.formatSize(freed)})",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            onClearTranslationCache = {
+                viewModel.clearAllTranslationCache {
+                    Toast.makeText(
+                        context,
+                        "Cache terjemahan berhasil dibersihkan",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            onDismiss = { showCacheDialog = false }
+        )
+    }
+}
+
+@Composable
+private fun CacheManagementDialog(
+    cacheSizeBytes: Long,
+    cacheLimitMb: Int,
+    autoCleanEnabled: Boolean,
+    onLimitChange: (Int) -> Unit,
+    onAutoCleanChange: (Boolean) -> Unit,
+    onClearCache: () -> Unit,
+    onClearTranslationCache: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var sliderMb by remember(cacheLimitMb) { mutableFloatStateOf(cacheLimitMb.toFloat()) }
+    val limitBytes = cacheLimitMb.toLong() * 1024L * 1024L
+    val progress = if (limitBytes > 0L) (cacheSizeBytes.toFloat() / limitBytes.toFloat()).coerceIn(0f, 1f) else 0f
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Storage,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text("Manajemen Cache", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                CacheSizeSummaryCard(
+                    cacheSizeBytes = cacheSizeBytes,
+                    cacheLimitMb = cacheLimitMb,
+                    progress = progress
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Batas Ukuran Cache",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = CacheManager.formatLimitLabel(sliderMb.toInt()),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = sliderMb,
+                        onValueChange = { sliderMb = (it / 100f).toInt() * 100f },
+                        onValueChangeFinished = {
+                            onLimitChange(
+                                sliderMb.toInt().coerceIn(CacheManager.MIN_CACHE_LIMIT_MB, CacheManager.MAX_CACHE_LIMIT_MB)
+                            )
+                        },
+                        valueRange = CacheManager.MIN_CACHE_LIMIT_MB.toFloat()..CacheManager.MAX_CACHE_LIMIT_MB.toFloat()
+                    )
+                }
+
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(
+                                "Auto-Clean Otomatis",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Jika aktif, cache file terlama dihapus hingga 80% batas (riwayat & playlist tetap aman)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(checked = autoCleanEnabled, onCheckedChange = onAutoCleanChange)
+                    }
+                }
+
+                CacheDialogActions(
+                    onClearCache = onClearCache,
+                    onClearTranslationCache = onClearTranslationCache,
+                    onDismiss = onDismiss
+                )
+            }
+        },
+        confirmButton = {}
+    )
+}
+
+@Composable
+private fun CacheSizeSummaryCard(
+    cacheSizeBytes: Long,
+    cacheLimitMb: Int,
+    progress: Float
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Ukuran Cache Saat Ini",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Batas: ${CacheManager.formatLimitLabel(cacheLimitMb)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = CacheManager.formatSize(cacheSizeBytes),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            )
+        }
+    }
+}
+
+@Composable
+private fun CacheDialogActions(
+    onClearCache: () -> Unit,
+    onClearTranslationCache: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = onClearCache,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Bersihkan Cache")
+            }
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Text(stringResource(R.string.action_close))
+            }
+        }
+
+        FilledTonalButton(
+            onClick = onClearTranslationCache,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.Translate, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Hapus Cache Terjemahan")
+        }
     }
 }

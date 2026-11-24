@@ -131,6 +131,10 @@ class PreferencesManager(private val context: Context) {
         val KEY_FLOATING_LYRICS_DISPLAY_MODE = stringPreferencesKey("floating_lyrics_display_mode")
         val KEY_FLOATING_LYRICS_LOCKED = booleanPreferencesKey("floating_lyrics_locked")
 
+        // Cache Management
+        val KEY_CACHE_LIMIT_MB = intPreferencesKey("cache_limit_mb")
+        val KEY_CACHE_AUTO_CLEAN = booleanPreferencesKey("cache_auto_clean")
+
         fun getFastCachedUsbVolume(context: Context): Float {
             return try {
                 val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
@@ -145,6 +149,24 @@ class PreferencesManager(private val context: Context) {
                 val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
                 sp.edit().putFloat(PREF_KEY_USB_VOLUME, volume.coerceIn(0.0f, 1.0f)).apply()
             } catch (ignored: Exception) {}
+        }
+
+        fun getFastCachedCacheLimitMb(context: Context): Int {
+            return try {
+                val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+                sp.getInt("cached_cache_limit_mb", 1024).coerceIn(200, 10240)
+            } catch (_: Exception) {
+                1024
+            }
+        }
+
+        fun getFastCachedCacheAutoClean(context: Context): Boolean {
+            return try {
+                val sp = context.getSharedPreferences("player_fast_cache", Context.MODE_PRIVATE)
+                sp.getBoolean("cached_cache_auto_clean", false)
+            } catch (_: Exception) {
+                false
+            }
         }
 
         fun getFastCachedLanguage(context: Context): String {
@@ -419,6 +441,28 @@ class PreferencesManager(private val context: Context) {
     suspend fun setPageSize(size: Int) {
         fastSp.edit().putInt("cached_page_size", size).apply()
         context.dataStore.edit { it[KEY_PAGE_SIZE] = size }
+    }
+
+    // Cache Management Preferences
+    val cacheLimitMbFlow: Flow<Int> = context.dataStore.data.map {
+        (it[KEY_CACHE_LIMIT_MB] ?: 1024).coerceIn(200, 10240)
+    }
+    val cacheAutoCleanFlow: Flow<Boolean> = context.dataStore.data.map {
+        it[KEY_CACHE_AUTO_CLEAN] ?: false
+    }
+
+    fun getInitialCacheLimitMb(): Int = fastSp.getInt("cached_cache_limit_mb", 1024).coerceIn(200, 10240)
+    fun getInitialCacheAutoClean(): Boolean = fastSp.getBoolean("cached_cache_auto_clean", false)
+
+    suspend fun setCacheLimitMb(limitMb: Int) {
+        val clamped = limitMb.coerceIn(200, 10240)
+        fastSp.edit().putInt("cached_cache_limit_mb", clamped).apply()
+        context.dataStore.edit { it[KEY_CACHE_LIMIT_MB] = clamped }
+    }
+
+    suspend fun setCacheAutoClean(enabled: Boolean) {
+        fastSp.edit().putBoolean("cached_cache_auto_clean", enabled).apply()
+        context.dataStore.edit { it[KEY_CACHE_AUTO_CLEAN] = enabled }
     }
 
     // Privacy Mode (Anti-Malu) Flows & Setters

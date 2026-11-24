@@ -8,7 +8,9 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.di.appModule
+import com.saymaven.downloader.japaneseasmr.service.CacheManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -39,6 +41,11 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
         CoroutineScope(Dispatchers.IO).launch {
             createNotificationChannels()
             com.saymaven.downloader.japaneseasmr.service.TranslationService.init(this@JapaneseAsmrApp)
+            CacheManager.enforceAutoCleanIfNeeded(
+                context = this@JapaneseAsmrApp,
+                limitMb = PreferencesManager.getFastCachedCacheLimitMb(this@JapaneseAsmrApp),
+                autoCleanEnabled = PreferencesManager.getFastCachedCacheAutoClean(this@JapaneseAsmrApp)
+            )
         }
     }
 
@@ -79,9 +86,10 @@ class JapaneseAsmrApp : Application(), ImageLoaderFactory {
                     .build()
             }
             .diskCache {
+                val limitBytes = PreferencesManager.getFastCachedCacheLimitMb(this).toLong() * 1024L * 1024L
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.10)
+                    .maxSizeBytes(limitBytes)
                     .build()
             }
             .okHttpClient {
