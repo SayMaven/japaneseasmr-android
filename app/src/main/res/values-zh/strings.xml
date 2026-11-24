@@ -687,4 +687,5 @@
     <string name="settings_update_install_failed">启动 APK 安装器失败</string>
     <string name="player_no_track_playing">当前没有播放音频</string>
     <string name="player_work_not_found_dlsite">在 DLsite 未找到作品 %1$s</string>
+    <string name="playlist_action_remove_item">从播放列表移除</string>
 </resources>

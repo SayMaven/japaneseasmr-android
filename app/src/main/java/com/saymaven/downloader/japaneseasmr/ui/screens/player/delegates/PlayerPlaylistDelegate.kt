@@ -9,13 +9,16 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.PlaylistItemEntity
 import com.saymaven.downloader.japaneseasmr.data.local.entity.UserPlaylistEntity
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneTrack
+import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import com.saymaven.downloader.japaneseasmr.service.BackupManager
+import com.saymaven.downloader.japaneseasmr.service.DownloadService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Delegate handling Room v6 user playlist CRUD and playlist playback resolution
@@ -114,7 +117,19 @@ class PlayerPlaylistDelegate(
                 }
             }
             val local = historyDao.findByRjOrLinkedRj(item.rjid)
-            if (local != null) {
+            val resolvedLocalFile = if (local != null) {
+                val customDirStr = prefs.downloadDirFlow.first()
+                val downloadDir = if (!customDirStr.isNullOrBlank()) {
+                    File(customDirStr)
+                } else {
+                    DownloadService.getDefaultDownloadDirectory()
+                }
+                AudioStorageHelper.resolveValidAudioFile(downloadDir, local.localFilePath, local.rjid)
+            } else {
+                null
+            }
+
+            if (local != null && resolvedLocalFile != null) {
                 withContext(Dispatchers.Main) {
                     onPlayLocalTrack(local)
                 }

@@ -95,7 +95,7 @@ private fun PlaylistItemOptionsMenu(
                 }
             )
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.playlist_dialog_delete), color = MaterialTheme.colorScheme.error) },
+                text = { Text(stringResource(R.string.playlist_action_remove_item), color = MaterialTheme.colorScheme.error) },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 onClick = {
                     isMenuExpanded = false

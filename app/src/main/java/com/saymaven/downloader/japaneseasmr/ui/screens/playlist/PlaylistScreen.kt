@@ -87,7 +87,8 @@ fun PlaylistScreen(
 
     val playlist by viewModel.playlist.collectAsState()
     val allDownloadedRjids = remember(playlist) {
-        playlist.flatMap { listOfNotNull(it.rjid, it.linkedRjId) }
+        playlist.filter { it.localFilePath.isNotBlank() && java.io.File(it.localFilePath).exists() }
+            .flatMap { listOfNotNull(it.rjid, it.linkedRjId) }
             .map { it.uppercase() }
             .toSet()
     }

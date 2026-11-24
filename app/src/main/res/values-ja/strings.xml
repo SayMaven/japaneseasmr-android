@@ -687,4 +687,5 @@
     <string name="settings_update_install_failed">APKインストーラーの起動に失敗しました</string>
     <string name="player_no_track_playing">再生中の音声はありません</string>
     <string name="player_work_not_found_dlsite">作品 %1$s はDLsiteで見つかりませんでした</string>
+    <string name="playlist_action_remove_item">プレイリストから削除</string>
 </resources>

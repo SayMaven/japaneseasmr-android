@@ -681,4 +681,5 @@
     <string name="settings_update_install_failed">Failed to launch APK installer</string>
     <string name="player_no_track_playing">No track playing</string>
     <string name="player_work_not_found_dlsite">Work %1$s was not found on DLsite</string>
+    <string name="playlist_action_remove_item">Remove from Playlist</string>
 </resources>
