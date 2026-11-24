@@ -332,12 +332,31 @@ object StorageSyncManager {
     /**
      * Memindai folder fisik: membedakan multi-track album dan single track audio secara akurat.
      */
+    private suspend fun isSubfolderOfExistingDownload(
+        dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao,
+        leaf: File,
+        pathRj: String?,
+        isImported: Boolean
+    ): Boolean {
+        if (isImported || pathRj == null) return false
+        val existing = dao.getHistoryById(pathRj) ?: return false
+        if (existing.sourceType != SourceType.DL_SITE.name) return false
+        val parent = File(existing.localFilePath)
+        if (!parent.exists()) return false
+        return leaf.canonicalPath == parent.canonicalPath ||
+            leaf.canonicalPath.startsWith(parent.canonicalPath + File.separator)
+    }
+
+    @Volatile
+    private var currentScanIsImported: Boolean = true
+
     private suspend fun scanPhysicalDirectory(
         context: Context,
         dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao,
         rootDir: File,
         isImported: Boolean
     ) {
+        currentScanIsImported = isImported
         val prefs = PreferencesManager(context)
         val formatPriority = prefs.getInitialAudioFormatPriority()
         val leafFolders = AudioStorageHelper.findLeafAudioFolders(rootDir, maxDepth = 5)
@@ -379,7 +398,15 @@ object StorageSyncManager {
                         } else {
                             rj
                         }
-                        syncMultiTrackFolder(context, dao, workDir, allRecursiveTracks, customRjid = effectiveCustomRjid, linkedRj = rj, fallbackCover = fallbackCover)
+                        syncMultiTrackFolder(
+                            context = context,
+                            dao = dao,
+                            folder = workDir,
+                            audioTracks = allRecursiveTracks,
+                            customRjid = effectiveCustomRjid,
+                            linkedRj = rj,
+                            fallbackCover = fallbackCover
+                        )
                         groupLeaves.forEach { mergedWorkDirs.add(it.canonicalPath) }
                     }
                 }
@@ -395,6 +422,8 @@ object StorageSyncManager {
 
             val fallbackCover = AudioStorageHelper.findCoverInPath(leaf, rootBoundary = rootDir)
             val pathRj = AudioStorageHelper.findRjCodeInPath(leaf, rootBoundary = rootDir.parentFile)
+            if (isSubfolderOfExistingDownload(dao, leaf, pathRj, isImported)) continue
+
             val isAlbum = isMultiTrackAlbumFolder(leaf, audioFiles, isImported, rootDir)
 
             if (isAlbum) {
@@ -408,7 +437,15 @@ object StorageSyncManager {
                 } else {
                     rj
                 }
-                syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = effectiveCustomRjid, linkedRj = rj, fallbackCover = fallbackCover)
+                syncMultiTrackFolder(
+                    context = context,
+                    dao = dao,
+                    folder = leaf,
+                    audioTracks = audioFiles,
+                    customRjid = effectiveCustomRjid,
+                    linkedRj = rj,
+                    fallbackCover = fallbackCover
+                )
             } else {
                 // Bersihkan entitas virtual album palsu/usang jika folder ini sebelumnya pernah salah didaftarkan sebagai album
                 val bogusAlbums = dao.getAllHistoryDirect().filter {
@@ -452,6 +489,11 @@ object StorageSyncManager {
     /**
      * Mengintegrasikan album multi-track sebagai satu entitas virtual di Room DB tanpa duplikasi storage.
      */
+    private fun resolveFolderSourceType(isOfficialRj: Boolean, rjid: String): String {
+        val isDownloadedWork = !currentScanIsImported && isOfficialRj && !rjid.contains("_IMPORT_") && !rjid.startsWith("LOCAL_")
+        return if (isDownloadedWork) SourceType.DL_SITE.name else SourceType.LOCAL_FOLDER.name
+    }
+
     private suspend fun syncMultiTrackFolder(
         context: Context,
         dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao,
@@ -535,6 +577,8 @@ object StorageSyncManager {
 
         val coverUrl = localCover?.absolutePath ?: fallbackCoverUrl
 
+        val desiredSourceType = resolveFolderSourceType(isOfficialRj, rjid)
+
         if (existing == null) {
             val newEntity = HistoryEntity(
                 rjid = rjid,
@@ -548,7 +592,7 @@ object StorageSyncManager {
                 downloadDate = formattedDate,
                 fileSize = AudioDownloader.formatFileSize(totalBytes),
                 chaptersJson = chaptersJson,
-                sourceType = SourceType.LOCAL_FOLDER.name,
+                sourceType = desiredSourceType,
                 linkedRjId = finalLinkedRjId
             )
             dao.insertHistory(newEntity)
@@ -564,8 +608,9 @@ object StorageSyncManager {
                 updated = updated.copy(localFilePath = folder.absolutePath)
                 needsUpdate = true
             }
-            if (existing.sourceType != SourceType.LOCAL_FOLDER.name) {
-                updated = updated.copy(sourceType = SourceType.LOCAL_FOLDER.name)
+            val keepDownloadType = existing.sourceType == SourceType.DL_SITE.name && !currentScanIsImported
+            if (existing.sourceType != desiredSourceType && !keepDownloadType) {
+                updated = updated.copy(sourceType = desiredSourceType)
                 needsUpdate = true
             }
             if (existing.chaptersJson != chaptersJson) {

@@ -86,7 +86,11 @@ fun PlaylistScreen(
     val haptic = LocalHapticFeedback.current
 
     val playlist by viewModel.playlist.collectAsState()
-    val allDownloadedRjids = remember(playlist) { playlist.map { it.rjid.uppercase() }.toSet() }
+    val allDownloadedRjids = remember(playlist) {
+        playlist.flatMap { listOfNotNull(it.rjid, it.linkedRjId) }
+            .map { it.uppercase() }
+            .toSet()
+    }
     val filteredPlaylist by viewModel.filteredPlaylist.collectAsState()
     val availableFolders by viewModel.availableFolders.collectAsState()
     val folderItemsMap by viewModel.folderItemsMap.collectAsState()

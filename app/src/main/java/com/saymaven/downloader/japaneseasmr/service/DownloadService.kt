@@ -751,7 +751,7 @@ class DownloadService : Service() {
                         downloadDate = dateStr,
                         fileSize = fileSizeStr,
                         chaptersJson = chaptersJsonStr,
-                        sourceType = SourceType.LOCAL_FOLDER.name
+                        sourceType = SourceType.DL_SITE.name
                     )
                 )
 
