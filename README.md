@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="assets/icon.png" width="128" height="128" alt="JapaneseASMR Downloader Logo" style="border-radius: 28px;" />
-  <h1>JapaneseASMR Downloader</h1>
+  <img src="assets/icon.png" width="128" height="128" alt="JapaneseASMR Logo" style="border-radius: 28px;" />
+  <h1>JapaneseASMR</h1>
   <p><b>A high-performance native Android application for browsing, streaming, downloading, and playing Japanese ASMR audio works.</b></p>
 
   <p>
@@ -34,7 +34,7 @@
 
 ## Overview
 
-JapaneseASMR Downloader is a full-featured, open-source Android application engineered specifically for browsing, streaming, downloading, archiving, and listening to Japanese ASMR voice dramas (RJ / VJ / BJ works). Built with Jetpack Compose, Koin DI, Kotlin Coroutines, Room Database, AndroidX Media3 (ExoPlayer), and a native C++ Oboe / USB DAC audio engine, the app delivers desktop-grade streaming and bit-perfect local playback on mobile devices.
+JapaneseASMR is a full-featured, open-source Android application engineered specifically for browsing, streaming, downloading, archiving, and listening to Japanese ASMR voice dramas (RJ / VJ / BJ works). Built with Jetpack Compose, Koin DI, Kotlin Coroutines, Room Database, AndroidX Media3 (ExoPlayer), and a native C++ Oboe / USB DAC audio engine, the app delivers desktop-grade streaming and bit-perfect local playback on mobile devices.
 
 ---
 

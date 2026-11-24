@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="assets/icon.png" width="128" height="128" alt="JapaneseASMR Downloader 图标" style="border-radius: 28px;" />
-  <h1>JapaneseASMR Downloader</h1>
+  <img src="assets/icon.png" width="128" height="128" alt="JapaneseASMR 图标" style="border-radius: 28px;" />
+  <h1>JapaneseASMR</h1>
   <p><b>一款用于浏览、在线串流、下载、管理和播放日本 ASMR 声音作品的高性能原生 Android 应用程序。</b></p>
 
   <p>
@@ -34,7 +34,7 @@
 
 ## 概述
 
-**JapaneseASMR Downloader** 是一款专为浏览、在线串流、下载、归档和聆听日本 ASMR 同人音声广播剧（RJ / VJ / BJ 作品）而设计的全功能开源 Android 客户端。应用基于 Jetpack Compose、Koin DI、Kotlin 协程、Room 数据库、AndroidX Media3 (ExoPlayer) 以及原生 C++ Oboe / USB DAC 音频引擎构建，在移动设备上带来流畅的在线播放与源码率本地听音体验。
+**JapaneseASMR** 是一款专为浏览、在线串流、下载、归档和聆听日本 ASMR 同人音声广播剧（RJ / VJ / BJ 作品）而设计的全功能开源 Android 客户端。应用基于 Jetpack Compose、Koin DI、Kotlin 协程、Room 数据库、AndroidX Media3 (ExoPlayer) 以及原生 C++ Oboe / USB DAC 音频引擎构建，在移动设备上带来流畅的在线播放与源码率本地听音体验。
 
 ---
 

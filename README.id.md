@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="assets/icon.png" width="128" height="128" alt="Logo JapaneseASMR Downloader" style="border-radius: 28px;" />
-  <h1>JapaneseASMR Downloader</h1>
+  <img src="assets/icon.png" width="128" height="128" alt="Logo JapaneseASMR" style="border-radius: 28px;" />
+  <h1>JapaneseASMR</h1>
   <p><b>Aplikasi Android native berperforma tinggi untuk menjelajah, streaming, mengunduh, mengelola, dan memutar karya audio Japanese ASMR.</b></p>
 
   <p>
@@ -34,7 +34,7 @@
 
 ## Gambaran Umum
 
-JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) lengkap untuk menjelajah, streaming online, mengunduh, mengarsipkan, dan mendengarkan drama suara ASMR Jepang (karya RJ / VJ / BJ). Dibangun dengan Jetpack Compose, Koin DI, Kotlin Coroutines, Room Database, AndroidX Media3 (ExoPlayer), dan mesin audio native C++ Oboe / USB DAC, aplikasi ini menghadirkan streaming yang mulus serta pemutaran lokal berkualitas bit-perfect di perangkat mobile.
+JapaneseASMR adalah aplikasi Android sumber terbuka (open-source) lengkap untuk menjelajah, streaming online, mengunduh, mengarsipkan, dan mendengarkan drama suara ASMR Jepang (karya RJ / VJ / BJ). Dibangun dengan Jetpack Compose, Koin DI, Kotlin Coroutines, Room Database, AndroidX Media3 (ExoPlayer), dan mesin audio native C++ Oboe / USB DAC, aplikasi ini menghadirkan streaming yang mulus serta pemutaran lokal berkualitas bit-perfect di perangkat mobile.
 
 ---
 
