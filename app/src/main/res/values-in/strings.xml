@@ -686,4 +686,6 @@
     <string name="settings_refresh_metadata_desc">Ambil ulang rating usia, judul, CV, circle, dan genre untuk seluruh karya lokal RJ/VJ/BJ</string>
     <string name="settings_refresh_metadata_progress">Memperbarui %1$d / %2$d...</string>
     <string name="settings_refresh_metadata_done">Metadata diperbarui untuk %1$d dari %2$d karya</string>
+    <string name="settings_llm_nsfw_tips_title">Tips Konten Dewasa &amp; NSFW:</string>
+    <string name="settings_llm_nsfw_tips_desc">Untuk audio drama erotis (R-18), model seperti DeepSeek sangat direkomendasikan karena tidak menolak dialog intim. Jika provider LLM menolak teks karena filter keamanan, aplikasi otomatis mengalihkan terjemahan ke Google Translate tanpa error.</string>
 </resources>

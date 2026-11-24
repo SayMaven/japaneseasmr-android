@@ -686,4 +686,6 @@
     <string name="settings_refresh_metadata_desc">Re-fetch age ratings, titles, CVs, circles, and genres for all local RJ/VJ/BJ works</string>
     <string name="settings_refresh_metadata_progress">Updating %1$d / %2$d...</string>
     <string name="settings_refresh_metadata_done">Metadata updated for %1$d of %2$d works</string>
+    <string name="settings_llm_nsfw_tips_title">Adult Content &amp; NSFW Tips:</string>
+    <string name="settings_llm_nsfw_tips_desc">For erotic audio dramas (R-18), models like DeepSeek are highly recommended as they do not refuse intimate dialogue. If your LLM provider blocks text due to safety filters, the app automatically falls back to Google Translate without errors.</string>
 </resources>

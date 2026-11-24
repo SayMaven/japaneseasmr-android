@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/icon.png" width="128" height="128" alt="JapaneseASMR Downloader Logo" style="border-radius: 28px;" />
   <h1>JapaneseASMR Downloader</h1>
-  <p><b>A high-performance native Android application for downloading, managing, and playing Japanese ASMR audio works.</b></p>
+  <p><b>A high-performance native Android application for browsing, streaming, downloading, and playing Japanese ASMR audio works.</b></p>
 
   <p>
     <a href="README.md">English</a> |
@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v1.4.3-blue?style=for-the-badge" alt="Version v1.4.3" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Version-v2.0.0-blue?style=for-the-badge" alt="Version v2.0.0" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 License" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Language-Kotlin-7c3aed?style=for-the-badge" alt="Language" />
@@ -18,12 +18,11 @@
   </p>
 
   <p>
-    <a href="#whats-new-in-v143">What's New</a> •
     <a href="#features">Features</a> •
     <a href="#screenshots">Screenshots</a> •
+    <a href="#architecture--tech-stack">Architecture</a> •
     <a href="#download">Download</a> •
     <a href="#building-from-source">Building</a> •
-    <a href="#architecture">Architecture</a> •
     <a href="#license">License</a>
   </p>
 </div>
@@ -35,73 +34,7 @@
 
 ## Overview
 
-JapaneseASMR Downloader is a full-featured, open-source Android application engineered specifically for downloading, archiving, and listening to Japanese ASMR voice dramas (RJ Works). Built from the ground up with Jetpack Compose, Kotlin Coroutines, Room Database, and AndroidX Media3 (ExoPlayer), the app delivers desktop-grade streaming performance, zero-OOM memory safety, and seamless background audio playback on mobile devices.
-
----
-
-## What's New in v1.4.3
-
-* **External Storage & SD Card Import Support**:
-  * **All Files Access (`MANAGE_EXTERNAL_STORAGE`)**: Integrated Android 11+ (API 30+) external storage management permission, enabling full POSIX filesystem access (`java.io.File`) to secondary storage volumes, MicroSD cards, and external drives.
-  * **Zero-File Detection Bug Fix**: Fixed an issue where selecting an SD Card folder in the folder picker displayed "Total 0 audio files detected" due to Android Scoped Storage directory listing restrictions.
-  * **Seamless Dual-Mode Scanner Fallback**: Implemented robust fallback between POSIX direct access and Android Storage Access Framework (`DocumentFile.fromTreeUri()`) ensuring folder contents and subfolders are reliably discovered regardless of permission states.
-  * **Interactive Permission Prompt**: Added a dedicated permission prompt dialog in Settings when adding or changing folders, guiding users directly to Android system settings to grant storage access.
-
----
-
-## What's New in v1.4.2
-
-* **USB DAC Exclusive Mode Stability & Freeze Prevention**:
-  * Completely eliminated 100% CPU lockup, ANR, and audio thread starvation by optimizing Linux kernel scheduler priority (`nice -19`, `SCHED_FIFO` priority 3) and introducing timed non-blocking `poll()` completions.
-  * Resolved app freeze, severe lagging, and force closes when pressing Next, switching tracks, or playing audio from the collection playlist during active USB DAC streaming.
-* **UAC2 DAC Audio Noise Reduction & Clock Synchronization**:
-  * **48 kHz Microframe Integer Ratio**: Transparently resamples audio to 48,000 Hz when USB DAC Exclusive mode is active on High-Speed UAC2 hardware (8,000 microframes/sec), ensuring an exact integer ratio of 6 frames per packet (24 bytes) and eliminating fractional timing drift and micro-slips.
-  * **Symmetric Clamping & Zero-Crossing Deadband Elimination**: Replaced truncating `int16_t` conversion with symmetric rounding (`std::lround`) and anti-deadband clamping across decoder and volume scaling routines, protecting the fine acoustic texture of soft ASMR whispers.
-* **Playlist Repeat All Cycle Fix**:
-  * Fixed an issue where `Repeat All` erroneously repeated only the current single track like `Repeat One`. The playlist now continuously advances across all tracks and smoothly wraps around to the beginning once the end of the collection is reached.
-* **C++ NDK IntelliSense Configuration**:
-  * Configured native include paths and Android NDK Clang properties for developer editors, resolving false positive linter diagnostics on Oboe headers.
-
----
-
-## What's New in v1.4.1
-
-* **Local Audio Folder Import & Virtual Multi-Track Albums**:
-  * Scan and import external/local audio folders (SAF & direct storage) as zero-copy virtual multi-track albums without physical file duplication or re-encoding.
-  * Automatically maps individual audio files within the folder into chapters with accurate durations and native ID3 tag extraction.
-  * Seamless cross-track playback within virtual albums with 0ms transition latency.
-  * Smart detection distinguishing collection/playlist subfolders (containing multiple standalone ASMR works) from true multi-track albums based on RJ codes and track numbering heuristics.
-* **Official DLsite RJ Code Linking & Custom Cover Art**:
-  * "Link RJ Code" feature for local/imported works to automatically scrape full DLsite metadata (HD covers, CV/voice actors, circle, original title, genres, and age ratings).
-  * Custom thumbnail selector from local image files or gallery with persistent caching.
-* **Player UI Ergonomics & Performance Polish (120 FPS)**:
-  * Locked and stabilized player cover art layout with spacious non-collapsing title/CV container and repositioned chapter bar above the timeline slider.
-  * Eliminated gray placeholder flicker when switching tracks via painter caching.
-  * Instant 0.0ms tab switching via synchronous selection and background pre-warming.
-  * Instant O(1) in-memory Download History loading without recursive disk scans.
-  * Isolated Download History to show only works downloaded from the app.
-  * Duplicate work detection prior to download, instantly skipping downloads for already existing/linked works.
-  * Updated navigation tab labels ("Download" / "Unduh") and headers across all supported languages.
-
-* **In-App Auto-Updater with Smart Dual-Channel Matching**:
-  * Check, download, and install new versions directly from the Settings menu via GitHub Releases API without manual browser downloads.
-  * *Smart Dual-Channel Matching*: Automatically detects whether you are running a debug testing build or a production release build, downloading the matching APK asset (`*-debug.apk` vs `*-release.apk`). This completely prevents Android signature conflicts (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) while preserving all local download history and settings.
-  * Modern Material 3 dialogs with real-time download speed & progress metrics, seamlessly integrated via Android `FileProvider`.
-* **HiBy-Style Playlist Collection & Multi-Field Sorting Toolbar**:
-  * Overhauled dedicated Playlist Collection screen directly displayed on launch.
-  * Horizontal multi-field sorting bar: instantly sort by **Custom Order**, **Date**, **Title**, **Duration**, and **RJ Code** with tap-to-toggle **Ascending (▲)** and **Descending (▼)** direction switching.
-* **Ultra-Smooth Physics-Based Drag & Drop Reordering**:
-  * Precision center-point collision detection algorithm paired with Jetpack Compose `Modifier.animateItem()` spring transitions.
-  * Subtle haptic vibration ticks on every slot swap and intelligent edge auto-scrolling.
-* **Zero-Latency 0ms Instant Cold-Launch Startup**:
-  * Synchronous playlist cache restoration on millisecond 0 (`fast_playlist.json`), eliminating loading delays and rendering collection items instantly on frame 1.
-* **Bit-Perfect USB Audio DAC Buffer Expansion (Crackle-Free Playback)**:
-  * Deepened Linux kernel USB isochronous streaming queue to 128ms hardware depth (32 URBs × 32 packets) and expanded lock-free SPSC ring buffer to 131,072 frames (~3 seconds buffer capacity) with real-time thread priority (`nice -20`).
-  * Tuned Coil image loader dispatcher parallelism, completely eliminating audio crackling, pops, and micro-stutter during rapid 120Hz playlist scrolling or multitasking.
-* **Player Ergonomics & UI Polish**:
-  * Playback transport controls (Play/Pause, Next, Previous) elevated by 44dp for effortless one-handed thumb reach.
-  * Resolved duplicate RJ code badge and refined navigation tab titles across locales ("Utama", "Home", "ホーム", "首页").
-
+JapaneseASMR Downloader is a full-featured, open-source Android application engineered specifically for browsing, streaming, downloading, archiving, and listening to Japanese ASMR voice dramas (RJ / VJ / BJ works). Built with Jetpack Compose, Koin DI, Kotlin Coroutines, Room Database, AndroidX Media3 (ExoPlayer), and a native C++ Oboe / USB DAC audio engine, the app delivers desktop-grade streaming and bit-perfect local playback on mobile devices.
 
 ---
 
@@ -119,85 +52,60 @@ JapaneseASMR Downloader is a full-featured, open-source Android application engi
   <img src="assets/screenshots/7.jpg" width="32%" alt="Screenshot 7" />
   <img src="assets/screenshots/8.jpg" width="32%" alt="Screenshot 8" />
   <img src="assets/screenshots/9.jpg" width="32%" alt="Screenshot 9" />
+  <br />
+  <img src="assets/screenshots/10.jpg" width="32%" alt="Screenshot 10" />
+  <img src="assets/screenshots/11.jpg" width="32%" alt="Screenshot 11" />
+  <img src="assets/screenshots/12.jpg" width="32%" alt="Screenshot 12" />
 </div>
 
 ---
 
 ## Features
 
-### Context-Aware ASMR Translation & Room Caching Engine
-* **Specialized Domain Translation**: Translates Japanese titles, tracks, and chapters into fluent target language with DLsite-specific vocabulary adaptation.
-* **Fuseji De-Obfuscation**: Automatically restores obscured characters in titles before translation to preserve contextual meaning.
-* **Dual-Tier Translation Architecture**: Primary Google Web Translate engine with seamless fallback to MyMemory Translation API.
-* **Dual-Tier Persistent Cache**: In-memory `ConcurrentHashMap` (0ms) backed by Room Database v4 SQLite table (`translation_cache`, <2ms), persisting translations across app restarts.
-* **Bulk SQL Batch Fetching**: Single-query bulk retrieval (`getTranslationsBatch`) for playlists and tracklists, minimizing database and CPU overhead.
-* **Bilingual Display**: Real-time bilingual display in the native audio player and download queue cards.
+### ASMR Browse & Direct Online Streaming
+* **Pinterest-Style Browse & Work Detail:** Browse ASMR works in grid or list view with KikoFlu-aligned sorting, multi-tag filtering, All-Ages safe mode, and an interactive Work Detail file tree.
+* **Direct Online Audio Streaming:** Stream works directly online without downloading first, with automatic fallback from Playlist items when local files are removed.
+* **Smart Track & Chapter Selection:** Automatically prioritizes main work folders (`本編` / `main`) over promo or recap subfolders (`販促`, `回想`) for accurate chapter lists and durations.
 
-### Fast Lossless Audio Remux & Chapter Discovery Engine
-* **Zero-Copy Kernel Audio Merger**: Merges multi-part MP3 files in under 1 second using `FileChannel.transferTo` without audio re-encoding or generational loss.
-* **Sequential M4A Remuxing**: Assembles segmented AAC streams into standard ISO M4A containers for universal seeking support.
-* **Smart Hybrid Chapter Mapping**: Automatically classifies and chronologically orders tracks into Prologue, Main Story, Epilogue, Bonus, and Free Talk tiers.
-* **Unicode NFKC Normalization**: Eliminates numbering inconsistencies across circled, full-width, and kanji numerals.
-* **Unified Chapter Discovery**: Intelligently resolves chapter markers from embedded ID3v2 `CHAP`/`CTOC` tags, companion `.cue` sheets, and DLsite metadata.
-* **CUE Sheet Sidecar Export**: Generates external `.cue` files alongside audio for full compatibility with audiophile hardware and desktop players.
-* **Universal Link & Code Resolver**: Accepts direct URLs from DLsite, asmr.one, and JapaneseASMR, automatically extracting product identifiers.
+### Synchronized Subtitles, Floating Lyrics & Multi-Provider Translation
+* **Built-in Subtitle Engine:** Supports `.vtt`, `.lrc`, and `.srt` subtitles with automatic ASMR backfill, an interactive synchronized lyrics panel, and an **in-app Floating Lyrics Bar** (enabled by default in translation mode).
+* **Multi-Provider Translation & LLM Support:** Supports Google Translate (with sequential pacing plus `clients5` & `MyMemory` batch failover for `HTTP 429` resilience), Microsoft Edge, Youdao, MyMemory, and custom **LLM providers** (Claude, Gemini, OpenAI-compatible) with specialized Japanese & Chinese ASMR glossaries.
+* **Encrypted API Keys & Dual-Tier Cache:** LLM API keys are encrypted via Android Keystore AES-256-GCM (`SecurePreferences`). Translations are cached in-memory (`ConcurrentHashMap`) and Room SQLite (`translation_cache`).
 
-### High-Speed Download & Stream Demuxing Engine
-* **Concurrent Parallel Connections (Multithread)**: Multi-threaded segment downloader supporting 4 to 32 parallel connections (default 16) for line-speed performance.
-* **Dynamic Continuous Download Queue**: Adding new audio items while downloads are running automatically continues the queue until 100% complete without requiring manual restarts.
-* **Zero-RAM Disk-Streaming Pipeline**: Stream demuxing directly to flash storage, enabling safe handling of multi-gigabyte audio tracks without risking `OutOfMemoryError`.
-* **Standard Audio Remuxing**: Native ISO M4A / AAC container packaging ensuring complete seekability (0-second timeline scrubbing) across third-party audio players.
-* **Automatic Storage Deduplication**: Detects existing files in your download folder and automatically skips redundant network requests.
-* **Persistent Live Console**: Real-time progress monitoring, transfer speed calculation, and estimated completion time (ETA) with a persistent toggle button (`>_` / `</>`).
+### Custom Playlists, Explorer Folders & Local Collection
+* **Custom User Playlists (Room v6):** Organize both offline and online works in custom playlists with seamless **mixed online/offline queue navigation** (`Next`/`Previous`, `Shuffle`, `Repeat`, and auto-advance).
+* **Local Folder & SD Card Import:** Import local folders or MicroSD/external storage via POSIX (`MANAGE_EXTERNAL_STORAGE`) or SAF (`DocumentFile`) as virtual multi-track albums, with Explorer-style folder thumbnails, RJ/VJ/BJ code linking, and custom cover art.
+* **Card & Player Customization:** Choose which badges appear on Work Cards (Rating, Price, Sales, Release Date, Circle, `CC` Subtitle icon, Age Rating), search in the Local Collection header, and reorder Player action bar buttons.
 
-### Integrated Native Audio Player
-* **Android MediaSession Integration**: Foreground audio playback service with rich notification controls and lock screen artwork display.
-* **Smart Sleep Timer**: Built-in countdown timer with presets (5, 10, 15, 30, 60, 120 min) and +/- 5 min stepper buttons. Countdown automatically pauses when audio playback is paused.
-* **Floating Mini Player (Tab-Aware)**: Interactive floating mini player bar displayed above the bottom navigation bar across Unduhan, Riwayat, and Pengaturan tabs for instant play/pause/skip and one-tap expansion.
-* **True USB DAC Bit-Perfect Exclusive Takeover**: Direct USB Audio Class (UAC1 / UAC2) interface claiming with full Android kernel driver detach, isolating audio exclusively to the connected DAC with top priority.
-* **DAC Hardware Volume Control & Solid Floating HUD**: Direct control of USB DAC hardware mixer via USB Control Transfers (`SET_CUR` / `GET_RANGE`), hardware volume key interception, and an ultra-slim 100% solid floating volume bar.
-* **Interactive Chapter Drawer**: Tap-to-seek chapter drawer synchronized with player timeline and track progress.
-* **0ms Instant Playlist Drawer**: Pre-cached reactive list with drag-and-drop reordering and instantaneous bottom sheet opening.
-* **Modern Playback Speed Dialog**: Continuous smooth slider (0.25x - 2.0x) with zero tick dots and a balanced 2x3 quick preset grid.
-* **Replay 10s & Forward 10s Controls**: Quick jump controls for navigating audio dialogue and chapters effortlessly.
-* **Persistent Timeline Mode**: Toggling between total elapsed duration and remaining time (`-mm:ss`) persists across app restarts.
-* **Strict Physical File Validation**: Automatically hides missing files in the playlist collection and refreshes in real-time when audio files are restored to storage.
+### Integrated Native Audio Player, Gain Boost & Privacy Mode
+* **Android MediaSession & Sleep Timer:** Foreground playback service with lock-screen artwork, notification controls, Floating Mini Player, and a pause-aware Sleep Timer.
+* **Audio Gain Boost (dB) & USB DAC Exclusive Mode:** Amplify quiet ASMR whispers in dB through both ExoPlayer and the native C++ Oboe / UAC1–UAC2 USB DAC engine with hardware volume control.
+* **Privacy Mode:** Blur cover art in-app and in system notifications, and mask work titles with customizable placeholder text.
 
-### Library & Metadata Management
-* **120 FPS High-Performance History Library**: Zero main-thread disk I/O blocking with precomputed UI models and stable keys for buttery-smooth 120 FPS list scrolling.
-* **Realtime Storage Synchronization (StorageSyncManager)**: Automatically scans physical storage on launch/resume, synchronizing new, moved, or deleted audio files with the local Room database.
-* **Smart Sorting Filters**: Instant ordering by Date (Newest / Oldest) with real millisecond timestamp precision and Title (A-Z / Z-A) with rock-solid list anchoring.
-* **Uniform Date Formatting**: Clean, standardized date strings (`dd MMM yyyy`) across the entire app.
-* **Complete Metadata Tagging**: Embeds high-resolution cover artwork, Voice Actor (CV), Circle/Author, Work Title, and Genre tags directly into audio files (ID3v2 / MP4 atom).
-* **Search & Collection Filtering**: Search your offline library by RJ Code, title, voice actor, or circle.
+### High-Speed Downloader, Cache Management & Backup
+* **Merge or Multi-Track Folder Mode:** Choose whether to merge multi-track downloads into a single file (`FileChannel.transferTo` MP3 / M4A remux) or preserve the original folder structure, with automatic ID3v2/MP4 metadata tagging, CUE sheet export, and 4–32 parallel connections.
+* **Cache Management & Auto-Clean:** Manage cache usage with a `200 MB – 10 GB` limit (`1 GB` default), optional Auto-Clean toggle (OFF by default to preserve history), and quick translation cache clearing.
+* **JSON Backup & Restore + Refresh All Metadata:** Export/import Custom Playlists and Download History as JSON (plus automatic local backup), and bulk-refresh metadata for all local RJ/VJ/BJ works from Download Settings.
 
-### Modern Material Design 3 UI & Navigation
-* **4 Independent Navigation Tabs**: Home (Full Audio Player), Unduhan (Download Queue), Riwayat (Audio Library), and Pengaturan (Settings).
-* **Deterministic Tab Retention**: Cold starts always begin at Home, while minimizing and reopening the app preserves the exact active tab without unwanted jumps.
-* **Dynamic Material You / Monet Engine**: Automatic color palette generation based on Android 12+ wallpaper colors.
-* **36 Curated Color Palettes**: Comprehensive theme selection with 3-segment circle previews, smooth horizontal carousel, and 9-dot pagination.
-* **0ms Instant Startup Fast Cache**: Synchronous caching of theme preferences eliminates cold start dynamic color flicker.
-* **Instant 0ms Tab Switching**: Retained GPU RenderNode layer architecture for zero-delay switching across tabs.
-* **System, Dark, and Light Modes**: Full day/night theme support with smooth transitions.
+### OKLCH Color System & Adaptive Material 3 UI
+* **OKLCH Perceptual Palette Engine:** 12 curated Light/Dark palettes alongside Material You Dynamic Color, with WCAG AA contrast, adaptive `NavigationRail` for tablets/landscape, and 4 UI languages (English, Indonesian, Japanese, Simplified Chinese).
+* **In-App Auto-Updater:** Dual-channel (`*-debug.apk` / `*-release.apk`) GitHub Releases updater with `FileProvider` installation.
 
 ---
 
 ## Architecture & Tech Stack
 
-JapaneseASMR Downloader adheres strictly to Modern Android Architecture guidelines with separation of concerns and reactive data flow:
-
 | Layer | Component | Description |
 | :--- | :--- | :--- |
-| **UI Layer** | Jetpack Compose + Material 3 | Declarative UI, Animations, Dynamic Monet Theming |
+| **UI Layer** | Jetpack Compose + Material 3 | Declarative UI, OKLCH perceptual theming, adaptive `NavigationRail` |
+| **DI & Navigation** | Koin DI + Navigation Compose | Modular ViewModels/delegates, `@Serializable` type-safe `AppRoute` |
 | **State Management** | Kotlin Coroutines + StateFlow | Reactive, lifecycle-aware unidirectional data flow |
-| **Media Player** | AndroidX Media3 (ExoPlayer) | Native audio decoding, MediaSession, Foreground Service |
-| **Local Database** | Room Database v4 (SQLite) | Library history, persistent translation cache (`translation_cache`), internal chapter mapping |
-| **Audio Processing** | FastRemuxEngine | Zero-copy kernel MP3 merge, sequential M4A remuxing, CUE sheet sidecar export |
-| **Translation Engine** | TranslationService | Dual-tier Google Web/MyMemory APIs, ASMR domain naturalization, fuseji de-obfuscation |
-| **Preferences** | AndroidX DataStore + SharedPreferences Fast Cache | Type-safe persistence with 0ms synchronous startup cache |
-| **Networking** | OkHttp 4 | HTTP/2 connection pooling, multi-thread segment downloads |
-| **Audio Tagging** | Jaudiotagger | ID3v2 (`CHAP`/`CTOC`), MP4 atom, and metadata embedding |
-| **Image Loading** | Coil Compose | Asynchronous image decoding, memory and hardware bitmap caching |
+| **Media & Native Audio** | AndroidX Media3 + C++ Oboe | ExoPlayer streaming/playback, MediaSession, USB DAC exclusive engine |
+| **Local Database** | Room Database v6 (SQLite) | History, Custom Playlists, persistent `translation_cache` |
+| **Audio Processing** | FastRemuxEngine + Jaudiotagger | Zero-copy MP3 merge, M4A remuxing, CUE export, ID3v2/MP4 tagging |
+| **Translation Engine** | TranslationService + LLM Client | Google (`gtx` + `clients5`), MyMemory, Edge, Youdao, encrypted LLM APIs |
+| **Networking & Images** | OkHttp 4 + Coil Compose | HTTP/2 pooling, multi-thread downloads, async cover caching |
+| **Quality & Security** | Detekt + MockWebServer + Keystore | Static analysis, unit/migration tests, AES-256-GCM key storage, R8 shrinking |
 
 ---
 
@@ -212,9 +120,9 @@ Pre-compiled universal release APKs signed with the official SayMaven certificat
 ## Building from Source
 
 ### Prerequisites
-* JDK 17 or higher
-* Android SDK with Build Tools 35.0.0+
-* Gradle 8.7+ (included via Gradle Wrapper)
+* JDK 21
+* Android SDK (compileSdk 36 / Build Tools 35+)
+* Gradle 8.10.2 (included via Gradle Wrapper)
 
 ### Clone and Compile
 ```bash
@@ -227,8 +135,8 @@ cd japaneseasmr-android
 ```
 
 The compiled APK will be located at:
-```
-app/build/outputs/apk/debug/JapaneseASMR-v1.4.0-debug.apk
+```text
+app/build/outputs/apk/debug/JapaneseASMR-v2.0.0-debug.apk
 ```
 
 ---

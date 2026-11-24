@@ -692,4 +692,6 @@
     <string name="settings_refresh_metadata_desc">重新获取所有本地 RJ/VJ/BJ 作品的年龄分级、标题、声优、社团与标签</string>
     <string name="settings_refresh_metadata_progress">正在更新 %1$d / %2$d...</string>
     <string name="settings_refresh_metadata_done">已更新 %1$d / %2$d 部作品的元数据</string>
+    <string name="settings_llm_nsfw_tips_title">成人内容与 NSFW 提示:</string>
+    <string name="settings_llm_nsfw_tips_desc">对于 R-18 音频作品，非常推荐使用 DeepSeek 等不会拒绝亲密对话的模型。即使当前 LLM 服务商因安全过滤拒绝文本，应用也会自动回退至 Google 翻译且不会报错。</string>
 </resources>

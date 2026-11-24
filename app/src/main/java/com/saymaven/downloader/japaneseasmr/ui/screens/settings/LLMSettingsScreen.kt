@@ -323,13 +323,13 @@ fun LLMSettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Tips Konten Dewasa & NSFW:",
+                        text = stringResource(R.string.settings_llm_nsfw_tips_title),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                     Text(
-                        text = "Untuk audio drama erotis (R-18), model seperti DeepSeek sangat direkomendasikan karena tidak menolak dialog intim. Jika provider LLM menolak teks karena filter keamanan, aplikasi otomatis mengalihkan terjemahan ke Google Translate tanpa error.",
+                        text = stringResource(R.string.settings_llm_nsfw_tips_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )

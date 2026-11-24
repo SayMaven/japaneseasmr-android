@@ -692,4 +692,6 @@
     <string name="settings_refresh_metadata_desc">ローカルの全RJ/VJ/BJ作品の年齢制限・タイトル・声優・サークル・ジャンルを再取得します</string>
     <string name="settings_refresh_metadata_progress">更新中 %1$d / %2$d...</string>
     <string name="settings_refresh_metadata_done">%2$d 件中 %1$d 件のメタデータを更新しました</string>
+    <string name="settings_llm_nsfw_tips_title">成人向け・NSFWコンテンツのヒント:</string>
+    <string name="settings_llm_nsfw_tips_desc">R-18音声ドラマには、親密なセリフを拒否しにくいDeepSeekなどのモデルを強くおすすめします。LLMの安全フィルターで拒否された場合でも、エラーを出さず自動的にGoogle翻訳へ切り替わります。</string>
 </resources>

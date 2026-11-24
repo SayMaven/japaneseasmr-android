@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/icon.png" width="128" height="128" alt="JapaneseASMR Downloader 图标" style="border-radius: 28px;" />
   <h1>JapaneseASMR Downloader</h1>
-  <p><b>一款用于下载、管理和播放日本 ASMR 声音作品的高性能原生 Android 应用程序。</b></p>
+  <p><b>一款用于浏览、在线串流、下载、管理和播放日本 ASMR 声音作品的高性能原生 Android 应用程序。</b></p>
 
   <p>
     <a href="README.md">English</a> |
@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/版本-v1.4.3-blue?style=for-the-badge" alt="版本 v1.4.3" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/版本-v2.0.0-blue?style=for-the-badge" alt="版本 v2.0.0" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/许可证-GPL%20v3.0-10b981?style=for-the-badge" alt="GPL v3.0 许可证" /></a>
     <img src="https://img.shields.io/badge/平台-Android%208.0%2B-059669?style=for-the-badge" alt="平台" />
     <img src="https://img.shields.io/badge/开发语言-Kotlin-7c3aed?style=for-the-badge" alt="开发语言" />
@@ -18,12 +18,11 @@
   </p>
 
   <p>
-    <a href="#v143-更新内容">更新日志</a> •
     <a href="#功能特性">功能特性</a> •
     <a href="#应用截图">应用截图</a> •
+    <a href="#架构设计与技术栈">架构设计</a> •
     <a href="#下载安装">下载安装</a> •
     <a href="#源码构建">源码构建</a> •
-    <a href="#架构设计与技术栈">架构设计</a> •
     <a href="#开源协议">开源协议</a>
   </p>
 </div>
@@ -35,73 +34,7 @@
 
 ## 概述
 
-**JapaneseASMR Downloader** 是一款专为下载、归档和聆听日本 ASMR 同人音声广播剧（RJ 作品）而设计的全功能开源 Android 客户端。应用完全基于现代 Android 技术栈构建，采用 Jetpack Compose、Kotlin 协程、Room 数据库和 AndroidX Media3 (ExoPlayer)，在移动设备上带来桌面级的流式传输性能、零 OOM（内存溢出）安全保障以及稳定省电的后台音频播放体验。
-
----
-
-## v1.4.3 更新内容
-
-* **全面支持外部存储与 SD 卡音频导入**:
-  * **所有文件访问权限 (`MANAGE_EXTERNAL_STORAGE`)**: 适配 Android 11+ (API 30+) 外部存储管理权限，完全解禁对 MicroSD 卡及外部储存卷的 POSIX 文件系统访问 (`java.io.File`)。
-  * **修复 SD 卡导入显示 0 个音频文件的 Bug**: 彻底解决因 Android Scoped Storage 分区存储限制导致从 SD 卡导入目录时预览界面显示“共检测到 0 个音频文件”的问题。
-  * **智能双模扫描回退机制**: 实现 POSIX 直接访问与 Android SAF 存储访问框架 (`DocumentFile.fromTreeUri()`) 的双向无缝回退，确保无论权限状态如何均可完整解析目录与子音轨。
-  * **设置页授权引导弹窗**: 在设置界面添加或更改音频目录时，若检测到未开启权限，将弹出友好指引对话框，一键跳转至系统设置页授权。
-
----
-
-## v1.4.2 更新内容
-
-* **USB DAC 独占模式稳定性增强与防卡死优化**:
-  * 彻底消除 CPU 假死、ANR 与音频线程饿死现象，优化 Linux 内核调度优先级（`nice -19` 与 `SCHED_FIFO` 优先级 3），引入非阻塞定时 `poll()` 机制。
-  * 解决在 USB DAC 独占播放期间按下下一曲、切换音轨或从收藏播放列表中点播导致的软件冻结、严重卡顿与闪退问题。
-* **UAC2 DAC 音频噪声消除与时钟微帧同步**:
-  * **48 kHz 整数微帧采样比**: 针对高速 UAC2 设备（8,000 微帧/秒）启用独占模式时，智能进行 48,000 Hz 透明重采样，确保每个传输包恒定为 6 帧（24 字节），消除由于浮点时钟漂移引发的周期性微破音。
-  * **对称四舍五入与消除过零失真**: 在解码器与音量衰减环节中全面采用 `std::lround` 对称取整与抗死区截断，杜绝微弱耳语 ASMR 音声在零电平处的削波失真。
-* **修复列表循环（Repeat All）逻辑**:
-  * 修复了开启 `Repeat All`（全曲循环）时却像单曲循环一样仅重复播放当前曲目的问题。现已支持在整个播放列表中依次流转，到达末尾后无缝跳转回到首曲继续循环。
-* **C++ NDK IntelliSense 环境配置**:
-  * 为 IDE 配置 Android NDK Clang 编译器与头文件包含路径，全面消除 Oboe 与 C++ STL 头文件的虚假报错提示。
-
----
-
-## v1.4.1 更新内容
-
-* **本地音频文件夹导入与虚拟多音轨专辑**:
-  * 支持直接扫描并导入本地/SAF 外部音频文件夹作为零拷贝虚拟多音轨专辑，无需复制物理文件或重新编码。
-  * 自动将文件夹内的各个音频音轨映射为章节（Chapter），精准提取播放时长与 ID3 标签信息。
-  * 虚拟专辑内跨音轨连续播放，音轨切换无缝 0 毫秒延迟。
-  * 智能区分包含多部独立作品的集合分类文件夹与真正的多音轨专辑。
-* **关联 DLsite 官方 RJ 编号与封面自定义**:
-  * 本地/导入作品一键“关联 RJ 编号”，自动抓取 DLsite 官方完整元数据（高清封面、声优/CV、社团、原名、分类与年龄分级）。
-  * 支持自定义封面更换，支持从本地图片或相册选取并持久化存储。
-* **播放器界面人体工学与性能打磨 (120 FPS)**:
-  * 锁定播放器封面位置，标题与 CV 区域自适应且永不遮挡，章节栏移至进度条上方，避免切歌时封面上下跳动。
-  * 彻底消除切歌时封面出现的灰色空白闪烁（Painter 缓存平滑过渡）。
-  * 0.0ms 极速标签页切换（同步选中与后台预加载）。
-  * 下载历史页面 O(1) 内存极速渲染，消除递归磁盘扫描延迟。
-  * 下载历史页面专属化，不再混杂本地导入的音频作品。
-  * 下载前重复作品检测：若作品已存在于存储或数据库中，自动跳过网络下载。
-  * 优化全语言导航栏标签（“下载” / “Download” / “Unduh”）与历史标题。
-
-* **应用内一键自动更新与智能双通道匹配**:
-  * 支持直接在“设置”页面中检查、下载并安装新版本，无需手动前往 GitHub 网页下载。
-  * *智能双通道匹配引擎*: 自动识别当前运行的是调试测试版还是正式发布版，并自动下载匹配的 APK 文件 (`*-debug.apk` 与 `*-release.apk`)，彻底解决签名不兼容问题 (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`)，完整保留本地下载历史与设置。
-  * 现代 Material 3 风格弹窗，实时显示下载速度与百分比进度，无缝集成 Android `FileProvider` 安全安装通道。
-* **HiBy 风格播放列表重构与多维度排序工具栏**:
-  * 重构独立的播放列表收藏视图，应用启动直接展现。
-  * 横向多字段排序工具栏：支持按**自定义顺序**、**添加日期**、**标题**、**时长**以及 **RJ 编号**排序，轻触即可在**升序 (▲)**与**降序 (▼)**之间切换。
-* **极致平滑物理碰撞拖拽重排**:
-  * 采用中心碰撞检测算法配合 Jetpack Compose `Modifier.animateItem()` 弹簧动画，相邻卡片丝滑让位。
-  * 每次插槽交换均附带细腻的触觉震动反馈，支持屏幕边缘智能自动滚动。
-* **0 毫秒零延迟极速冷启动**:
-  * 首帧毫秒级同步还原 `fast_playlist.json` 播放列表缓存，彻底消除白屏与加载等待。
-* **源码率 USB DAC 缓冲区深度扩容 (彻底告别杂音破音)**:
-  * Linux 内核 USB 等时传输队列深度扩展至 128ms（32 URB × 32 数据包），SPSC 无锁环形缓冲区扩展至 131,072 帧（约 3 秒缓冲容量），配以实时线程高优先级 (`nice -20`)。
-  * 调优 Coil 图片分发器并行度，彻底解决在 120Hz 高刷屏上飞速滚动列表或多任务切换时的音频爆音与微卡顿。
-* **播放器人体工学与界面细节打磨**:
-  * 核心播放控制按钮（播放/暂停、下一曲、上一曲）整体上移 44dp，便于单手拇指触控。
-  * 修复全屏播放器 RJ 编号徽章重复问题，精简导航栏文字并优化多语言文案（"Utama", "Home", "ホーム", "首页"）。
-
+**JapaneseASMR Downloader** 是一款专为浏览、在线串流、下载、归档和聆听日本 ASMR 同人音声广播剧（RJ / VJ / BJ 作品）而设计的全功能开源 Android 客户端。应用基于 Jetpack Compose、Koin DI、Kotlin 协程、Room 数据库、AndroidX Media3 (ExoPlayer) 以及原生 C++ Oboe / USB DAC 音频引擎构建，在移动设备上带来流畅的在线播放与源码率本地听音体验。
 
 ---
 
@@ -119,85 +52,60 @@
   <img src="assets/screenshots/7.jpg" width="32%" alt="截图 7" />
   <img src="assets/screenshots/8.jpg" width="32%" alt="截图 8" />
   <img src="assets/screenshots/9.jpg" width="32%" alt="截图 9" />
+  <br />
+  <img src="assets/screenshots/10.jpg" width="32%" alt="截图 10" />
+  <img src="assets/screenshots/11.jpg" width="32%" alt="截图 11" />
+  <img src="assets/screenshots/12.jpg" width="32%" alt="截图 12" />
 </div>
 
 ---
 
 ## 功能特性
 
-### 语境感知型 ASMR 翻译与 Room 缓存引擎
-* **领域定制化翻译**：将日文作品标题、音轨名称与章节准确翻译为流畅的目标语言，针对同人声音剧特征词汇进行专门润色。
-* **伏字智能去混淆**：在发起翻译请求前自动识别并还原遮蔽字符，避免机器翻译产生断句歧义。
-* **双引擎容灾机制**：Google Web Translate 优先处理，失败时自动静默切换至备用 MyMemory API。
-* **双层持久缓存**：以高速内存 `ConcurrentHashMap`（0ms）搭配 Room 数据库 v4（`translation_cache` 数据表，<2ms），实现冷启动免重复联网。
-* **批量 SQL 聚合获取**：单次批量 SQL `IN` 查询即可拉取全部歌单翻译，降低 CPU 与电池开销。
-* **实时双语字幕**：原生播放器与下载卡片均支持日汉双语实时对照。
+### ASMR 浏览与在线直接串流
+* **Pinterest 风格浏览与作品详情**：支持网格/列表视图、KikoFlu 同步排序、多标签筛选、全年龄安全模式以及交互式文件树。
+* **在线直接串流播放**：无需预先下载即可直接在线收听；若播放列表中的本地文件已被删除，将自动无缝回退至在线串流。
+* **智能主线音轨与章节识别**：自动优先识别作品本篇目录（`本編` / `main`），排除贩促与回想特典目录（`販促`、`回想`），确保章节数与总时长准确无误。
 
-### 极速无损音频重封装与章节智能解析引擎
-* **零拷贝内核音频合并**：针对多段分卷 MP3 文件，利用操作系统内核 `FileChannel.transferTo` 进行无损极速拼接，耗时不足 1 秒。
-* **顺序 M4A 重封装**：将分段 AAC 音频重构为规范的 ISO M4A 容器，保证标准播放器下的精准定位跳转。
-* **智能混合章节层级划分**：全自动将音轨按情节分类为序章、主线、尾声、特典及访谈等，按正确时序排布。
-* **Unicode NFKC 标准化**：统一规范带圈数字、全角数字和汉字序号，彻底规避音轨乱序。
-* **全方位章节探测**：自动识别内嵌 ID3v2 章节标签、外部 CUE 轨道表及 DLsite 远端元数据。
-* **CUE 伴随文件导出**：可在设置中启用外部 `.cue` 伴随文件导出功能，无缝契合高端便携播放器（DAP）。
-* **全平台链接提取**：支持粘贴 DLsite、asmr.one 及 JapaneseASMR 等网页链接自动解析提取番号。
+### 同步字幕、悬浮歌词与多引擎翻译
+* **内置字幕引擎**：支持 `.vtt`、`.lrc`、`.srt` 字幕及自动回填，提供播放器同步歌词面板与应用内**悬浮歌词栏**（默认开启翻译模式）。
+* **多引擎翻译与自定义 LLM**：支持 Google 翻译（顺序限流搭配 `clients5` 与 `MyMemory` 批量容灾，缓解 `HTTP 429`）、Microsoft Edge、有道、MyMemory 及自定义 **LLM 模型**（Claude、Gemini、OpenAI 兼容接口），内置日语/中文 ASMR 专业术语表。
+* **密钥加密与双层缓存**：通过 Android Keystore AES-256-GCM（`SecurePreferences`）加密保存 LLM API 密钥，并由内存 `ConcurrentHashMap` 与 Room SQLite（`translation_cache`）持久化缓存翻译结果。
 
-### 高速多线程下载与流解复用引擎
-* **并发多线程分段加速**：支持 4 至 32 条并发连接（默认 16 线程），充分跑满设备带宽。
-* **动态连续排队下载**：下载过程中随时追加新任务，队列自动按序处理直至全部完成，无需手动干预。
-* **零内存磁盘流写入**：直接写入闪存存储，哪怕下载数 GB 的超长音频也绝不会发生 `OutOfMemoryError`。
-* **标准音频容器封装**：输出标准的 ISO M4A / AAC 与 MP3 文件，杜绝第三方播放器出现不可拖动进度条的问题。
-* **智能存储去重验证**：自动校验下载目录中已存在的物理文件，跳过冗余重复下载。
-* **实时传输控制台**：内置实时传输日志、当前速度测算与预计剩余时间（ETA），支持浮动按钮（`>_` / `</>`）一键折叠或展开。
+### 自定义播放列表、资源管理器目录与本地收藏
+* **自定义播放列表（Room v6）**：同一播放列表可混合收藏离线与在线作品，支持列表内无缝**上一曲/下一曲、随机、循环与自动连播**。
+* **本地目录与 SD 卡导入**：支持通过 POSIX（`MANAGE_EXTERNAL_STORAGE`）或 SAF（`DocumentFile`）将本地与 MicroSD 卡目录导入为虚拟多音轨专辑，支持资源管理器风格目录缩略图、RJ/VJ/BJ 关联及自定义封面。
+* **卡片与播放器自定义**：自由开关作品卡片徽章（评分、价格、销量、发售日、社团、`CC` 字幕图标、年龄分级），支持本地收藏顶栏搜索及播放器按钮顺序自定义。
 
-### 现代化内置原生音频播放器
-* **完整 Android MediaSession 集成**：前台服务常驻，支持锁屏高清大图展示、媒体通知控制栏与耳机线控。
-* **智能睡眠定时器**：提供常用预设倒计时（5、10、15、30、60、120 分钟）并支持 +/- 5 分钟微调。暂停播放时倒计时自动随之暂停。
-* **全局悬浮 Mini Player**：在“下载”、“历史”、“设置”等主界面底部常驻悬浮微型播放条，可快捷控制播放与一键向上展开全屏播放器。
-* **USB DAC 硬件独占（Bit-Perfect 独占输出）**：支持直接接管 USB Audio Class（UAC1 / UAC2）硬件接口，绕过 Android 系统音频混音与采样率重采样，提供纯净声音输出。
-* **DAC 硬件音量控制与实体音量条**：通过 USB 控制传输指令（`SET_CUR` / `GET_RANGE`）直控 DAC 耳放硬件音量，拦截实体音量键，并提供超薄悬浮实体音量状态条。
-* **章节抽屉与进度同步**：点按章节即可无缝跳转对应时段，章节高亮状态与音轨进度条实时联动。
-* **0ms 即时响应播放列表抽屉**：经过预缓存的响应式歌单，支持平滑拖拽重排与快速打开。
-* **连续倍速调节弹窗**：0.25x 至 2.0x 无级微调滑动条，搭配清晰的 2x3 常用倍速快捷预设网格。
-* **快退 10 秒 / 快进 10 秒**：方便随时重听关键对白与台词。
-* **时间显示模式记忆**：点击可在“已播放时间”与“剩余时间（-mm:ss）”之间自由切换，重启后依然保存偏好。
-* **严苛的物理文件有效性校验**：自动隐藏已被外部文件管理器删除的失效音轨，并在文件恢复时即时自动刷新。
+### 原生音频播放器、增益放大 (dB) 与隐私模式
+* **MediaSession 与睡眠定时**：支持锁屏封面、媒体通知栏、全局悬浮 Mini Player，以及随音频暂停自动暂停的睡眠定时器。
+* **音频增益放大 (dB) 与 USB DAC 独占输出**：可在 ExoPlayer 与原生 C++ Oboe / UAC1–UAC2 USB DAC 引擎上直接放大微弱耳语音量（dB），并支持 DAC 硬件音量控制。
+* **隐私模式**：支持应用内及系统通知封面模糊，以及自定义占位标题遮罩。
 
-### 声音库与元数据管理
-* **120 FPS 高性能历史播放库**：零主线程磁盘 I/O 阻塞，采用轻量 UI 模型与稳定键值，确保列表以 120 FPS 满帧丝滑滚动。
-* **实时本地存储同步（StorageSyncManager）**：启动及从后台切回时自动核对物理存储，让新增、移动或删除的音频与本地 Room 数据库实时保持一致。
-* **多维度智能排序**：支持按收录时间（最新 / 最旧，毫秒级绝对时间戳）及标题（A-Z / Z-A）瞬间重排。
-* **统一日期显示格式**：全应用统一遵循清晰明了的 `dd MMM yyyy` 日期展示。
-* **完整元数据标签写入**：将高分辨率封面插图、声优（CV）、社团/作者、作品标题与标签类别直接内嵌写入音频文件（ID3v2 / MP4 atom）。
-* **快速检索与离线库筛选**：支持输入 RJ 号、标题关键字、声优或社团名即时筛选离线已下载作品。
+### 高速下载、缓存管理与备份恢复
+* **合并单文件 / 多目录下载模式**：可自由选择将多音轨无损合并为单文件（`FileChannel.transferTo` MP3 / M4A 重封装）或保留原始目录结构，支持自动写入 ID3v2/MP4 标签、导出 `.cue` 轨表及 4–32 并发线程。
+* **缓存管理与自动清理**：支持配置 `200 MB – 10 GB` 缓存上限（默认 `1 GB`）、可选自动清理开关（默认关闭以保护历史记录）及一键清除翻译缓存。
+* **JSON 备份恢复与批量刷新元数据**：支持导出/导入播放列表与下载历史 JSON 文件（含自动本地镜像备份），并在下载设置中提供一键**刷新全部元数据**。
 
-### 现代化 Material Design 3 界面与导航
-* **4 大独立导航页面**：播放器（主页）、下载队列、历史库以及应用设置。
-* **智能页面记忆**：冷启动时固定展示主页播放器；在后台切换任务时则精准保持当前所在页面。
-* **Material You 动态取色（Monet 引擎）**：支持提取 Android 12+ 系统壁纸的主色调生成个性化主题。
-* **36 款精美预设调色板**：提供丰富的自选主题色彩方案，附带三段圆环色彩预览与平滑滚动的轮播选择器。
-* **0ms 启动快速缓存**：同步读取主题与语言偏好，彻底消除冷启动瞬间的屏幕闪白或主题闪烁。
-* **0ms 瞬间无缝切页**：底层采用常驻 GPU RenderNode 渲染层架构，页面切换毫无卡顿与空白。
-* **系统、浅色与深色模式**：完整支持白天/黑夜主题自适应及平滑切换。
+### OKLCH 色彩系统与自适应 Material 3 界面
+* **OKLCH 感知调色板引擎**：内置 12 套明暗主题调色板并支持 Material You 动态取色，符合 WCAG AA 对比度标准，支持平板/横屏 `NavigationRail` 自适应布局与 4 种界面语言（英语、印尼语、日语、简体中文）。
+* **应用内双通道自动更新**：自动匹配调试版/正式版 APK（`*-debug.apk` / `*-release.apk`）并通过 `FileProvider` 安全安装。
 
 ---
 
 ## 架构设计与技术栈
 
-JapaneseASMR Downloader 严格遵照现代 Android 架构指南（Modern Android Architecture），秉持关注点分离与单向数据流原则：
-
 | 架构层级 | 核心组件 | 职责与技术说明 |
 | :--- | :--- | :--- |
-| **UI 表现层** | Jetpack Compose + Material 3 | 声明式组件、平滑微动效、Material You 动态主题 |
+| **UI 表现层** | Jetpack Compose + Material 3 | 声明式界面、OKLCH 感知主题、自适应 `NavigationRail` |
+| **依赖注入与导航** | Koin DI + Navigation Compose | 模块化 ViewModel/Delegate、`@Serializable` 类型安全路由 `AppRoute` |
 | **状态管理** | Kotlin Coroutines + StateFlow | 响应式、生命周期感知型单向数据流（UDF） |
-| **媒体播放引擎** | AndroidX Media3 (ExoPlayer) | 原生硬件解码、MediaSession 媒体会话、前台播放服务 |
-| **本地持久化** | Room Database v4 (SQLite) | 历史作品归档、持久化翻译缓存（`translation_cache`）、内置章节索引 |
-| **音频重封装** | FastRemuxEngine | 零拷贝内核级 MP3 拼接、顺序 M4A 封装重构、CUE 轨道单输出 |
-| **翻译引擎** | TranslationService | Google Web / MyMemory 双接口容灾、ASMR 语境自然化、伏字去混淆 |
-| **配置存储** | AndroidX DataStore + SharedPreferences | 类型安全偏好存储，辅以冷启动 0ms 同步高速缓存 |
-| **网络通信** | OkHttp 4 | HTTP/2 连接池复用、多线程分块并发下载 |
-| **音频标签写入** | Jaudiotagger | ID3v2 标签（`CHAP`/`CTOC`）、MP4 atom 及元数据封装 |
-| **图像加载** | Coil Compose | 异步图片流式解码、内存与硬件位图缓存 |
+| **媒体与原生音频** | AndroidX Media3 + C++ Oboe | ExoPlayer 串流/播放、MediaSession、USB DAC 硬件独占引擎 |
+| **本地持久化** | Room Database v6 (SQLite) | 下载历史、自定义播放列表、`translation_cache` 持久缓存 |
+| **音频处理** | FastRemuxEngine + Jaudiotagger | 零拷贝 MP3 拼接、M4A 重封装、CUE 导出、ID3v2/MP4 标签写入 |
+| **翻译引擎** | TranslationService + LLM Client | Google（`gtx` + `clients5`）、MyMemory、Edge、有道、加密 LLM 接口 |
+| **网络与图像** | OkHttp 4 + Coil Compose | HTTP/2 连接池、多线程下载、异步封面缓存 |
+| **质量与安全** | Detekt + MockWebServer + Keystore | 静态代码检查、单元/迁移测试、AES-256-GCM 密钥存储、R8 体积优化 |
 
 ---
 
@@ -212,9 +120,9 @@ JapaneseASMR Downloader 严格遵照现代 Android 架构指南（Modern Android
 ## 源码构建
 
 ### 环境要求
-* JDK 17 或更高版本
-* 配置好 Build Tools 35.0.0+ 的 Android SDK
-* Gradle 8.7+（项目已通过 Gradle Wrapper 包含）
+* JDK 21
+* Android SDK（compileSdk 36 / Build Tools 35+）
+* Gradle 8.10.2（项目已通过 Gradle Wrapper 包含）
 
 ### 克隆仓库与编译
 ```bash
@@ -227,8 +135,8 @@ cd japaneseasmr-android
 ```
 
 编译生成的 APK 文件将位于：
-```
-app/build/outputs/apk/debug/JapaneseASMR-v1.4.0-debug.apk
+```text
+app/build/outputs/apk/debug/JapaneseASMR-v2.0.0-debug.apk
 ```
 
 ---

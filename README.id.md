@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/icon.png" width="128" height="128" alt="Logo JapaneseASMR Downloader" style="border-radius: 28px;" />
   <h1>JapaneseASMR Downloader</h1>
-  <p><b>Aplikasi Android native berperforma tinggi untuk mengunduh, mengelola, dan memutar karya audio Japanese ASMR.</b></p>
+  <p><b>Aplikasi Android native berperforma tinggi untuk menjelajah, streaming, mengunduh, mengelola, dan memutar karya audio Japanese ASMR.</b></p>
 
   <p>
     <a href="README.md">English</a> |
@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v1.4.3-blue?style=for-the-badge" alt="Versi v1.4.3" /></a>
+    <a href="https://github.com/SayMaven/japaneseasmr-android/releases/latest"><img src="https://img.shields.io/badge/Versi-v2.0.0-blue?style=for-the-badge" alt="Versi v2.0.0" /></a>
     <a href="https://github.com/SayMaven/japaneseasmr-android/blob/main/LICENSE"><img src="https://img.shields.io/badge/Lisensi-GPL%20v3.0-10b981?style=for-the-badge" alt="Lisensi GPL v3.0" /></a>
     <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-059669?style=for-the-badge" alt="Platform" />
     <img src="https://img.shields.io/badge/Bahasa-Kotlin-7c3aed?style=for-the-badge" alt="Bahasa" />
@@ -18,12 +18,11 @@
   </p>
 
   <p>
-    <a href="#apa-yang-baru-di-v143">Pembaruan</a> •
     <a href="#fitur-utama">Fitur Utama</a> •
     <a href="#tangkapan-layar">Tangkapan Layar</a> •
+    <a href="#arsitektur-aplikasi">Arsitektur</a> •
     <a href="#unduh-aplikasi">Unduh</a> •
     <a href="#kompilasi-dari-kode-sumber">Kompilasi</a> •
-    <a href="#arsitektur-aplikasi">Arsitektur</a> •
     <a href="#lisensi">Lisensi</a>
   </p>
 </div>
@@ -35,73 +34,7 @@
 
 ## Gambaran Umum
 
-JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) lengkap yang dirancang khusus untuk mengunduh, mengarsipkan, dan mendengarkan drama suara ASMR Jepang (Karya RJ). Dibangun menggunakan teknologi modern Android seperti Jetpack Compose, Kotlin Coroutines, Room Database, dan AndroidX Media3 (ExoPlayer), aplikasi ini menghadirkan performa pengunduhan berkecepatan tinggi, keamanan memori tanpa risiko OOM (Out of Memory), serta pemutaran audio latar belakang yang stabil dan hemat daya.
-
----
-
-## Apa yang Baru di v1.4.3
-
-* **Dukungan Penuh Impor Audio dari Kartu SD & Penyimpanan Eksternal**:
-  * **Akses Semua Berkas (`MANAGE_EXTERNAL_STORAGE`)**: Menambahkan izin pengelolaan penyimpanan eksternal Android 11+ (API 30+), membuka akses sistem berkas POSIX (`java.io.File`) secara penuh ke kartu MicroSD dan drive eksternal tanpa batasan Scoped Storage.
-  * **Perbaikan Masalah 0 Berkas Terdeteksi**: Memperbaiki bug di mana folder audio pada Kartu SD menampilkan "Total 0 berkas audio terdeteksi" pada dialog pratinjau impor akibat pemblokiran pembacaan direktori sekunder.
-  * **Fallback Pemindaian Ganda (Dual-Mode)**: Menerapkan mekanisme pemindaian cerdas yang otomatis beralih antara akses langsung POSIX dan SAF (`DocumentFile.fromTreeUri()`), memastikan seluruh audio di folder dan sub-folder terbaca dengan sempurna.
-  * **Dialog Panduan Izin di Pengaturan**: Menambahkan dialog interaktif di menu Pengaturan saat memilih atau mengubah folder audio untuk memandu pengguna langsung ke pengaturan sistem Android guna mengaktifkan akses penyimpanan.
-
----
-
-## Apa yang Baru di v1.4.2
-
-* **Peningkatan Stabilitas USB DAC Exclusive & Pencegahan Freeze**:
-  * Mengeliminasi 100% CPU lockup, ANR, dan thread starvation dengan mengoptimalkan prioritas scheduler Linux (`nice -19`, `SCHED_FIFO` priority 3) serta menerapkan non-blocking timed `poll()`.
-  * Memperbaiki masalah aplikasi freeze, lag parah, dan force close saat menekan tombol Next, berganti trek, atau memutar lagu dari playlist koleksi selama streaming USB DAC aktif.
-* **Reduksi Noise Audio DAC UAC2 & Sinkronisasi Clock**:
-  * **Rasio Integer Microframe 48 kHz**: Secara cerdas melakukan resampling audio ke 48.000 Hz saat mode USB DAC Exclusive aktif pada perangkat UAC2 High-Speed (8.000 microframe/detik), memastikan rasio transfer bilangan bulat tetap 6 frame per paket (24 bytes) untuk mencegah desah akibat pergeseran clock.
-  * **Eliminasi Distorsi Crossover & Zero-Crossing Deadband**: Mengganti konversi truncating `int16_t` dengan pembulatan simetris (`std::lround`) dan saturasi clamping pada decoder dan volume scaling, menjaga kemurnian detail suara bisikan lembut ASMR.
-* **Perbaikan Siklus Playlist Repeat All**:
-  * Memperbaiki bug di mana opsi `Repeat All` hanya mengulang trek yang sedang diputar seperti `Repeat One`. Seluruh antrean lagu kini diputar secara berurutan dan otomatis berputar kembali ke awal daftar saat mencapai akhir playlist.
-* **Konfigurasi IntelliSense C++ NDK**:
-  * Mengonfigurasi include path dan properti compiler Android NDK Clang untuk editor, melenyapkan false positive error linter pada header native C++ dan Oboe.
-
----
-
-## Apa yang Baru di v1.4.1
-
-* **Dukungan Import Folder Audio Lokal & Album Multi-Track Virtual**:
-  * Pindai dan import folder audio dari penyimpanan lokal/SAF sebagai album multi-track virtual tanpa perlu duplikasi berkas fisik atau re-encode.
-  * Setiap track di dalam folder secara otomatis dipetakan sebagai bab (*chapter*) dengan durasi dan metadata tag ID3 asli.
-  * Pemutaran berkesinambungan antar-track dalam album virtual dengan penanganan jeda 0ms.
-  * Deteksi cerdas subfolder koleksi/playlist (seperti folder berisi banyak karya ASMR mandiri) vs album multi-track berbasis kode RJ dan pola penomoran track.
-* **Tautkan Kode RJ Resmi DLsite & Kustomisasi Cover**:
-  * Fitur "Tautkan Kode RJ" untuk karya audio lokal/import guna menarik metadata lengkap DLsite secara otomatis (cover HD, pengisi suara/CV, circle, judul asli, genre, dan rating usia).
-  * Kustomisasi thumbnail dari galeri atau berkas gambar lokal dengan penyimpanan persisten.
-* **Penyempurnaan Performa & Antarmuka Pemutar (120 FPS)**:
-  * Posisi cover art pemutar terkunci stabil tanpa bergeser saat berpindah lagu, baris bab diposisikan di atas slider timeline, dan ruang judul/CV lega tanpa tumpang-tindih.
-  * Eliminasi flicker abu-abu pada cover art saat berpindah track (*cached painter retention*).
-  * Transisi tab instan 0.0ms dengan *synchronous tab selection* dan *background pre-warming*.
-  * Optimasi loading tab Riwayat Unduhan instan O(1) di memori tanpa disk scanning rekursif.
-  * Tab Riwayat Unduhan kini murni hanya menampilkan karya yang diunduh dari aplikasi.
-  * Deteksi karya ganda sebelum mengunduh: otomatis melewati unduhan jika karya sudah ada di storage atau database.
-  * Pembaruan label tab "Unduh" ("Download") dan header "Riwayat Unduhan" di seluruh bahasa.
-
-* **Pembaruan Otomatis Aplikasi Langsung (In-App Auto-Updater)**:
-  * Pengecekan, pengunduhan, dan pemasangan pembaruan versi langsung dari menu Pengaturan melalui GitHub Releases API.
-  * *Smart Dual-Channel Matching*: Otomatis mendeteksi varian build (Debug vs Release) dan mengunduh berkas APK yang cocok (`*-debug.apk` vs `*-release.apk`), mencegah konflik tanda tangan (*Signature Mismatch* / `INSTALL_FAILED_UPDATE_INCOMPATIBLE`) pada perangkat pengujian tanpa menghapus data riwayat.
-  * Tampilan dialog modern Material 3 dengan pelacakan kecepatan unduh, persentase *real-time*, dan integrasi aman Android `FileProvider`.
-* **Desain Ulang Layar Daftar Putar HiBy-Style & Bilah Sortir**:
-  * Tampilan mandiri Daftar Putar Koleksi langsung saat aplikasi dibuka.
-  * Bilah alat sortir multi-field: urutkan instan berdasarkan **Kustom**, **Tanggal**, **Judul**, **Durasi**, dan **Kode RJ** dengan sentuhan toggle arah **Ascending (▲)** dan **Descending (▼)**.
-* **Geser Urutan Lagu Ultra-Mulus (Physics-Based Drag & Drop)**:
-  * Algoritma deteksi tabrakan presisi (*center-point collision*) dengan animasi transisi pegas Jetpack Compose `Modifier.animateItem()`.
-  * Haptic vibration feedback pada setiap pergeseran slot lagu dan auto-scrolling otomatis di tepi layar.
-* **Startup Dingin Instan 0ms (Zero-Latency Cold Launch)**:
-  * Penghapusan total jeda beberapa ratus milidetik saat membuka aplikasi melalui pemulihan cache lokal sinkron `fast_playlist.json` pada frame ke-1.
-* **Peningkatan Buffer USB Audio DAC Bit-Perfect (Bebas Kresek-Kresek)**:
-  * Antrean streaming kernel Linux USB isochronous diperdalam ke 128ms (32 URBs × 32 paket) dan buffer sirkular SPSC diperluas menjadi 131.072 frame (~3 detik) dengan prioritas thread waktu nyata (`nice -20`).
-  * Optimasi paralelisme Coil image dispatcher untuk melenyapkan suara kresek, letupan, dan micro-stutter saat scrolling cepat 120Hz di daftar lagu.
-* **Ergonomi Pemutar Musik**:
-  * Tombol kontrol pemutar (Play/Pause, Next, Previous) dinaikkan (+44dp) agar ramah jangkauan jempol satu tangan.
-  * Perbaikan duplikasi badge kode RJ dan penyesuaian penamaan tab navigasi ("Utama", "Home", "ホーム", "首页").
-
+JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) lengkap untuk menjelajah, streaming online, mengunduh, mengarsipkan, dan mendengarkan drama suara ASMR Jepang (karya RJ / VJ / BJ). Dibangun dengan Jetpack Compose, Koin DI, Kotlin Coroutines, Room Database, AndroidX Media3 (ExoPlayer), dan mesin audio native C++ Oboe / USB DAC, aplikasi ini menghadirkan streaming yang mulus serta pemutaran lokal berkualitas bit-perfect di perangkat mobile.
 
 ---
 
@@ -119,91 +52,66 @@ JapaneseASMR Downloader adalah aplikasi Android sumber terbuka (open-source) len
   <img src="assets/screenshots/7.jpg" width="32%" alt="Tangkapan Layar 7" />
   <img src="assets/screenshots/8.jpg" width="32%" alt="Tangkapan Layar 8" />
   <img src="assets/screenshots/9.jpg" width="32%" alt="Tangkapan Layar 9" />
+  <br />
+  <img src="assets/screenshots/10.jpg" width="32%" alt="Tangkapan Layar 10" />
+  <img src="assets/screenshots/11.jpg" width="32%" alt="Tangkapan Layar 11" />
+  <img src="assets/screenshots/12.jpg" width="32%" alt="Tangkapan Layar 12" />
 </div>
 
 ---
 
 ## Fitur Utama
 
-### Mesin Terjemahan ASMR Kontekstual & Cache Dua Tingkat
-* **Terjemahan Khusus Domain**: Menerjemahkan judul bahasa Jepang, daftar trek, dan bab ke dalam bahasa tujuan secara alami dengan adaptasi kosakata khusus DLsite.
-* **De-Obfuskasi Sensor Fuseji**: Mengembalikan simbol sensor pada judul secara otomatis sebelum diterjemahkan untuk menjaga keutuhan makna kontekstual.
-* **Arsitektur Terjemahan Dua Tingkat**: Mesin utama Google Web Translate dengan failover otomatis ke MyMemory Translation API.
-* **Cache Persisten Dua Tingkat**: Cache memori `ConcurrentHashMap` (0ms) didukung database Room SQLite v4 (`translation_cache`, <2ms), menjaga ketersediaan terjemahan antar sesi aplikasi.
-* **Pengambilan Kueri Batch SQL**: Pengambilan banyak data sekaligus dalam satu kueri (`getTranslationsBatch`) untuk daftar putar dan daftar trek guna meminimalkan penggunaan CPU.
-* **Tampilan Dwibahasa**: Tampilan bilingual waktu-nyata pada layar pemutar native dan kartu antrean unduhan.
+### Jelajah ASMR & Streaming Online Langsung
+* **Jelajah Bergaya Pinterest & Detail Karya:** Jelajahi karya ASMR dalam tampilan grid atau list dengan pengurutan ala KikoFlu, filter multi-tag, mode aman Semua Usia (*All-Ages*), serta pohon berkas interaktif di Detail Karya.
+* **Streaming Audio Online Langsung:** Putar karya langsung secara online tanpa perlu mengunduh lebih dulu, termasuk fallback otomatis ke streaming online di Playlist jika file lokal telah dihapus.
+* **Pemilihan Bab & Trek Cerdas:** Otomatis memprioritaskan folder karya utama (`本編` / `main`) di atas folder promo atau recap (`販促`, `回想`) agar daftar bab dan durasi selalu akurat.
 
-### Mesin Remux Audio Lossless Cepat & Deteksi Bab
-* **Penggabungan Audio Zero-Copy**: Menggabungkan trek MP3 multi-bagian dalam waktu kurang dari 1 detik menggunakan `FileChannel.transferTo` tanpa encoding ulang audio atau penurunan kualitas.
-* **Remux Kontainer M4A Sekuensial**: Mengemas aliran data AAC terfragmentasi ke dalam kontainer ISO M4A standar untuk mendukung scrubbing timeline instan.
-* **Pemetaan Bab Cerdas Hibrida**: Mengelompokkan dan mengurutkan berkas audio secara otomatis ke dalam kategori Prolog, Cerita Utama, Epilog, Bonus, dan Free Talk.
-* **Normalisasi Unicode NFKC**: Menghilangkan ketidakkonsistenan penomoran pada angka berlingkar, karakter full-width, maupun angka kanji.
-* **Deteksi Bab Terpadu**: Mengekstrak penanda bab dari tag ID3v2 `CHAP`/`CTOC`, berkas pendamping `.cue`, maupun data remote DLsite secara terpadu.
-* **Ekspor Berkas CUE Sheet**: Membuat berkas `.cue` sidecar otomatis bersamaan dengan audio untuk kompatibilitas penuh dengan perangkat audiophile dan pemutar desktop.
-* **Universal Link & Code Resolver**: Mendukung input tautan langsung dari DLsite, asmr.one, dan JapaneseASMR dengan resolusi kode otomatis.
+### Subtitle Tersinkronisasi, Lirik Mengambang & Terjemahan Multi-Provider
+* **Dukungan Subtitle Lengkap:** Mendukung `.vtt`, `.lrc`, dan `.srt` dengan pengisian otomatis, panel lirik sinkron di Player, serta **Bar Lirik Mengambang** (*Floating Lyrics*, aktif default dalam mode terjemahan).
+* **Terjemahan Multi-Provider & LLM:** Mendukung Google Translate (dengan antrean berurutan serta *failover* batch `clients5` & `MyMemory` saat `HTTP 429`), Microsoft Edge, Youdao, MyMemory, dan **provider LLM kustom** (Claude, Gemini, OpenAI-compatible) lengkap dengan glosarium ASMR Jepang & Mandarin.
+* **Kunci API Terenkripsi & Cache Dua Tingkat:** API key LLM disimpan terenkripsi menggunakan Android Keystore AES-256-GCM (`SecurePreferences`), dengan cache terjemahan persisten di memori (`ConcurrentHashMap`) dan Room SQLite (`translation_cache`).
 
-### Mesin Pengunduhan & Demuxing Berkecepatan Tinggi
-* **Koneksi Simultan Multithread**: Pengunduh segmen multi-jalur yang mendukung 4 hingga 32 jalur simultan (default 16) untuk memaksimalkan bandwidth internet.
-* **Antrean Dinamis Otomatis**: Antrean baru langsung terintegrasi ke dalam proses unduh aktif secara berkelanjutan tanpa perlu restart manual.
-* **Streaming Disk Tanpa Beban RAM**: Demuxing langsung ke penyimpanan internal/eksternal untuk menangani berkas audio berukuran gigabyte tanpa risiko `OutOfMemoryError`.
-* **Remuxing Kontainer Standar**: Pengemasan kontainer ISO M4A / AAC native yang menjamin fungsi scrubbing timeline instan (0 detik) di semua pemutar audio pihak ketiga.
-* **Deduplikasi Berkas Otomatis**: Mendeteksi keberadaan berkas di penyimpanan dan secara otomatis melewati pengunduhan ulang yang tidak diperlukan.
-* **Konsol Log Interaktif**: Pemantauan progres unduhan, kecepatan transfer waktu-nyata, dan estimasi waktu selesai (ETA) dengan tombol toggle (`>_` / `</>`).
+### Playlist Kustom, Folder Explorer & Koleksi Lokal
+* **Playlist Kustom (Room v6):** Kelola karya offline maupun online dalam satu playlist dengan navigasi **antrean campuran** (`Next`/`Previous`, `Shuffle`, `Repeat`, dan *auto-advance*) di dalam playlist aktif.
+* **Impor Folder Lokal & Kartu SD:** Pindai folder lokal maupun Kartu SD/penyimpanan eksternal melalui akses POSIX (`MANAGE_EXTERNAL_STORAGE`) atau SAF (`DocumentFile`) sebagai album multi-trek virtual, lengkap dengan thumbnail folder ala Explorer, penautan kode RJ/VJ/BJ, dan kustomisasi cover art.
+* **Kustomisasi Kartu & Tombol Player:** Pilih badge yang tampil di kartu karya (Rating, Harga, Penjualan, Tanggal Rilis, Circle, ikon Subtitle `CC`, Rating Usia), cari cepat di header Koleksi Lokal, dan atur urutan tombol Player.
 
-### Pemutar Audio Native Terintegrasi
-* **Integrasi Android MediaSession**: Layanan pemutar latar belakang foreground dengan kontrol notifikasi lengkap dan tampilan cover art di layar kunci.
-* **Sleep Timer Otomatis**: Penghitung waktu mundur yang tersinkronisasi dengan status pemutaran audio.
-* **Floating Mini Player**: Kontrol pemutar melayang yang responsif di berbagai tab navigasi untuk pemutaran cepat dan ekspansi satu sentuhan.
-* **Mode Eksklusif Bit-Perfect USB DAC**: Pengambilalihan antarmuka USB Audio Class (UAC1 / UAC2) langsung dengan pemisahan driver kernel Android untuk audio murni prioritas tinggi.
-* **Kontrol Volume Perangkat Keras DAC**: Pengaturan langsung chip mixer DAC melalui USB Control Transfers (`SET_CUR` / `GET_RANGE`), pencegatan tombol volume fisik HP, dan HUD volume melayang.
-* **Drawer Daftar Bab Interaktif**: Lembar daftar bab interaktif dengan fitur lompat waktu (tap-to-seek) yang tersinkronisasi dengan timeline.
-* **Drawer Daftar Putar 0ms**: Daftar putar koleksi reaktif dengan fitur pengurutan ulang (drag-and-drop) instan.
-* **Dialog Kecepatan Putar Halus**: Pengaturan kecepatan fleksibel dari 0.25x hingga 2.0x dengan preset 2x3.
-* **Tombol Lompat 10 Detik**: Mundur 10 detik dan Maju 10 detik untuk navigasi dialog audio dengan mudah.
-* **Format Waktu Persisten**: Pilihan format waktu putar (durasi total vs sisa waktu `-mm:ss`) tersimpan secara permanen.
-* **Validasi Berkas Fisik**: Otomatis menyembunyikan berkas yang terhapus dari penyimpanan fisik dan memperbarui daftar saat berkas dikembalikan.
+### Pemutar Audio Native, Penguatan Gain (dB) & Mode Privasi
+* **Integrasi Android MediaSession & Sleep Timer:** Pemutaran latar belakang dengan kontrol notifikasi, cover layar kunci, Floating Mini Player, dan Sleep Timer yang ikut jeda saat audio di-pause.
+* **Penguatan Audio (dB) & USB DAC Exclusive Mode:** Tingkatkan volume bisikan ASMR (dB) baik lewat ExoPlayer maupun mesin native C++ Oboe / USB DAC (UAC1/UAC2) lengkap dengan kontrol volume hardware DAC.
+* **Mode Privasi:** Blur sampul di dalam aplikasi maupun notifikasi sistem, serta samarkan judul karya dengan teks pengganti kustom.
 
-### Manajemen Koleksi & Metadata
-* **Koleksi Riwayat 120 FPS**: Bebas hambatan operasi I/O pada thread utama dengan model data UI yang dihitung di awal untuk scrolling halus 120 FPS.
-* **Sinkronisasi Penyimpanan Otomatis (StorageSyncManager)**: Memindai folder penyimpanan saat aplikasi dibuka/dilanjutkan, menyinkronkan berkas baru, berpindah, atau terhapus dengan database Room.
-* **Filter Pengurutan Cerdas**: Pengurutan instan berdasarkan Waktu (Terbaru / Terlama) dengan presisi milidetik dan Judul (A-Z / Z-A).
-* **Format Tanggal Standar**: Format tampilan tanggal yang seragam (`dd MMM yyyy`) di seluruh aplikasi.
-* **Penyematan Metadata Lengkap**: Menyematkan cover art resolusi tinggi, Pengisi Suara (CV), Lingkaran/Pembuat (Circle), Judul Karya, dan Genre langsung ke dalam tag berkas audio (ID3v2 / MP4 atom).
-* **Pencarian Cepat Offline**: Cari karya berdasarkan Kode RJ, judul, nama CV, atau circle pembuat.
+### Pengunduh Berkecepatan Tinggi, Manajemen Cache & Backup
+* **Mode Gabung Trek atau Multi-Folder:** Pilih apakah trek digabung menjadi 1 berkas (`FileChannel.transferTo` MP3 / remux M4A) atau diunduh sesuai struktur folder asli, lengkap dengan tagging ID3v2/MP4, ekspor `.cue`, dan 4–32 koneksi paralel.
+* **Manajemen Cache & Auto-Clean:** Atur batas cache `200 MB – 10 GB` (default `1 GB`), opsi toggle *Auto-Clean* (default mati agar riwayat tetap aman), serta pembersihan cepat cache terjemahan.
+* **Backup & Restore JSON + Refresh Semua Metadata:** Ekspor/impor Playlist dan Riwayat sebagai JSON (ditambah cadangan otomatis), serta tombol **Refresh Semua Metadata** di Pengaturan Unduhan untuk memperbarui rating usia dan metadata seluruh karya lokal secara massal.
 
-### Tampilan Modern Material Design 3
-* **4 Tab Navigasi Mandiri**: Home (Pemutar Penuh), Unduhan (Antrean Unduh), Riwayat (Koleksi Berkas), dan Pengaturan.
-* **Retensi Sesi Stabil**: Buka aplikasi awal selalu di tab Home, dan tetap berada di tab aktif saat aplikasi diminimize.
-* **Mesin Warna Dinamis Material You / Monet**: Penyesuaian tema otomatis berdasarkan warna wallpaper Android 12+.
-* **36 Palet Warna Pilihan**: Pilihan palet warna lengkap dengan pratinjau lingkaran 3 segmen dan carousel horizontal.
-* **Fast Cache Startup 0ms**: Penyimpanan cache tema sinkron untuk menghilangkan kedipan warna saat peluncuran awal.
-* **Perpindahan Tab Instan**: Arsitektur GPU RenderNode layer yang mempertahankan seluruh tab di memori tanpa jeda rendering.
-* **Dukungan Mode Gelap & Terang**: Tema sistem, gelap, dan terang penuh dengan transisi halus.
+### Sistem Warna OKLCH & UI Material 3 Adaptif
+* **Mesin Palet Perseptual OKLCH:** 12 palet Terang/Gelap pilihan bersama Material You Dynamic Color dengan kontras WCAG AA, `NavigationRail` adaptif untuk tablet/layar lebar, dan 4 bahasa UI (Indonesia, Inggris, Jepang, Mandarin).
+* **Auto-Updater Dalam Aplikasi:** Pembaruan langsung dari GitHub Releases dengan pencocokan kanal Debug/Release (`*-debug.apk` / `*-release.apk`) via `FileProvider`.
 
 ---
 
 ## Arsitektur Aplikasi
 
-JapaneseASMR Downloader mengimplementasikan prinsip Modern Android Architecture dengan pemisahan modul yang jelas dan alur data searah (unidirectional data flow):
-
 | Lapisan | Komponen | Deskripsi |
 | :--- | :--- | :--- |
-| **UI Layer** | Jetpack Compose + Material 3 | Antarmuka deklaratif, Animasi, Tema kustom Monet |
-| **State Management** | Kotlin Coroutines + StateFlow | Aliran data reaktif yang sadar siklus hidup (lifecycle-aware) |
-| **Media Player** | AndroidX Media3 (ExoPlayer) | Pemutar audio native, MediaSession, Foreground Service |
-| **Database Lokal** | Room Database v4 (SQLite) | Riwayat pustaka, cache terjemahan persisten (`translation_cache`), pemetaan bab |
-| **Pemrosesan Audio** | FastRemuxEngine | Penggabungan MP3 zero-copy, remux kontainer M4A sekuensial, ekspor sidecar CUE |
-| **Mesin Terjemahan** | TranslationService | API Google Web/MyMemory dua tingkat, naturalisasi domain ASMR, de-obfuskasi fuseji |
-| **Preferensi** | AndroidX DataStore + SharedPreferences Fast Cache | Penyimpanan preferensi tipe-aman dengan cache sinkron 0ms |
-| **Jaringan** | OkHttp 4 | HTTP/2 connection pooling, unduhan multi-jalur simultan |
-| **Tagging Audio** | Jaudiotagger | Penulisan tag metadata ID3v2 (`CHAP`/`CTOC`) dan MP4 atom |
-| **Pemuatan Gambar** | Coil Compose | Dekoding gambar asinkron, cache memori dan hardware bitmap |
+| **UI Layer** | Jetpack Compose + Material 3 | Antarmuka deklaratif, tema perseptual OKLCH, `NavigationRail` adaptif |
+| **DI & Navigasi** | Koin DI + Navigation Compose | ViewModel/delegate modular, `@Serializable` `AppRoute` |
+| **State Management** | Kotlin Coroutines + StateFlow | Aliran data reaktif searah (UDF) |
+| **Media & Audio Native** | AndroidX Media3 + C++ Oboe | Streaming/pemutar ExoPlayer, MediaSession, mesin eksklusif USB DAC |
+| **Database Lokal** | Room Database v6 (SQLite) | Riwayat, Playlist kustom, `translation_cache` persisten |
+| **Pemrosesan Audio** | FastRemuxEngine + Jaudiotagger | Penggabungan MP3 zero-copy, remux M4A, ekspor CUE, tagging ID3v2/MP4 |
+| **Mesin Terjemahan** | TranslationService + LLM Client | Google (`gtx` + `clients5`), MyMemory, Edge, Youdao, LLM terenkripsi |
+| **Jaringan & Gambar** | OkHttp 4 + Coil Compose | HTTP/2 connection pooling, unduhan multithread, cache sampul asinkron |
+| **Kualitas & Keamanan** | Detekt + MockWebServer + Keystore | Analisis statis, unit/migration test, enkripsi AES-256-GCM, R8 shrinking |
 
 ---
 
 ## Unduh Aplikasi
 
-Berkas APK rilis yang telah dikompilasi dan ditandatangani secara resmi tersedia di halaman GitHub Releases:
+Berkas APK rilis universal yang ditandatangani secara resmi tersedia di halaman GitHub Releases:
 
 [**Unduh Rilis Terbaru (GitHub Releases)**](https://github.com/SayMaven/japaneseasmr-android/releases/latest)
 
@@ -212,9 +120,9 @@ Berkas APK rilis yang telah dikompilasi dan ditandatangani secara resmi tersedia
 ## Kompilasi dari Kode Sumber
 
 ### Prasyarat
-* JDK 17 atau lebih baru
-* Android SDK dengan Build Tools 35.0.0+
-* Gradle 8.7+ (sudah termasuk melalui Gradle Wrapper)
+* JDK 21
+* Android SDK (compileSdk 36 / Build Tools 35+)
+* Gradle 8.10.2 (sudah termasuk melalui Gradle Wrapper)
 
 ### Kloning dan Kompilasi
 ```bash
@@ -227,8 +135,8 @@ cd japaneseasmr-android
 ```
 
 Berkas APK hasil kompilasi akan tersimpan di:
-```
-app/build/outputs/apk/debug/JapaneseASMR-v1.4.0-debug.apk
+```text
+app/build/outputs/apk/debug/JapaneseASMR-v2.0.0-debug.apk
 ```
 
 ---
