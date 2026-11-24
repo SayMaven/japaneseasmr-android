@@ -1,6 +1,6 @@
 ## What's New
 
-### Complete UI Overhaul, ASMR.one Browse & Online Streaming
+### Complete UI Overhaul, ASMR Browse & Online Streaming
 JapaneseASMR v2.0.0 introduces a brand-new **ASMR Browse** experience with Pinterest-style grid and horizontal list views, KikoFlu-aligned sorting, multi-tag filtering, All-Ages safe mode, and an interactive Work Detail file tree. You can now **stream audio works directly online** without downloading them first, alongside a redesigned **Navigation Drawer** and **15+ dedicated Settings sub-screens**.
 
 ### Custom Playlists, Explorer Folders & Card Customization
@@ -12,7 +12,11 @@ Enjoy built-in `.vtt` / `.lrc` / `.srt` subtitle support with automatic ASMR bac
 ### Audio Gain Boost (dB), Privacy Mode & Download Merge Mode
 * **Audio Gain Amplification (dB):** Boost quiet ASMR whispers directly through both ExoPlayer and the native C++ Oboe / USB DAC engine.
 * **Privacy Mode:** Blur cover art in-app and in system notifications, and mask work titles with custom placeholder text.
-* **Download Audio Merge & Auto-Enrichment:** Choose whether to merge multi-track downloads into a single file, and automatically enrich metadata for imported local works.
+* **Download Audio Merge & Auto-Enrichment:** Choose whether to merge multi-track downloads into a single file (with automatic metadata & genre tagging in both merged and multi-track folder modes), and automatically enrich metadata for imported local works.
+
+### OKLCH Color System & Playlist/History Backup
+* **OKLCH Perceptual Palette Engine:** Rebuilt Light and Dark Mode color generation across all 12 palettes (alongside Material You Dynamic Color) with WCAG AA contrast, brand-tinted neutral canvases, crisp rounded cards, and distinct genre/CV badges.
+* **Backup & Restore:** Export and restore your Custom Playlists and Download History as JSON from Download & Storage Settings, backed by an automatic mirror file (`Download/JapaneseASMR/japaneseasmr_backup_auto.json`).
 
 ---
 
@@ -28,8 +32,8 @@ Enjoy built-in `.vtt` / `.lrc` / `.srt` subtitle support with automatic ASMR bac
 
 ## Improvements
 
-* Enabled R8 code and resource shrinking for Release builds, cutting APK size nearly in half (~11.2 MB)
-* Migrated dependencies to Gradle Version Catalog (`gradle/libs.versions.toml`) and added Dual-APK GitHub Actions CI
-* Modularized core UI screens, Player delegates, and translation providers for smoother 120 FPS performance and easier maintenance
-* Updated in-app User Guide and Settings across English, Indonesian, Japanese, and Simplified Chinese
+* **Security & Privacy Hardening:** Encrypted LLM API key storage using Android Keystore AES-256-GCM (`SecurePreferences`) with automatic one-time migration, plus `network_security_config.xml` enforcing HTTPS by default
+* **Modern Architecture & Adaptive UI:** Adopted Koin Dependency Injection, extracted `PlayerPlaylistDelegate`, added `@Serializable` type-safe `AppRoute` definitions, and added adaptive `NavigationRail` support for tablets/landscape screens
+* **Testing, Quality & Build Optimization:** Added Detekt static analysis, `MockWebServer` offline translation tests, OKLCH WCAG contrast tests, Room schema export (`exportSchema = true`) with migration tests, R8 shrinking (~11.2 MB Release APK), Gradle Version Catalog, and Dual-APK GitHub Actions CI
+* **Diagnostics & Localization:** Added centralized `AppLogger` with diagnostic error ring buffer, and updated in-app User Guide and Settings across English, Indonesian, Japanese, and Simplified Chinese
 * Bumped application version to v2.0.0 (`versionCode = 12`)
