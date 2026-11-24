@@ -343,6 +343,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _isOnlineStreaming = MutableStateFlow(false)
     val isOnlineStreaming = _isOnlineStreaming.asStateFlow()
 
+    private val _activePlaylistQueue = MutableStateFlow<List<PlaylistItemEntity>>(emptyList())
+    val isPlaylistQueueActive: StateFlow<Boolean> = _activePlaylistQueue
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    @Volatile
+    private var preserveQueueOnNextLocalPlay = false
+
     val currentDisplayBadge = combine(_currentRjId, _playlist, _isOnlineStreaming) { rj, list, isStream ->
         if (rj.isNullOrBlank()) return@combine ""
         if (isStream) return@combine "STREAM | $rj"
@@ -421,14 +429,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             prefs = prefs,
             historyDao = historyDao,
             playlistDao = playlistDao,
-            onPlayLocalTrack = { local -> playLocalTrack(local) },
+            onSetPlaylistQueue = { queue -> _activePlaylistQueue.value = queue },
+            onPlayLocalTrack = { local ->
+                preserveQueueOnNextLocalPlay = true
+                playLocalTrack(local)
+            },
             onPlayOnlineWork = { rjid, workTitle, cv, coverUrl, tracks ->
                 playOnlineWork(
                     rjid = rjid,
                     workTitle = workTitle,
                     cv = cv,
                     coverUrl = coverUrl,
-                    tracks = tracks
+                    tracks = tracks,
+                    preservePlaylistQueue = true
                 )
             }
         )
@@ -1355,6 +1368,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (_repeatMode.value == Player.REPEAT_MODE_ONE) {
                         p.seekTo(p.currentMediaItemIndex, 0L)
                         p.play()
+                    } else if (_activePlaylistQueue.value.isNotEmpty()) {
+                        playAdjacentPlaylistItem(forward = true)
                     } else if (_isOnlineStreaming.value) {
                         if (_repeatMode.value == Player.REPEAT_MODE_ALL && p.mediaItemCount > 0) {
                             p.seekTo(0, 0L)
@@ -1478,6 +1493,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playLocalTrack(history: HistoryEntity, fullList: List<HistoryEntity> = _playlist.value, startPositionMs: Long = 0L) {
+        if (!preserveQueueOnNextLocalPlay) {
+            _activePlaylistQueue.value = emptyList()
+        }
+        preserveQueueOnNextLocalPlay = false
         val cleanRj = history.linkedRjId ?: history.rjid
         val earlyCover = if (!history.coverUrl.isNullOrBlank() && File(history.coverUrl).exists()) {
             val audioF = File(history.localFilePath)
@@ -1709,13 +1728,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         coverUrl: String,
         tracks: List<AsmrOneTrack>,
         startIndex: Int = 0,
-        startPositionMs: Long = 0L
+        startPositionMs: Long = 0L,
+        preservePlaylistQueue: Boolean = false
     ) {
         val p = player ?: run {
             initMediaController()
             return
         }
         if (tracks.isEmpty()) return
+        if (!preservePlaylistQueue) {
+            _activePlaylistQueue.value = emptyList()
+        }
 
         viewModelScope.launch {
             _playbackMode.value = PlaybackMode.ONLINE_STREAM
@@ -1951,6 +1974,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playNext() {
+        if (_activePlaylistQueue.value.isNotEmpty()) {
+            playAdjacentPlaylistItem(forward = true)
+            saveCurrentState()
+            return
+        }
         val p = player
         if (_isOnlineStreaming.value && p != null) {
             if (p.hasNextMediaItem()) {
@@ -1966,6 +1994,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun playPrevious() {
         val p = player
+        if (_activePlaylistQueue.value.isNotEmpty()) {
+            val pos = if (isCurrentVirtualAlbum || _isOnlineStreaming.value) _currentPosition.value else (p?.currentPosition ?: 0L)
+            if (p != null && pos > 3000) {
+                seekTo(0L)
+            } else {
+                playAdjacentPlaylistItem(forward = false)
+            }
+            saveCurrentState()
+            return
+        }
         if (_isOnlineStreaming.value && p != null) {
             if (p.currentPosition > 3000) {
                 p.seekTo(0)
@@ -1985,6 +2023,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         saveCurrentState()
     }
 
+    private fun playAdjacentPlaylistItem(forward: Boolean) {
+        val queue = _activePlaylistQueue.value
+        if (queue.isEmpty()) return
+        val curId = _currentRjId.value ?: currentAlbumHistory?.rjid
+        val linkedId = currentAlbumHistory?.linkedRjId
+        val curIdx = queue.indexOfFirst {
+            it.rjid.equals(curId, ignoreCase = true) ||
+                (!linkedId.isNullOrBlank() && it.rjid.equals(linkedId, ignoreCase = true))
+        }
+        val targetIdx = if (curIdx != -1) {
+            resolveAdjacentIndex(
+                currentIndex = curIdx,
+                size = queue.size,
+                forward = forward,
+                shuffle = _shuffleMode.value,
+                repeatMode = _repeatMode.value
+            )
+        } else {
+            0
+        }
+        if (targetIdx in queue.indices) {
+            playlistDelegate.playPlaylistItem(queue[targetIdx], queue)
+        }
+    }
+
     private fun playAdjacentWork(forward: Boolean) {
         val list = filteredPlaylist.value.ifEmpty { _playlist.value }
         if (list.isEmpty()) return
@@ -1997,21 +2060,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             curIdx = list.indexOfFirst { it.localFilePath == curId || it.linkedRjId == curId }
         }
         if (curIdx != -1) {
-            val targetIdx = if (_shuffleMode.value) {
-                if (list.size > 1) {
-                    var r = (0 until list.size).random()
-                    while (r == curIdx) {
-                        r = (0 until list.size).random()
-                    }
-                    r
-                } else curIdx
-            } else if (forward) {
-                if (curIdx + 1 < list.size) curIdx + 1
-                else if (_repeatMode.value == Player.REPEAT_MODE_ALL) 0 else -1
-            } else {
-                if (curIdx - 1 >= 0) curIdx - 1
-                else if (_repeatMode.value == Player.REPEAT_MODE_ALL) list.size - 1 else -1
-            }
+            val targetIdx = resolveAdjacentIndex(
+                currentIndex = curIdx,
+                size = list.size,
+                forward = forward,
+                shuffle = _shuffleMode.value,
+                repeatMode = _repeatMode.value
+            )
             if (targetIdx != -1) {
                 playLocalTrack(list[targetIdx], list)
             }
@@ -2053,7 +2108,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _repeatMode.value = nextMode
         p.repeatMode = if (nextMode == Player.REPEAT_MODE_ONE) {
             Player.REPEAT_MODE_ONE
-        } else if (_isOnlineStreaming.value && nextMode == Player.REPEAT_MODE_ALL) {
+        } else if (_isOnlineStreaming.value && _activePlaylistQueue.value.isEmpty() && nextMode == Player.REPEAT_MODE_ALL) {
             Player.REPEAT_MODE_ALL
         } else {
             Player.REPEAT_MODE_OFF
@@ -2063,7 +2118,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun toggleShuffleMode() {
         val p = player ?: return
-        if (_isOnlineStreaming.value) return // shuffle is disabled during online streaming
+        if (_isOnlineStreaming.value && _activePlaylistQueue.value.isEmpty()) return
         val nextState = !p.shuffleModeEnabled
         p.shuffleModeEnabled = nextState
         _shuffleMode.value = nextState
@@ -2557,8 +2612,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun getItemsForPlaylist(playlistId: Long): kotlinx.coroutines.flow.Flow<List<PlaylistItemEntity>> =
         playlistDelegate.getItemsForPlaylist(playlistId)
 
-    fun playPlaylistItem(item: PlaylistItemEntity) =
-        playlistDelegate.playPlaylistItem(item)
+    fun playPlaylistItem(item: PlaylistItemEntity, playlistItems: List<PlaylistItemEntity> = emptyList()) =
+        playlistDelegate.playPlaylistItem(item, playlistItems)
 
     // --- Audio Gain & Privacy Mode ---
 
@@ -2614,5 +2669,41 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         saveCurrentState()
         controllerFuture?.let { MediaController.releaseFuture(it) }
         super.onCleared()
+    }
+
+    companion object {
+        internal fun resolveAdjacentIndex(
+            currentIndex: Int,
+            size: Int,
+            forward: Boolean,
+            shuffle: Boolean,
+            repeatMode: Int,
+            randomIndexProvider: (Int) -> Int = { (0 until it).random() }
+        ): Int {
+            if (size <= 0 || currentIndex !in 0 until size) return -1
+            if (shuffle) {
+                if (size == 1) return currentIndex
+                var next = randomIndexProvider(size)
+                var attempts = 0
+                while (next == currentIndex && attempts < 8) {
+                    next = randomIndexProvider(size)
+                    attempts++
+                }
+                return if (next == currentIndex) (currentIndex + 1) % size else next
+            }
+            return if (forward) {
+                when {
+                    currentIndex + 1 < size -> currentIndex + 1
+                    repeatMode == Player.REPEAT_MODE_ALL -> 0
+                    else -> -1
+                }
+            } else {
+                when {
+                    currentIndex - 1 >= 0 -> currentIndex - 1
+                    repeatMode == Player.REPEAT_MODE_ALL -> size - 1
+                    else -> -1
+                }
+            }
+        }
     }
 }

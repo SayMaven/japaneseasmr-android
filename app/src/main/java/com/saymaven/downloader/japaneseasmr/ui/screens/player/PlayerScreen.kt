@@ -62,6 +62,7 @@ fun PlayerScreen(
     val translatedTitle by viewModel.translatedTitle.collectAsState()
     val translatedChapters by viewModel.translatedChapters.collectAsState()
     val isOnlineStreaming by viewModel.isOnlineStreaming.collectAsState()
+    val isPlaylistQueueActive by viewModel.isPlaylistQueueActive.collectAsState()
     val isVirtualAlbum by viewModel.isVirtualAlbum.collectAsState()
     val currentStreamTrackTitle by viewModel.currentStreamTrackTitle.collectAsState()
     val currentDisplayBadge by viewModel.currentDisplayBadge.collectAsState()
@@ -311,7 +312,7 @@ fun PlayerScreen(
                 playerButtonOrder = playerButtonOrder,
                 repeatMode = repeatMode,
                 sleepTimerRemainingMs = sleepTimerRemainingMs,
-                isOnlineStreaming = isOnlineStreaming,
+                isOnlineStreaming = isOnlineStreaming && !isPlaylistQueueActive,
                 shuffleMode = shuffleMode,
                 playbackSpeed = playbackSpeed,
                 onOpenChapterSheet = { showChapterSheet = true },

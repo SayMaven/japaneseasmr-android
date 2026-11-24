@@ -649,8 +649,11 @@ fun PlaylistScreen(
                         if (!playlistItems.isNullOrEmpty()) {
                             FilledTonalButton(
                                 onClick = {
-                                    viewModel.playPlaylistItem(playlistItems!!.first())
-                                    onOpenPlayer()
+                                    val itemsList = playlistItems ?: emptyList()
+                                    itemsList.firstOrNull()?.let { firstItem ->
+                                        viewModel.playPlaylistItem(firstItem, itemsList)
+                                        onOpenPlayer()
+                                    }
                                 }
                             ) {
                                 Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -705,7 +708,7 @@ fun PlaylistScreen(
                                     isCurrentTrack = isCurrentTrack,
                                     isOffline = isOffline,
                                     onClick = {
-                                        viewModel.playPlaylistItem(item)
+                                        viewModel.playPlaylistItem(item, itemsList)
                                         onOpenPlayer()
                                     },
                                     onRemove = {
@@ -738,7 +741,7 @@ fun PlaylistScreen(
                                     displayTitle = displayTitle,
                                     isOffline = isOffline,
                                     onClick = {
-                                        viewModel.playPlaylistItem(item)
+                                        viewModel.playPlaylistItem(item, itemsList)
                                         onOpenPlayer()
                                     },
                                     onRemove = {

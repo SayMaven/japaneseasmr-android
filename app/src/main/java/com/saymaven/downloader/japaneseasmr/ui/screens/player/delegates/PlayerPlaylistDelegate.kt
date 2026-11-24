@@ -28,6 +28,7 @@ class PlayerPlaylistDelegate(
     private val prefs: PreferencesManager,
     private val historyDao: HistoryDao,
     private val playlistDao: PlaylistDao,
+    private val onSetPlaylistQueue: (List<PlaylistItemEntity>) -> Unit = {},
     private val onPlayLocalTrack: (HistoryEntity) -> Unit,
     private val onPlayOnlineWork: (
         rjid: String,
@@ -98,8 +99,20 @@ class PlayerPlaylistDelegate(
         return playlistDao.getItemsForPlaylist(playlistId)
     }
 
-    fun playPlaylistItem(item: PlaylistItemEntity) {
+    fun playPlaylistItem(item: PlaylistItemEntity, playlistItems: List<PlaylistItemEntity> = emptyList()) {
         scope.launch(Dispatchers.IO) {
+            val resolvedQueue = playlistItems.ifEmpty {
+                try {
+                    playlistDao.getItemsForPlaylist(item.playlistId).first()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+            if (resolvedQueue.isNotEmpty()) {
+                withContext(Dispatchers.Main) {
+                    onSetPlaylistQueue(resolvedQueue)
+                }
+            }
             val local = historyDao.findByRjOrLinkedRj(item.rjid)
             if (local != null) {
                 withContext(Dispatchers.Main) {
