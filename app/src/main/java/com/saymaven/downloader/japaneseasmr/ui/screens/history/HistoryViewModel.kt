@@ -157,6 +157,10 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun setSortOrder(order: HistorySortOrder) {
+        _sortOrder.value = order
+    }
+
     fun toggleSortByDate() {
         _sortOrder.value = if (_sortOrder.value == HistorySortOrder.DATE_DESC) {
             HistorySortOrder.DATE_ASC
