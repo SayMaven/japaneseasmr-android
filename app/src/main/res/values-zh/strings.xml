@@ -688,4 +688,8 @@
     <string name="player_no_track_playing">当前没有播放音频</string>
     <string name="player_work_not_found_dlsite">在 DLsite 未找到作品 %1$s</string>
     <string name="playlist_action_remove_item">从播放列表移除</string>
+    <string name="settings_refresh_metadata_title">刷新全部元数据</string>
+    <string name="settings_refresh_metadata_desc">重新获取所有本地 RJ/VJ/BJ 作品的年龄分级、标题、声优、社团与标签</string>
+    <string name="settings_refresh_metadata_progress">正在更新 %1$d / %2$d...</string>
+    <string name="settings_refresh_metadata_done">已更新 %1$d / %2$d 部作品的元数据</string>
 </resources>

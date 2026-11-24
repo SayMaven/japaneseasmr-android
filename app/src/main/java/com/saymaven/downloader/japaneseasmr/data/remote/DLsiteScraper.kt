@@ -326,16 +326,10 @@ object DLsiteScraper {
                     genre = genreRows.eachText().take(30).joinToString(", ")
                 }
 
-                // 5. Ambil Age Rating
-                val ageRow = doc.select("th:matches(年齢指定) + td, .work_genre")
-                if (ageRow.isNotEmpty()) {
-                    val ageText = ageRow.text()
-                    ageRating = when {
-                        ageText.contains("18") || ageText.contains("R-18") || ageText.contains("R18") -> "R18"
-                        ageText.contains("15") || ageText.contains("R-15") || ageText.contains("R15") -> "R-15"
-                        ageText.contains("全年齢") || ageText.contains("All") || ageText.contains("Safe") -> "SAFE"
-                        else -> ageText.take(15).trim()
-                    }
+                // 5. Ambil Age Rating (mendukung layout Vue baru DLsite & layout tabel klasik)
+                val parsedAge = parseAgeRatingFromDocument(doc)
+                if (parsedAge != "-") {
+                    ageRating = parsedAge
                 }
 
                 // 6. Fallback JSON-LD Product schema (terutama untuk halaman DLsite Pro / VJ / BJ)
@@ -375,9 +369,9 @@ object DLsiteScraper {
                     }
                 }
 
-                // Fallback Age Rating jika kategori Pro / R18 di URL atau judul
+                // Fallback Age Rating hanya jika kategori Pro (tanpa mengandalkan akhiran "| DLsite 同人 - R18" di judul tab maniax)
                 if (ageRating == "-" || ageRating.isBlank()) {
-                    if (url.contains("/pro/") || doc.title().contains("R18") || doc.title().contains("R-18")) {
+                    if (url.contains("/pro/")) {
                         ageRating = "R18"
                     }
                 }
@@ -417,5 +411,26 @@ object DLsiteScraper {
             ageRating = if (ageRating.isBlank()) "-" else ageRating,
             coverUrl = bestCoverUrl
         )
+    }
+
+    internal fun parseAgeRatingFromDocument(doc: org.jsoup.nodes.Document): String {
+        val vueAll = doc.select(".c-productInfo__value [class*=label_all], [class*=label_all]")
+        if (vueAll.isNotEmpty()) return "SAFE"
+        val vueR15 = doc.select(".c-productInfo__value [class*=label_r15], [class*=label_r15]")
+        if (vueR15.isNotEmpty()) return "R-15"
+        val vueR18 = doc.select(".c-productInfo__value [class*=label_r18], [class*=label_r18]")
+        if (vueR18.isNotEmpty()) return "R18"
+
+        val ageRow = doc.select("th:matches(年齢指定) + td, dt:matches(年齢指定) + dd, .work_genre")
+        if (ageRow.isNotEmpty()) {
+            val ageText = ageRow.text()
+            return when {
+                ageText.contains("18") || ageText.contains("R-18") || ageText.contains("R18") -> "R18"
+                ageText.contains("15") || ageText.contains("R-15") || ageText.contains("R15") -> "R-15"
+                ageText.contains("全年齢") || ageText.contains("All") || ageText.contains("Safe") -> "SAFE"
+                else -> ageText.take(15).trim().ifBlank { "-" }
+            }
+        }
+        return "-"
     }
 }

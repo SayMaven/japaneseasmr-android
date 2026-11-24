@@ -296,7 +296,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             PlaylistSortType.ALL_AGES -> {
                 val safeWorks = folderFiltered.filter { item ->
                     val normalized = AgeRatingHelper.normalize(item.ageRating)
-                    normalized == AgeRatingHelper.RATING_SAFE
+                    normalized == AgeRatingHelper.RATING_SAFE || normalized == AgeRatingHelper.RATING_R15
                 }
                 if (sort.isAscending) {
                     safeWorks.sortedByDescending { AudioStorageHelper.parseDateToTimestamp(it.downloadDate, it.localFilePath) }
@@ -1503,6 +1503,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _activePlaylistQueue.value = emptyList()
         }
         preserveQueueOnNextLocalPlay = false
+        if (_currentRjId.value != history.rjid) {
+            translationDelegate.clearCurrentTranslations()
+        }
         val cleanRj = history.linkedRjId ?: history.rjid
         val earlyCover = if (!history.coverUrl.isNullOrBlank() && File(history.coverUrl).exists()) {
             val audioF = File(history.localFilePath)
@@ -1744,6 +1747,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (tracks.isEmpty()) return
         if (!preservePlaylistQueue) {
             _activePlaylistQueue.value = emptyList()
+        }
+        if (_currentRjId.value != rjid) {
+            translationDelegate.clearCurrentTranslations()
         }
 
         viewModelScope.launch {
@@ -2463,7 +2469,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val meta = withContext(Dispatchers.IO) {
                 try {
                     var m = DLsiteScraper.fetchMetadata(targetRj)
-                    if (m.title == targetRj || m.cv == "-" || m.circle == "-" || m.genre == "-") {
+                    val needsEnrich = m.title == targetRj || listOf(m.cv, m.circle, m.genre, m.ageRating).any { it == "-" }
+                    if (needsEnrich) {
                         val asmrWork = AsmrOneApiService.getWork(targetRj).getOrNull()
                         if (asmrWork != null) {
                             m = m.copy(

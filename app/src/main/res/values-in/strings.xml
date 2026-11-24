@@ -682,4 +682,8 @@
     <string name="player_no_track_playing">Belum ada lagu yang diputar</string>
     <string name="player_work_not_found_dlsite">Karya %1$s tidak ditemukan di DLsite</string>
     <string name="playlist_action_remove_item">Hapus dari Playlist</string>
+    <string name="settings_refresh_metadata_title">Refresh Semua Metadata</string>
+    <string name="settings_refresh_metadata_desc">Ambil ulang rating usia, judul, CV, circle, dan genre untuk seluruh karya lokal RJ/VJ/BJ</string>
+    <string name="settings_refresh_metadata_progress">Memperbarui %1$d / %2$d...</string>
+    <string name="settings_refresh_metadata_done">Metadata diperbarui untuk %1$d dari %2$d karya</string>
 </resources>

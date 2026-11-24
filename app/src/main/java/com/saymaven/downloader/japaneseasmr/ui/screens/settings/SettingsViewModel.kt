@@ -5,10 +5,13 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.saymaven.downloader.japaneseasmr.BuildConfig
+import com.saymaven.downloader.japaneseasmr.data.local.AsmrDatabase
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.data.model.UpdateInfo
+import com.saymaven.downloader.japaneseasmr.data.remote.DLsiteScraper
+import com.saymaven.downloader.japaneseasmr.service.AudioStorageHelper
 import com.saymaven.downloader.japaneseasmr.service.BackupManager
 import com.saymaven.downloader.japaneseasmr.service.BackupRestoreResult
 import com.saymaven.downloader.japaneseasmr.service.CacheManager
@@ -17,11 +20,14 @@ import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import com.saymaven.downloader.japaneseasmr.service.TranslationService
 import com.saymaven.downloader.japaneseasmr.service.UpdateManager
 import com.saymaven.downloader.japaneseasmr.service.UsbDacManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -587,6 +593,58 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun importBackup(uri: android.net.Uri, onResult: (Result<BackupRestoreResult>) -> Unit) = viewModelScope.launch {
         val result = BackupManager.importFromUri(getApplication(), uri)
         onResult(result)
+    }
+
+    // Refresh All Local Metadata
+    private val _metadataRefreshProgress = MutableStateFlow<Pair<Int, Int>?>(null)
+    val metadataRefreshProgress = _metadataRefreshProgress.asStateFlow()
+
+    fun refreshAllLocalMetadata(onComplete: (Int, Int) -> Unit) {
+        if (_metadataRefreshProgress.value != null) return
+        viewModelScope.launch {
+            var updatedCount = 0
+            var totalCount = 0
+            try {
+                val dao = AsmrDatabase.getDatabase(getApplication()).historyDao()
+                val targets = withContext(Dispatchers.IO) {
+                    dao.getAllHistoryDirect().mapNotNull { item ->
+                        val rj = item.linkedRjId?.takeIf { it.isNotBlank() }
+                            ?: StorageSyncManager.RJ_REGEX.find(item.rjid)?.value
+                            ?: StorageSyncManager.RJ_REGEX.find(item.title)?.value
+                            ?: AudioStorageHelper.findRjCodeInPath(File(item.localFilePath))
+                        rj?.uppercase()?.trim()?.let { item to it }
+                    }
+                }
+                totalCount = targets.size
+                _metadataRefreshProgress.value = 0 to totalCount
+
+                withContext(Dispatchers.IO) {
+                    targets.forEachIndexed { idx, (item, cleanRj) ->
+                        try {
+                            val meta = DLsiteScraper.fetchMetadata(cleanRj)
+                            val updated = item.copy(
+                                title = if (meta.title.isNotBlank() && meta.title != cleanRj) meta.title else item.title,
+                                cv = if (meta.cv.isNotBlank() && meta.cv != "-") meta.cv else item.cv,
+                                circle = if (meta.circle.isNotBlank() && meta.circle != "-") meta.circle else item.circle,
+                                genre = if (meta.genre.isNotBlank() && meta.genre != "-") meta.genre else item.genre,
+                                ageRating = if (meta.ageRating.isNotBlank() && meta.ageRating != "-") meta.ageRating else item.ageRating,
+                                linkedRjId = item.linkedRjId ?: cleanRj
+                            )
+                            if (updated != item) {
+                                dao.insertHistory(updated)
+                                updatedCount++
+                            }
+                        } catch (_: Exception) {
+                        }
+                        _metadataRefreshProgress.value = (idx + 1) to totalCount
+                        delay(200L)
+                    }
+                }
+            } finally {
+                _metadataRefreshProgress.value = null
+            }
+            onComplete(updatedCount, totalCount)
+        }
     }
 
     // Cache Management

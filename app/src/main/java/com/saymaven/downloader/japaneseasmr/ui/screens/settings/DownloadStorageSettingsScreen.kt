@@ -50,6 +50,7 @@ fun DownloadStorageSettingsScreen(
     val cacheSizeBytes by viewModel.cacheSizeBytes.collectAsState()
     val cacheLimitMb by viewModel.cacheLimitMb.collectAsState()
     val cacheAutoClean by viewModel.cacheAutoClean.collectAsState()
+    val metadataRefreshProgress by viewModel.metadataRefreshProgress.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.refreshCacheSize()
@@ -419,6 +420,42 @@ fun DownloadStorageSettingsScreen(
                         },
                         leadingContent = {
                             Icon(Icons.Default.FileDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    val isRefreshingMetadata = metadataRefreshProgress != null
+                    ListItem(
+                        modifier = Modifier.clickable(enabled = !isRefreshingMetadata) {
+                            viewModel.refreshAllLocalMetadata { updated, total ->
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.settings_refresh_metadata_done, updated, total),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        },
+                        headlineContent = {
+                            Text(stringResource(R.string.settings_refresh_metadata_title), fontWeight = FontWeight.SemiBold)
+                        },
+                        supportingContent = {
+                            val progress = metadataRefreshProgress
+                            Text(
+                                text = if (progress != null) {
+                                    stringResource(R.string.settings_refresh_metadata_progress, progress.first, progress.second)
+                                } else {
+                                    stringResource(R.string.settings_refresh_metadata_desc)
+                                },
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = {
+                            if (isRefreshingMetadata) {
+                                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     )
                 }

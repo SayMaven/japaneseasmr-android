@@ -682,4 +682,8 @@
     <string name="player_no_track_playing">No track playing</string>
     <string name="player_work_not_found_dlsite">Work %1$s was not found on DLsite</string>
     <string name="playlist_action_remove_item">Remove from Playlist</string>
+    <string name="settings_refresh_metadata_title">Refresh All Metadata</string>
+    <string name="settings_refresh_metadata_desc">Re-fetch age ratings, titles, CVs, circles, and genres for all local RJ/VJ/BJ works</string>
+    <string name="settings_refresh_metadata_progress">Updating %1$d / %2$d...</string>
+    <string name="settings_refresh_metadata_done">Metadata updated for %1$d of %2$d works</string>
 </resources>

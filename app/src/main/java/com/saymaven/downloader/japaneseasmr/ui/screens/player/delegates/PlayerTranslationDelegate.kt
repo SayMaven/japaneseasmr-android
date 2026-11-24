@@ -53,6 +53,15 @@ class PlayerTranslationDelegate(
     private var translationJob: Job? = null
     private var pageTranslateJob: Job? = null
     private var lastTranslatedKey: String? = null
+    private var lastTranslatedRjid: String? = null
+
+    fun clearCurrentTranslations() {
+        translationJob?.cancel()
+        _translatedTitle.value = null
+        _translatedChapters.value = emptyList()
+        lastTranslatedKey = null
+        lastTranslatedRjid = null
+    }
 
     fun observePreferences() {
         scope.launch {
@@ -225,9 +234,14 @@ class PlayerTranslationDelegate(
 
     fun loadOrFetchTranslations(targetRjid: String? = getCurrentRjId(), forceOnline: Boolean = false) {
         if (targetRjid.isNullOrBlank()) {
+            clearCurrentTranslations()
+            return
+        }
+        if (!targetRjid.equals(lastTranslatedRjid, ignoreCase = true)) {
             _translatedTitle.value = null
             _translatedChapters.value = emptyList()
-            return
+            lastTranslatedKey = null
+            lastTranslatedRjid = targetRjid
         }
 
         translationJob?.cancel()

@@ -688,4 +688,8 @@
     <string name="player_no_track_playing">再生中の音声はありません</string>
     <string name="player_work_not_found_dlsite">作品 %1$s はDLsiteで見つかりませんでした</string>
     <string name="playlist_action_remove_item">プレイリストから削除</string>
+    <string name="settings_refresh_metadata_title">すべてのメタデータを更新</string>
+    <string name="settings_refresh_metadata_desc">ローカルの全RJ/VJ/BJ作品の年齢制限・タイトル・声優・サークル・ジャンルを再取得します</string>
+    <string name="settings_refresh_metadata_progress">更新中 %1$d / %2$d...</string>
+    <string name="settings_refresh_metadata_done">%2$d 件中 %1$d 件のメタデータを更新しました</string>
 </resources>
