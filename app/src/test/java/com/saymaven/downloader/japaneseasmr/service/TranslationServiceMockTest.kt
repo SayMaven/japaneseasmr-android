@@ -23,6 +23,7 @@ class TranslationServiceMockTest {
         val baseUrl = server.url("").toString().trimEnd('/')
         WebTranslationProviders.googleApiBaseUrl = baseUrl
         WebTranslationProviders.clients5BaseUrl = baseUrl
+        WebTranslationProviders.myMemoryBaseUrl = baseUrl
         WebTranslationProviders.resetRateLimit()
     }
 
@@ -30,6 +31,7 @@ class TranslationServiceMockTest {
     fun tearDown() {
         WebTranslationProviders.googleApiBaseUrl = "https://translate.googleapis.com"
         WebTranslationProviders.clients5BaseUrl = "https://clients5.google.com"
+        WebTranslationProviders.myMemoryBaseUrl = "https://api.mymemory.translated.net"
         WebTranslationProviders.resetRateLimit()
         server.shutdown()
     }
@@ -118,5 +120,55 @@ class TranslationServiceMockTest {
         assertEquals("ja", TranslationService.detectSourceLanguage("耳かき・ささやきボイス"))
         assertEquals("zh-CN", TranslationService.detectSourceLanguage("这只小猫很可爱"))
         assertEquals("en", TranslationService.detectSourceLanguage("Gentle Whispering Ear Cleaning"))
+    }
+
+    @Test
+    fun `translateViaGoogleWeb uses single POST for multiline batch payload`() {
+        val gtxPostBody = """[[["[[0]] Selamat pagi\n[[1]] Pembersihan telinga","[[0]] おはよう\n[[1]] 耳かき",null,null,10]],null,"ja"]"""
+        server.enqueue(MockResponse().setResponseCode(200).setBody(gtxPostBody))
+
+        val payload = "[[0]] おはよう\n[[1]] 耳かき"
+        val result = WebTranslationProviders.translateViaGoogleWeb(payload, tl = "id", sl = "ja")
+
+        assertNotNull(result)
+        assertTrue(result!!.contains("[[0]] Selamat pagi"))
+        val recorded = server.takeRequest()
+        assertEquals("POST", recorded.method)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `translateViaGoogleClients5 works independently after gtx 429 and parses nested array`() {
+        server.enqueue(MockResponse().setResponseCode(429))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""[["[[0]] Tes 1\n[[1]] Pembersihan telinga","ja"]]"""))
+
+        val gtxResult = WebTranslationProviders.translateViaGoogleWeb("[[0]] テスト1\n[[1]] 耳かき", tl = "id", sl = "ja")
+        assertNull(gtxResult)
+        assertTrue(WebTranslationProviders.googleRateLimitUntilMs > System.currentTimeMillis())
+
+        val clients5Result = WebTranslationProviders.translateViaGoogleClients5("[[0]] テスト1\n[[1]] 耳かき", tl = "id", sl = "ja")
+        assertEquals("[[0]] Tes 1\n[[1]] Pembersihan telinga", clients5Result)
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `translateBatchViaMyMemory splits long payload into sub-batches`() {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody("""{"responseStatus":200,"responseData":{"translatedText":"Bagian 1"}}""")
+        )
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody("""{"responseStatus":200,"responseData":{"translatedText":"Bagian 2"}}""")
+        )
+
+        val line1 = "a".repeat(250)
+        val line2 = "b".repeat(250)
+        val result = WebTranslationProviders.translateBatchViaMyMemory("$line1\n$line2", targetLang = "id", sourceLang = "ja")
+
+        assertEquals("Bagian 1\nBagian 2", result)
+        assertEquals(2, server.requestCount)
     }
 }

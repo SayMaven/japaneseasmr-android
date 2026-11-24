@@ -440,12 +440,13 @@ object TrackDiscoveryService {
                 score -= 80
             }
 
-            // Penalti sound effect / BGM murni jika bukan bagian dari cerita utama (本編)
+            // Penalti sound effect / BGM / recap / promo murni jika bukan bagian dari cerita utama (本編)
             val sfxPenalties = listOf("システムボイス", "システム音", "昭和音質", "木枯らし", "雨降り", "se強化")
             if (sfxPenalties.any { lower.contains(it) }) {
                 score -= 80
             }
-            if (!fTitle.contains("本編") && (lower.contains("効果音") || lower.contains("bgm"))) {
+            val nonMainPenalties = listOf("効果音", "bgm", "販促", "回想")
+            if (!fTitle.contains("本編") && nonMainPenalties.any { lower.contains(it) }) {
                 score -= 80
             }
             if (fTitle.contains("おまけ") && !fTitle.contains("本編")) {
@@ -533,9 +534,15 @@ object TrackDiscoveryService {
                 }
                 if (subFolders.isEmpty()) break
 
-                // Jika subfolder bersaudara bukan varian format/SE, berarti setiap trek dipisah per subfolder
+                // Jika subfolder bersaudara bukan varian format/SE, berarti setiap trek dipisah per subfolder,
+                // KECUALI jika ada subfolder khusus karya utama (本編 / main) dengan >= 2 audio
+                val hasDedicatedMainSubfolder = subFolders.any { sf ->
+                    val sfTitle = sf.optString("title", "")
+                    val isMainName = sfTitle.contains("本編") || sfTitle.lowercase().contains("main")
+                    isMainName && extractAudiosFromNode(sf, sfTitle).size >= 2
+                }
                 val subVariantCount = subFolders.count { isFormatOrVariantFolder(it.optString("title")) }
-                if (subFolders.size >= 2 && subVariantCount == 0) {
+                if (!hasDedicatedMainSubfolder && subFolders.size >= 2 && subVariantCount == 0) {
                     val multiSubTracks = extractAudiosFromNode(targetNode, pathAccumulator)
                     if (multiSubTracks.size >= 2) {
                         return deduplicateTracks(multiSubTracks)

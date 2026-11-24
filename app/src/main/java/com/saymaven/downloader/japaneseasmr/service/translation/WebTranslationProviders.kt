@@ -23,6 +23,10 @@ internal object WebTranslationProviders {
         private set
 
     @Volatile
+    var clients5RateLimitUntilMs: Long = 0L
+        private set
+
+    @Volatile
     var lastNetworkError: String? = null
         private set
 
@@ -31,6 +35,9 @@ internal object WebTranslationProviders {
 
     @androidx.annotation.VisibleForTesting
     internal var clients5BaseUrl: String = "https://clients5.google.com"
+
+    @androidx.annotation.VisibleForTesting
+    internal var myMemoryBaseUrl: String = "https://api.mymemory.translated.net"
 
     private val webClient = OkHttpClient.Builder()
         .dispatcher(Dispatcher().apply {
@@ -44,6 +51,7 @@ internal object WebTranslationProviders {
 
     fun resetRateLimit() {
         googleRateLimitUntilMs = 0L
+        clients5RateLimitUntilMs = 0L
         lastNetworkError = null
     }
 
@@ -56,6 +64,19 @@ internal object WebTranslationProviders {
         val encoded = try {
             URLEncoder.encode(trimmed, "UTF-8")
         } catch (_: Exception) {
+            return null
+        }
+
+        val isBatchPayload = trimmed.contains('\n') || encoded.length > 1000
+        if (isBatchPayload) {
+            val postUrl = "$googleApiBaseUrl/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t"
+            tryPost(postUrl, trimmed)?.let { return it }
+            if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
+
+            if (sl != "auto") {
+                val postAutoUrl = "$googleApiBaseUrl/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t"
+                tryPost(postAutoUrl, trimmed)?.let { return it }
+            }
             return null
         }
 
@@ -89,6 +110,27 @@ internal object WebTranslationProviders {
         return null
     }
 
+    /**
+     * Jalur cadangan independen via clients5.google.com (client=dict-chrome-ex)
+     * dengan cooldown terpisah agar HTTP 429 pada translate.googleapis.com tidak ikut memblokir host ini.
+     */
+    fun translateViaGoogleClients5(text: String, tl: String, sl: String = "auto"): String? {
+        if (System.currentTimeMillis() < clients5RateLimitUntilMs) return null
+
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return ""
+
+        val url = "$clients5BaseUrl/translate_a/t?client=dict-chrome-ex&sl=$sl&tl=$tl"
+        tryPost(url, trimmed, isClients5 = true)?.let { return it }
+        if (System.currentTimeMillis() < clients5RateLimitUntilMs) return null
+
+        if (sl != "auto") {
+            val autoUrl = "$clients5BaseUrl/translate_a/t?client=dict-chrome-ex&sl=auto&tl=$tl"
+            tryPost(autoUrl, trimmed, isClients5 = true)?.let { return it }
+        }
+        return null
+    }
+
     private fun tryGet(url: String): String? {
         return try {
             val req = Request.Builder()
@@ -115,7 +157,7 @@ internal object WebTranslationProviders {
         }
     }
 
-    private fun tryPost(url: String, text: String): String? {
+    private fun tryPost(url: String, text: String, isClients5: Boolean = false): String? {
         return try {
             val formBody = FormBody.Builder()
                 .add("q", text)
@@ -132,7 +174,12 @@ internal object WebTranslationProviders {
                     parseGoogleWebResponse(resp.body?.string())
                 } else {
                     if (resp.code == 429 || resp.code == 403) {
-                        googleRateLimitUntilMs = System.currentTimeMillis() + 15_000L
+                        val until = System.currentTimeMillis() + 15_000L
+                        if (isClients5) {
+                            clients5RateLimitUntilMs = until
+                        } else {
+                            googleRateLimitUntilMs = until
+                        }
                     }
                     lastNetworkError = "HTTP ${resp.code}"
                     null
@@ -160,6 +207,10 @@ internal object WebTranslationProviders {
             }
 
             val parts = array.optJSONArray(0) ?: return null
+            if (parts.optJSONArray(0) == null) {
+                val direct = parts.optString(0)?.trim()
+                return if (!direct.isNullOrBlank()) cleanHtmlEntities(direct) else null
+            }
             val sb = StringBuilder()
             for (i in 0 until parts.length()) {
                 val item = parts.optJSONArray(i)
@@ -180,9 +231,13 @@ internal object WebTranslationProviders {
         return try {
             val encoded = URLEncoder.encode(text, "UTF-8")
             val tl = if (targetLang.startsWith("id") || targetLang.startsWith("in")) "id" else targetLang
-            val sl = if (sourceLang.startsWith("zh")) "zh" else "ja"
+            val sl = when {
+                sourceLang.startsWith("zh") -> "zh-CN"
+                sourceLang.startsWith("en") -> "en"
+                else -> "ja"
+            }
             val langPair = "$sl|$tl"
-            val url = "https://api.mymemory.translated.net/get?q=$encoded&langpair=$langPair"
+            val url = "$myMemoryBaseUrl/get?q=$encoded&langpair=$langPair"
             val req = Request.Builder()
                 .url(url)
                 .header("User-Agent", USER_AGENT)
@@ -204,6 +259,33 @@ internal object WebTranslationProviders {
         } catch (_: Exception) {
             null
         }
+    }
+
+    /**
+     * Memecah payload batch menjadi sub-paket <= 380 karakter agar bisa diterjemahkan lewat MyMemory.
+     */
+    fun translateBatchViaMyMemory(payload: String, targetLang: String, sourceLang: String = "ja"): String? {
+        val lines = payload.lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return null
+
+        val subBatches = mutableListOf<String>()
+        val current = StringBuilder()
+        for (line in lines) {
+            if (current.isNotEmpty() && current.length + 1 + line.length > 380) {
+                subBatches.add(current.toString())
+                current.clear()
+            }
+            if (current.isNotEmpty()) current.append('\n')
+            current.append(line)
+        }
+        if (current.isNotEmpty()) subBatches.add(current.toString())
+
+        val translatedParts = mutableListOf<String>()
+        for (sub in subBatches) {
+            val tr = translateViaMyMemory(sub, targetLang, sourceLang) ?: return null
+            translatedParts.add(tr)
+        }
+        return translatedParts.joinToString("\n").takeIf { it.isNotBlank() }
     }
 
     fun translateViaMicrosoftEdge(text: String, tl: String): String? {

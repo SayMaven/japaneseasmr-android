@@ -55,8 +55,8 @@ object TranslationService {
     private val cacheClearedListeners = java.util.Collections.synchronizedList(mutableListOf<() -> Unit>())
 
     // Jalur cepat terpisah untuk klik tunggal agar tidak pernah antre di belakang batch massal
-    private val singleTextSemaphore = Semaphore(4)
-    private val batchSemaphore = Semaphore(6)
+    private val singleTextSemaphore = Semaphore(3)
+    private val batchSemaphore = Semaphore(1)
 
     val googleRateLimitUntilMs: Long
         get() = WebTranslationProviders.googleRateLimitUntilMs
@@ -477,9 +477,11 @@ object TranslationService {
             if (toTranslateOnline.isNotEmpty()) {
                 val chunkPairs = toTranslateOnline
                     .groupBy { detectSourceLanguage(it, isSubtitleMode) }
-                    .flatMap { (lang, items) -> items.chunked(10).map { it to lang } }
+                    .flatMap { (lang, items) ->
+                        chunkByCharBudget(items, maxItems = 25, maxChars = 2400).map { it to lang }
+                    }
 
-                val completedOrTimedOut = withTimeoutOrNull(35_000L) {
+                val completedOrTimedOut = withTimeoutOrNull(60_000L) {
                     coroutineScope {
                         chunkPairs.map { (chunk, sourceLang) ->
                             async(Dispatchers.IO) {
@@ -502,11 +504,13 @@ object TranslationService {
                                 val taggedPayload = preparedChunk.mapIndexed { idx, str -> "[[$idx]] $str" }.joinToString("\n")
 
                                 val batchResponse = batchSemaphore.withPermit {
-                                    when (effectiveProvider.lowercase()) {
-                                        "microsoft" -> WebTranslationProviders.translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
-                                        "youdao" -> WebTranslationProviders.translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
-                                        else -> WebTranslationProviders.translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)
-                                    }
+                                    kotlinx.coroutines.delay(450L)
+                                    translateBatchChunkWithFailover(
+                                        payload = taggedPayload,
+                                        targetLang = normalizedTl,
+                                        sourceLang = sourceLang,
+                                        provider = effectiveProvider
+                                    )
                                 }
 
                                 // Ekstrak hasil via Regex deterministik (mendukung bracket ASCII, fullwidth, dan spasi)
@@ -523,28 +527,27 @@ object TranslationService {
                                     }
                                 }
 
-                                // Fallback newline-only jika tag [[idx]] dirusak oleh mesin terjemah (khususnya mode subtitle)
-                                if (parsedMap.size < chunk.size / 2 && chunk.size > 1 && System.currentTimeMillis() >= googleRateLimitUntilMs) {
+                                // Fallback newline-only HANYA jika tag [[idx]] benar-benar gagal di-parse
+                                if (parsedMap.isEmpty() && chunk.size > 1) {
                                     val plainPayload = preparedChunk.joinToString("\n")
                                     val plainResponse = batchSemaphore.withPermit {
-                                        when (effectiveProvider.lowercase()) {
-                                            "microsoft" -> WebTranslationProviders.translateViaMicrosoftEdge(plainPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
-                                            "youdao" -> WebTranslationProviders.translateViaYoudaoWeb(plainPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
-                                            else -> WebTranslationProviders.translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)
-                                        }
+                                        kotlinx.coroutines.delay(450L)
+                                        translateBatchChunkWithFailover(
+                                            payload = plainPayload,
+                                            targetLang = normalizedTl,
+                                            sourceLang = sourceLang,
+                                            provider = effectiveProvider
+                                        )
                                     }
                                     val respLines = plainResponse?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
                                     if (respLines.size == chunk.size) {
                                         for (i in chunk.indices) {
-                                            if (!parsedMap.containsKey(i)) {
-                                                parsedMap[i] = respLines[i]
-                                            }
+                                            parsedMap[i] = respLines[i]
                                         }
                                     }
                                 }
 
-                                // Simpan semua item yang berhasil di-parse (jangan buang hasil parsial!)
-                                val missingIndices = mutableListOf<Int>()
+                                // Simpan semua item yang berhasil di-parse
                                 for (i in chunk.indices) {
                                     val src = chunk[i]
                                     val rawParsed = parsedMap[i]
@@ -570,22 +573,6 @@ object TranslationService {
                                                     translatedText = finalTr
                                                 )
                                             )
-                                        } else {
-                                            missingIndices.add(i)
-                                        }
-                                    } else {
-                                        missingIndices.add(i)
-                                    }
-                                }
-
-                                // Fallback HANYA untuk maksimal 3 item yang benar-benar gagal, dan hentikan jika Google sedang rate-limited
-                                if (missingIndices.isNotEmpty() && System.currentTimeMillis() >= googleRateLimitUntilMs) {
-                                    for (idx in missingIndices.take(3)) {
-                                        if (System.currentTimeMillis() < googleRateLimitUntilMs) break
-                                        val src = chunk[idx]
-                                        val tr = translateText(src, effectiveTargetLang, effectiveProvider)
-                                        if (tr.isNotBlank() && !isPoisonedTranslation(src, tr, effectiveTargetLang)) {
-                                            result[src] = tr
                                         }
                                     }
                                 }
@@ -614,6 +601,49 @@ object TranslationService {
         }
 
         result
+    }
+
+    private fun chunkByCharBudget(
+        items: List<String>,
+        maxItems: Int,
+        maxChars: Int
+    ): List<List<String>> {
+        val chunks = mutableListOf<List<String>>()
+        var current = mutableListOf<String>()
+        var currentChars = 0
+        for (item in items) {
+            val itemCost = item.length + 8
+            if (current.isNotEmpty() && (current.size >= maxItems || currentChars + itemCost > maxChars)) {
+                chunks.add(current)
+                current = mutableListOf()
+                currentChars = 0
+            }
+            current.add(item)
+            currentChars += itemCost
+        }
+        if (current.isNotEmpty()) chunks.add(current)
+        return chunks
+    }
+
+    private fun translateBatchChunkWithFailover(
+        payload: String,
+        targetLang: String,
+        sourceLang: String,
+        provider: String
+    ): String? {
+        return when (provider.lowercase()) {
+            "microsoft" -> WebTranslationProviders.translateViaMicrosoftEdge(payload, targetLang)
+                ?: WebTranslationProviders.translateViaGoogleWeb(payload, targetLang, sourceLang)
+                ?: WebTranslationProviders.translateViaGoogleClients5(payload, targetLang, sourceLang)
+                ?: WebTranslationProviders.translateBatchViaMyMemory(payload, targetLang, sourceLang)
+            "youdao" -> WebTranslationProviders.translateViaYoudaoWeb(payload, targetLang)
+                ?: WebTranslationProviders.translateViaGoogleWeb(payload, targetLang, sourceLang)
+                ?: WebTranslationProviders.translateViaGoogleClients5(payload, targetLang, sourceLang)
+                ?: WebTranslationProviders.translateBatchViaMyMemory(payload, targetLang, sourceLang)
+            else -> WebTranslationProviders.translateViaGoogleWeb(payload, targetLang, sourceLang)
+                ?: WebTranslationProviders.translateViaGoogleClients5(payload, targetLang, sourceLang)
+                ?: WebTranslationProviders.translateBatchViaMyMemory(payload, targetLang, sourceLang)
+        }
     }
 
     /**

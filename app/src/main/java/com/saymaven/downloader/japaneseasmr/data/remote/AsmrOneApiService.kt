@@ -605,6 +605,7 @@ object AsmrOneApiService {
             if (lowerPath.contains("本編") || lowerPath.contains("main")) score += 30
             if (lowerPath.contains("seなし") || lowerPath.contains("se無し") || lowerPath.contains("se_nashi") || lowerPath.contains("se nashi") || lowerPath.contains("効果音なし") || lowerPath.contains("効果音無") || lowerPath.contains("nose")) score -= 60
             if (lowerPath.contains("おまけ") || lowerPath.contains("特典") || lowerPath.contains("bonus") || lowerPath.contains("free talk") || lowerPath.contains("フリートーク")) score -= 40
+            if (!lowerPath.contains("本編") && (lowerPath.contains("販促") || lowerPath.contains("回想"))) score -= 60
 
             return score
         }
