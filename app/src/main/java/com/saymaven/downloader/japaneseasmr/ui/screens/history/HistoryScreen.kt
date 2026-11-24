@@ -34,8 +34,10 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.saymaven.downloader.japaneseasmr.R
 import com.saymaven.downloader.japaneseasmr.data.local.entity.HistoryEntity
+import com.saymaven.downloader.japaneseasmr.ui.components.PaginationBar
 import com.saymaven.downloader.japaneseasmr.ui.components.SortOptionItem
 import com.saymaven.downloader.japaneseasmr.ui.components.SortOptionsSheet
+import kotlinx.coroutines.launch
 
 private enum class HistoryStatusFilter {
     ALL,
@@ -56,15 +58,22 @@ fun HistoryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
     val hasMissingFiles by viewModel.hasMissingFiles.collectAsState()
+    val pageSize by viewModel.pageSize.collectAsState()
 
+    val coroutineScope = rememberCoroutineScope()
     var itemToDelete by remember { mutableStateOf<HistoryUiItem?>(null) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var showSortSheet by remember { mutableStateOf(false) }
     var statusFilter by rememberSaveable { mutableStateOf(HistoryStatusFilter.ALL) }
+    var currentPage by rememberSaveable { mutableStateOf(1) }
 
     BackHandler(enabled = isSearchExpanded) {
         isSearchExpanded = false
         viewModel.onSearchQueryChanged("")
+    }
+
+    LaunchedEffect(searchQuery, statusFilter, sortOrder, pageSize) {
+        currentPage = 1
     }
 
     val filteredHistory = remember(historyUiList, statusFilter) {
@@ -73,6 +82,15 @@ fun HistoryScreen(
             HistoryStatusFilter.PRESENT -> historyUiList.filter { it.isPresent }
             HistoryStatusFilter.MISSING -> historyUiList.filter { !it.isPresent }
         }
+    }
+
+    val safePageSize = pageSize.coerceAtLeast(10)
+    val totalPages = ((filteredHistory.size + safePageSize - 1) / safePageSize).coerceAtLeast(1)
+    val safePage = currentPage.coerceIn(1, totalPages)
+    val pagedHistory = remember(filteredHistory, safePage, safePageSize) {
+        val start = ((safePage - 1) * safePageSize).coerceAtMost(filteredHistory.size)
+        val end = (start + safePageSize).coerceAtMost(filteredHistory.size)
+        filteredHistory.subList(start, end)
     }
 
     Column(
@@ -106,47 +124,10 @@ fun HistoryScreen(
         )
 
         AnimatedVisibility(visible = isSearchExpanded) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.onSearchQueryChanged(it) },
-                placeholder = {
-                    Text(
-                        text = stringResource(R.string.history_search_hint),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                trailingIcon = {
-                    IconButton(
-                        onClick = {
-                            if (searchQuery.isNotEmpty()) {
-                                viewModel.onSearchQueryChanged("")
-                            } else {
-                                isSearchExpanded = false
-                            }
-                        }
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
+            HistorySearchBar(
+                query = searchQuery,
+                onQueryChange = { viewModel.onSearchQueryChanged(it) },
+                onClose = { isSearchExpanded = false }
             )
         }
 
@@ -191,7 +172,7 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(
-                        items = filteredHistory,
+                        items = pagedHistory,
                         key = { it.rjid },
                         contentType = { "history_item" }
                     ) { item ->
@@ -202,45 +183,30 @@ fun HistoryScreen(
                             onDelete = onDeleteAction
                         )
                     }
+
+                    item(key = "history_pagination") {
+                        PaginationBar(
+                            currentPage = safePage,
+                            totalPages = totalPages,
+                            totalCount = filteredHistory.size,
+                            onPageSelected = { targetPage ->
+                                if (targetPage != safePage) {
+                                    currentPage = targetPage
+                                    coroutineScope.launch { listState.scrollToItem(0) }
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 
     if (showSortSheet) {
-        val isDateField = sortOrder == HistorySortOrder.DATE_DESC || sortOrder == HistorySortOrder.DATE_ASC
-        val isAsc = sortOrder == HistorySortOrder.DATE_ASC || sortOrder == HistorySortOrder.TITLE_ASC
-        SortOptionsSheet(
-            title = stringResource(R.string.browse_sort_title),
-            fieldOptions = listOf(
-                SortOptionItem("DATE", R.string.history_sort_date_desc),
-                SortOptionItem("TITLE", R.string.history_sort_title_asc)
-            ),
-            selectedField = if (isDateField) "DATE" else "TITLE",
-            onFieldSelected = { field ->
-                val next = when {
-                    field == "DATE" && isAsc -> HistorySortOrder.DATE_ASC
-                    field == "DATE" -> HistorySortOrder.DATE_DESC
-                    isAsc -> HistorySortOrder.TITLE_ASC
-                    else -> HistorySortOrder.TITLE_DESC
-                }
-                viewModel.setSortOrder(next)
-            },
-            directionOptions = listOf(
-                SortOptionItem(false, R.string.history_sort_date_desc),
-                SortOptionItem(true, R.string.history_sort_date_asc)
-            ),
-            selectedDirection = isAsc,
-            onDirectionSelected = { asc ->
-                val next = when {
-                    isDateField && asc -> HistorySortOrder.DATE_ASC
-                    isDateField -> HistorySortOrder.DATE_DESC
-                    asc -> HistorySortOrder.TITLE_ASC
-                    else -> HistorySortOrder.TITLE_DESC
-                }
-                viewModel.setSortOrder(next)
-            },
-            onDismissRequest = { showSortSheet = false }
+        HistorySortSheet(
+            sortOrder = sortOrder,
+            onSortSelected = { viewModel.setSortOrder(it) },
+            onDismiss = { showSortSheet = false }
         )
     }
 
@@ -255,6 +221,90 @@ fun HistoryScreen(
             }
         )
     }
+}
+
+@Composable
+private fun HistorySearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = {
+            Text(
+                text = stringResource(R.string.history_search_hint),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        trailingIcon = {
+            IconButton(onClick = { if (query.isNotEmpty()) onQueryChange("") else onClose() }) {
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_close))
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(14.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+    )
+}
+
+@Composable
+private fun HistorySortSheet(
+    sortOrder: HistorySortOrder,
+    onSortSelected: (HistorySortOrder) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val isDateField = sortOrder == HistorySortOrder.DATE_DESC || sortOrder == HistorySortOrder.DATE_ASC
+    val isAsc = sortOrder == HistorySortOrder.DATE_ASC || sortOrder == HistorySortOrder.TITLE_ASC
+    SortOptionsSheet(
+        title = stringResource(R.string.browse_sort_title),
+        fieldOptions = listOf(
+            SortOptionItem("DATE", R.string.history_sort_date_desc),
+            SortOptionItem("TITLE", R.string.history_sort_title_asc)
+        ),
+        selectedField = if (isDateField) "DATE" else "TITLE",
+        onFieldSelected = { field ->
+            val next = when {
+                field == "DATE" && isAsc -> HistorySortOrder.DATE_ASC
+                field == "DATE" -> HistorySortOrder.DATE_DESC
+                isAsc -> HistorySortOrder.TITLE_ASC
+                else -> HistorySortOrder.TITLE_DESC
+            }
+            onSortSelected(next)
+        },
+        directionOptions = listOf(
+            SortOptionItem(false, R.string.history_sort_date_desc),
+            SortOptionItem(true, R.string.history_sort_date_asc)
+        ),
+        selectedDirection = isAsc,
+        onDirectionSelected = { asc ->
+            val next = when {
+                isDateField && asc -> HistorySortOrder.DATE_ASC
+                isDateField -> HistorySortOrder.DATE_DESC
+                asc -> HistorySortOrder.TITLE_ASC
+                else -> HistorySortOrder.TITLE_DESC
+            }
+            onSortSelected(next)
+        },
+        onDismissRequest = onDismiss
+    )
 }
 
 @Composable

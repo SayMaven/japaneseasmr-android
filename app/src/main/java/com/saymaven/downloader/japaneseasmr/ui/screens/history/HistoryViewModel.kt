@@ -48,6 +48,12 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
     private val _sortOrder = MutableStateFlow(HistorySortOrder.DATE_DESC)
     val sortOrder = _sortOrder.asStateFlow()
 
+    val pageSize: StateFlow<Int> = prefs.pageSizeFlow.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        prefs.getInitialPageSize()
+    )
+
     // O(1) Instant presence cache to eliminate disk I/O on UI thread during scroll
     private val filePresenceCache = ConcurrentHashMap<String, Boolean>()
 
