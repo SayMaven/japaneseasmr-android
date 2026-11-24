@@ -1,5 +1,6 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.browse.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,18 +46,17 @@ fun AsmrOneWorkCard(
     onCardClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val cardShape = RoundedCornerShape(12.dp)
+    val cardShape = RoundedCornerShape(14.dp)
     var showMenu by remember { mutableStateOf(false) }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(cardShape)
-            .clickable { onCardClick() },
+        onClick = onCardClick,
+        modifier = modifier.fillMaxWidth(),
         shape = cardShape,
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -64,6 +64,7 @@ fun AsmrOneWorkCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1.3f)
+                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -293,18 +294,7 @@ fun AsmrOneWorkCard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         work.tags.forEach { rawTag ->
-                            val localizedTag = TagLocalizer.localize(null, rawTag)
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
-                            ) {
-                                Text(
-                                    text = localizedTag,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
+                            WorkGenreChip(text = TagLocalizer.localize(null, rawTag))
                         }
                     }
                 }
@@ -388,18 +378,17 @@ fun AsmrOneWorkListItem(
     onCardClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val cardShape = RoundedCornerShape(12.dp)
+    val cardShape = RoundedCornerShape(14.dp)
     var showMenu by remember { mutableStateOf(false) }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(cardShape)
-            .clickable { onCardClick() },
+        onClick = onCardClick,
+        modifier = modifier.fillMaxWidth(),
         shape = cardShape,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
         Row(
@@ -615,18 +604,7 @@ fun AsmrOneWorkListItem(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         work.tags.forEach { rawTag ->
-                            val localizedTag = TagLocalizer.localize(null, rawTag)
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
-                            ) {
-                                Text(
-                                    text = localizedTag,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
+                            WorkGenreChip(text = TagLocalizer.localize(null, rawTag))
                         }
                     }
                 }
@@ -685,5 +663,21 @@ fun AsmrOneWorkListItem(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WorkGenreChip(text: String) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
     }
 }

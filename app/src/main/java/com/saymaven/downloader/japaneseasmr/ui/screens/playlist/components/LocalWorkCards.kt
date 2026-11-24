@@ -1,5 +1,6 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.playlist.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -52,7 +53,7 @@ fun LocalWorkPinterestCard(
 ) {
     val context = LocalContext.current
     var isMenuExpanded by remember { mutableStateOf(false) }
-    val cardShape = RoundedCornerShape(10.dp)
+    val cardShape = RoundedCornerShape(14.dp)
     val hasSubtitle = remember(item.localFilePath, item.chaptersJson) {
         (!item.chaptersJson.isNullOrBlank() && (item.chaptersJson.contains(".vtt") || item.chaptersJson.contains(".lrc") || item.chaptersJson.contains(".srt"))) ||
         try {
@@ -69,17 +70,23 @@ fun LocalWorkPinterestCard(
     }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(cardShape)
-            .clickable { onClick() },
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
         shape = cardShape,
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrentTrack) 4.dp else 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrentTrack) 2.dp else 1.dp),
+        border = BorderStroke(
+            width = if (isCurrentTrack) 1.25.dp else 0.75.dp,
+            color = if (isCurrentTrack) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            }
+        ),
         colors = CardDefaults.cardColors(
             containerColor = if (isCurrentTrack) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                MaterialTheme.colorScheme.surfaceContainerHigh
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                MaterialTheme.colorScheme.surfaceContainerLow
             }
         )
     ) {
@@ -88,6 +95,7 @@ fun LocalWorkPinterestCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1.3f)
+                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
             ) {
                 val cover = item.coverUrl
                 if (!cover.isNullOrBlank()) {
@@ -268,18 +276,7 @@ fun LocalWorkPinterestCard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         genreList.forEach { rawTag ->
-                            val tag = TagLocalizer.localize(null, rawTag)
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
-                            ) {
-                                Text(
-                                    text = tag,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
+                            LocalWorkGenreChip(text = TagLocalizer.localize(null, rawTag))
                         }
                     }
                 }
@@ -441,7 +438,7 @@ fun LocalWorkListViewItem(
 ) {
     val context = LocalContext.current
     var isMenuExpanded by remember { mutableStateOf(false) }
-    val cardShape = RoundedCornerShape(12.dp)
+    val cardShape = RoundedCornerShape(14.dp)
     val hasSubtitle = remember(item.localFilePath, item.chaptersJson) {
         (!item.chaptersJson.isNullOrBlank() && (item.chaptersJson.contains(".vtt") || item.chaptersJson.contains(".lrc") || item.chaptersJson.contains(".srt"))) ||
         try {
@@ -458,17 +455,23 @@ fun LocalWorkListViewItem(
     }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(cardShape)
-            .clickable { onClick(item) },
+        onClick = { onClick(item) },
+        modifier = modifier.fillMaxWidth(),
         shape = cardShape,
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrentTrack) 4.dp else 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrentTrack) 2.dp else 1.dp),
+        border = BorderStroke(
+            width = if (isCurrentTrack) 1.25.dp else 0.75.dp,
+            color = if (isCurrentTrack) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            }
+        ),
         colors = CardDefaults.cardColors(
             containerColor = if (isCurrentTrack) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                MaterialTheme.colorScheme.surfaceContainerHigh
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                MaterialTheme.colorScheme.surfaceContainerLow
             }
         )
     ) {
@@ -652,18 +655,7 @@ fun LocalWorkListViewItem(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         genreList.forEach { rawTag ->
-                            val tag = TagLocalizer.localize(null, rawTag)
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
-                            ) {
-                                Text(
-                                    text = tag,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
+                            LocalWorkGenreChip(text = TagLocalizer.localize(null, rawTag))
                         }
                     }
                 }
@@ -795,5 +787,21 @@ fun LocalWorkListViewItem(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LocalWorkGenreChip(text: String) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
     }
 }

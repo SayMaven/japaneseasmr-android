@@ -1,6 +1,7 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.playlist.components
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -117,16 +118,24 @@ fun PlaylistItemGridCard(
     onViewDetail: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val cardShape = RoundedCornerShape(10.dp)
+    val cardShape = RoundedCornerShape(14.dp)
     Card(
         onClick = onClick,
         shape = cardShape,
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrentTrack) 4.dp else 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrentTrack) 2.dp else 1.dp),
+        border = BorderStroke(
+            width = if (isCurrentTrack) 1.25.dp else 0.75.dp,
+            color = if (isCurrentTrack) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            }
+        ),
         colors = CardDefaults.cardColors(
             containerColor = if (isCurrentTrack) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                MaterialTheme.colorScheme.surfaceContainerHigh
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                MaterialTheme.colorScheme.surfaceContainerLow
             }
         ),
         modifier = modifier.fillMaxWidth()
@@ -136,6 +145,7 @@ fun PlaylistItemGridCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1.3f)
+                    .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
             ) {
                 if (item.coverUrl.isNotBlank()) {
                     AsyncImage(
@@ -268,8 +278,9 @@ fun PlaylistItemRow(
 ) {
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(0.75.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
@@ -398,11 +409,19 @@ fun PlaylistItemCard(
     Card(
         modifier = cardModifier,
         shape = PlaylistItemCardShape,
+        border = BorderStroke(
+            width = if (isCurrentTrack) 1.25.dp else 0.75.dp,
+            color = if (isCurrentTrack) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            }
+        ),
         colors = CardDefaults.cardColors(
             containerColor = when {
                 isDragged -> MaterialTheme.colorScheme.secondaryContainer
-                isCurrentTrack -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                isCurrentTrack -> MaterialTheme.colorScheme.surfaceContainerHigh
+                else -> MaterialTheme.colorScheme.surfaceContainerLow
             }
         )
     ) {
