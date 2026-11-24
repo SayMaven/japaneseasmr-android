@@ -1,0 +1,499 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>ComplexCondition:AsmrOneApiService.kt$AsmrOneApiService$(lowerPath.contains("mp3") || sampleExt == "mp3") &amp;&amp; (lowerPath.contains("seあり") || lowerPath.contains("se有り") || lowerPath.contains("se_ari") || lowerPath.contains("se ari") || lowerPath.contains("効果音あり"))</ID>
+    <ID>ComplexCondition:AsmrOneApiService.kt$AsmrOneApiService$lowerPath.contains("seなし") || lowerPath.contains("se無し") || lowerPath.contains("se_nashi") || lowerPath.contains("se nashi") || lowerPath.contains("効果音なし") || lowerPath.contains("効果音無") || lowerPath.contains("nose")</ID>
+    <ID>ComplexCondition:AsmrOneApiService.kt$AsmrOneApiService$lowerPath.contains("おまけ") || lowerPath.contains("特典") || lowerPath.contains("bonus") || lowerPath.contains("free talk") || lowerPath.contains("フリートーク")</ID>
+    <ID>ComplexCondition:AsmrOneApiService.kt$AsmrOneApiService$numId != null &amp;&amp; numId &gt; 0 &amp;&amp; (clean.startsWith("RJ") || digits == clean)</ID>
+    <ID>ComplexCondition:AsmrOneWorkCards.kt$(showCardRating &amp;&amp; work.rating != null &amp;&amp; work.rating &gt; 0.0) || (showCardPrice &amp;&amp; work.price != null) || (showCardSales &amp;&amp; work.dlCount != null &amp;&amp; work.dlCount &gt; 0)</ID>
+    <ID>ComplexCondition:AsmrOneWorkDetailScreen.kt$autoTranslateDetail &amp;&amp; !isFileTreeTranslated &amp;&amp; translatedNodeTitles.isEmpty() &amp;&amp; fileTree.isNotEmpty()</ID>
+    <ID>ComplexCondition:AsmrOneWorkDetailScreen.kt$autoTranslateDetail &amp;&amp; !isTitleTranslated &amp;&amp; translatedTitleText == null &amp;&amp; work.title.isNotBlank()</ID>
+    <ID>ComplexCondition:AudioDownloader.kt$AudioDownloader$payloadLen &gt;= 9 &amp;&amp; pkt[payloadOffset] == 0.toByte() &amp;&amp; pkt[payloadOffset + 1] == 0.toByte() &amp;&amp; pkt[payloadOffset + 2] == 1.toByte()</ID>
+    <ID>ComplexCondition:AudioMerger.kt$AudioMerger$(bytes[i] == 'X'.code.toByte() &amp;&amp; bytes[i + 1] == 'i'.code.toByte() &amp;&amp; bytes[i + 2] == 'n'.code.toByte() &amp;&amp; bytes[i + 3] == 'g'.code.toByte()) || (bytes[i] == 'I'.code.toByte() &amp;&amp; bytes[i + 1] == 'n'.code.toByte() &amp;&amp; bytes[i + 2] == 'f'.code.toByte() &amp;&amp; bytes[i + 3] == 'o'.code.toByte())</ID>
+    <ID>ComplexCondition:ChapterDiscoveryService.kt$ChapterDiscoveryService$sec != null &amp;&amp; tStr.isNotBlank() &amp;&amp; tStr.length &lt; 120 &amp;&amp; !isNonsense</ID>
+    <ID>ComplexCondition:DLsiteScraper.kt$DLsiteScraper$!c.isNullOrBlank() &amp;&amp; c.length in 2..30 &amp;&amp; !c.startsWith("http") &amp;&amp; !foundCvs.contains(c)</ID>
+    <ID>ComplexCondition:DLsiteScraper.kt$DLsiteScraper$title == cleanId || cv == "-" || circle == "-" || genre == "-" || ageRating == "-"</ID>
+    <ID>ComplexCondition:FileTreeComponents.kt$full.contains("mp3") &amp;&amp; (full.contains("seあり") || full.contains("se有り") || full.contains("se_ari") || full.contains("se ari") || full.contains("効果音あり"))</ID>
+    <ID>ComplexCondition:FileTreeComponents.kt$full.contains("seなし") || full.contains("se無し") || full.contains("se_nashi") || full.contains("se nashi") || full.contains("効果音なし") || full.contains("効果音無") || full.contains("nose")</ID>
+    <ID>ComplexCondition:FileTreeComponents.kt$full.contains("おまけ") || full.contains("特典") || full.contains("bonus") || full.contains("free talk") || full.contains("フリートーク")</ID>
+    <ID>ComplexCondition:LyricsParser.kt$LyricsParser$audioStripped.length &gt; 3 &amp;&amp; subStripped.length &gt; 3 &amp;&amp; (subStripped.contains(audioStripped) || audioStripped.contains(subStripped))</ID>
+    <ID>ComplexCondition:PlaybackService.kt$PlaybackService$path.isNullOrBlank() &amp;&amp; !mediaId.isNullOrBlank() &amp;&amp; (mediaId.startsWith("/") || mediaId.contains("/"))</ID>
+    <ID>ComplexCondition:PlayerScreen.kt$(isOnlineStreaming || isVirtualAlbum) &amp;&amp; !currentStreamTrackTitle.isNullOrBlank() &amp;&amp; !shouldMask</ID>
+    <ID>ComplexCondition:PlayerScreen.kt$isTranslationActive &amp;&amp; !cleanTranslatedTitle.isNullOrBlank() &amp;&amp; cleanOriginalTitle.isNotBlank() &amp;&amp; cleanTranslatedTitle != cleanOriginalTitle</ID>
+    <ID>ComplexCondition:PlayerTranslationDelegate.kt$PlayerTranslationDelegate$!forceOnline &amp;&amp; lastTranslatedKey == currentKey &amp;&amp; !_translatedTitle.value.isNullOrBlank() &amp;&amp; (currentChaps.isEmpty() || _translatedChapters.value.size == currentChaps.size)</ID>
+    <ID>ComplexCondition:PlayerViewModel.kt$PlayerViewModel$(isCurrentVirtualAlbum || _isOnlineStreaming.value || p.mediaItemCount &gt; 1) &amp;&amp; _currentChapters.value.isNotEmpty()</ID>
+    <ID>ComplexCondition:PlayerViewModel.kt$PlayerViewModel$m.title == targetRj || m.cv == "-" || m.circle == "-" || m.genre == "-"</ID>
+    <ID>ComplexCondition:PlayerViewModel.kt$PlayerViewModel$meta.title == history.linkedRjId || meta.cv == "-" || meta.circle == "-" || meta.genre == "-"</ID>
+    <ID>ComplexCondition:PlayerViewModel.kt$PlayerViewModel$meta.title.isNotBlank() || meta.cv.isNotBlank() || (meta.genre.isNotBlank() &amp;&amp; meta.genre != "-")</ID>
+    <ID>ComplexCondition:PlayerViewModel.kt$PlayerViewModel$targetFile != null &amp;&amp; targetFile.exists() &amp;&amp; (history?.sourceType == SourceType.LOCAL_FOLDER.name || targetFile.isDirectory)</ID>
+    <ID>ComplexCondition:PlayerViewModel.kt$PlayerViewModel$validFile != null &amp;&amp; validFile.exists() &amp;&amp; (validFile.isDirectory || validFile.length() &gt; 0L)</ID>
+    <ID>ComplexCondition:PlayerViewModel.kt$PlayerViewModel.&lt;no name provided&gt;$prevRj != cleanId &amp;&amp; cleanId.isNotBlank() &amp;&amp; !cleanId.startsWith("http") &amp;&amp; !cleanId.contains('/')</ID>
+    <ID>ComplexCondition:StorageSyncManager.kt$StorageSyncManager$directFile != null &amp;&amp; directFile.exists() &amp;&amp; directFile.isDirectory &amp;&amp; directFile.canRead()</ID>
+    <ID>ComplexCondition:StorageSyncManager.kt$StorageSyncManager$finalLinkedRjId != null &amp;&amp; (existing.genre == "-" || existing.ageRating == "-" || existing.cv == "-")</ID>
+    <ID>ComplexCondition:StorageSyncManager.kt$StorageSyncManager$isOfficialRj &amp;&amp; (existing.genre == "-" || existing.ageRating == "-" || existing.cv == "-")</ID>
+    <ID>ComplexCondition:StorageSyncManager.kt$StorageSyncManager$rj != null &amp;&amp; existingByRj != null &amp;&amp; existingByRj.localFilePath != leaf.absolutePath &amp;&amp; File(existingByRj.localFilePath).exists()</ID>
+    <ID>ComplexCondition:StorageSyncManager.kt$StorageSyncManager$rj != null &amp;&amp; existingByRj != null &amp;&amp; existingByRj.localFilePath != workDir.absolutePath &amp;&amp; File(existingByRj.localFilePath).exists()</ID>
+    <ID>ComplexCondition:TrackDiscoveryService.kt$TrackDiscoveryService$fTitle.contains("おすすめ") || fTitle.contains("お勧め") || lower.contains("seあり") || lower.contains("se有り") || lower.contains("効果音あり") || lower.contains("効果音有り") || (fTitle.contains("効果音") &amp;&amp; !fTitle.contains("効果音なし") &amp;&amp; !fTitle.contains("効果音無")) || fTitle.contains("ボイス")</ID>
+    <ID>CyclomaticComplexMethod:AsmrOneApiService.kt$AsmrOneApiService$private fun parseWorkJson(obj: JSONObject): AsmrOneWork?</ID>
+    <ID>CyclomaticComplexMethod:AsmrOneApiService.kt$AsmrOneApiService$private fun selectPrimaryAudioTracks(tree: List&lt;AsmrOneFileNode&gt;, formatPriority: String = "mp3_se,mp3,flac,wav,opus,m4a,aac"): List&lt;AsmrOneTrack&gt;</ID>
+    <ID>CyclomaticComplexMethod:AsmrOneBrowseScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AsmrOneBrowseScreen( viewModel: AsmrOneBrowseViewModel, playerViewModel: PlayerViewModel, onOpenDrawer: () -&gt; Unit, onOpenPlayer: () -&gt; Unit = {}, onSelectWorkForDownload: (String) -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>CyclomaticComplexMethod:AsmrOneWorkCards.kt$@Composable fun AsmrOneWorkCard( work: AsmrOneWork, displayTitle: String, isDownloaded: Boolean, isSavedToPlaylist: Boolean, showCardCircle: Boolean, showCardSubtitle: Boolean, showCardAgeRating: Boolean, showCardReleaseDate: Boolean, showCardRating: Boolean = false, showCardPrice: Boolean = false, showCardSales: Boolean = false, onCopyRj: () -&gt; Unit, onDownloadClick: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit, onCardClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>CyclomaticComplexMethod:AsmrOneWorkCards.kt$@Composable fun AsmrOneWorkListItem( work: AsmrOneWork, displayTitle: String, isDownloaded: Boolean, isSavedToPlaylist: Boolean, showCardCircle: Boolean, showCardReleaseDate: Boolean, showCardSubtitle: Boolean = true, showCardAgeRating: Boolean = true, showCardRating: Boolean = false, showCardPrice: Boolean = false, showCardSales: Boolean = false, onCopyRj: () -&gt; Unit, onDownloadClick: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit, onCardClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>CyclomaticComplexMethod:AsmrOneWorkDetailScreen.kt$@OptIn(ExperimentalLayoutApi::class) @Composable fun AsmrOneWorkDetailScreen( work: AsmrOneWork, fileTree: List&lt;AsmrOneFileNode&gt;, audioTracks: List&lt;AsmrOneTrack&gt;, isLoadingFiles: Boolean, playerViewModel: PlayerViewModel, showRating: Boolean = false, showPrice: Boolean = false, showDuration: Boolean = true, showSales: Boolean = false, showReleaseDate: Boolean = true, showTranslateBtn: Boolean = true, showSubtitle: Boolean = true, showAgeRating: Boolean = true, onBack: () -&gt; Unit, onOpenPlayer: () -&gt; Unit = {}, onDownload: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>CyclomaticComplexMethod:AudioDownloader.kt$AudioDownloader$private fun muxAdtsFileToM4a(adtsFile: File, outputFile: File, onLog: (String) -&gt; Unit): Boolean</ID>
+    <ID>CyclomaticComplexMethod:AudioDownloader.kt$AudioDownloader$private suspend fun downloadHlsStream( m3u8Url: String, destFile: File, tempDir: File, parallelConnections: Int, referer: String? = null, onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -&gt; Unit, onLog: (String) -&gt; Unit ): Boolean</ID>
+    <ID>CyclomaticComplexMethod:AudioFormatSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AudioFormatSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>CyclomaticComplexMethod:AudioStorageHelper.kt$AudioStorageHelper$fun getLocalCoverFile(context: Context, rjid: String, audioFilePath: String?): File?</ID>
+    <ID>CyclomaticComplexMethod:AudioStorageHelper.kt$AudioStorageHelper$fun resolvePhysicalPathFromUri(context: Context, uriString: String?): String?</ID>
+    <ID>CyclomaticComplexMethod:ChapterDiscoveryService.kt$ChapterDiscoveryService$suspend fun fetchJapaneseAsmrChapters(rjIdOrUrl: String): List&lt;ChapterItem&gt;</ID>
+    <ID>CyclomaticComplexMethod:ChapterDiscoveryService.kt$ChapterDiscoveryService$suspend fun generateChapters( trackFiles: List&lt;File&gt;, trackNames: List&lt;String&gt;? = null, rjId: String? = null ): List&lt;ChapterItem&gt;</ID>
+    <ID>CyclomaticComplexMethod:DLsiteScraper.kt$DLsiteScraper$private fun enrichMetadataFromAsmrOne( cleanId: String, title: String, cv: String, circle: String, genre: String, ageRating: String ): Array&lt;String&gt;</ID>
+    <ID>CyclomaticComplexMethod:DLsiteScraper.kt$DLsiteScraper$suspend fun fetchMetadata(rawRjId: String): AsmrWork</ID>
+    <ID>CyclomaticComplexMethod:DownloadService.kt$DownloadService$private suspend fun processQueue()</ID>
+    <ID>CyclomaticComplexMethod:FileTreeComponents.kt$internal fun findAutoExpandedFolders( tree: List&lt;AsmrOneFileNode&gt;, formatPriority: String = "mp3_se,mp3,flac,wav,opus,m4a,aac" ): Set&lt;String&gt;</ID>
+    <ID>CyclomaticComplexMethod:LocalWorkCards.kt$@Composable fun LocalWorkListViewItem( modifier: Modifier = Modifier, item: HistoryEntity, displayTitle: String = item.title, isCurrentTrack: Boolean, isPlaying: Boolean, isInPlaylist: Boolean = false, onClick: (HistoryEntity) -&gt; Unit, onMoveFolder: () -&gt; Unit, onCopyRj: () -&gt; Unit, onAudioInfo: () -&gt; Unit, onDelete: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit = {}, onViewDetail: (() -&gt; Unit)? = null, onLinkRj: (() -&gt; Unit)? = null, showCardCircle: Boolean = true, showCardSubtitle: Boolean = true, showCardAgeRating: Boolean = true, showCardReleaseDate: Boolean = true )</ID>
+    <ID>CyclomaticComplexMethod:LocalWorkCards.kt$@Composable fun LocalWorkPinterestCard( item: HistoryEntity, displayTitle: String = item.title, isCurrentTrack: Boolean, isPlaying: Boolean, isInPlaylist: Boolean = false, onClick: () -&gt; Unit, onMoveFolder: () -&gt; Unit, onCopyRj: () -&gt; Unit, onAudioInfo: () -&gt; Unit, onDelete: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit = {}, onViewDetail: (() -&gt; Unit)? = null, onLinkRj: (() -&gt; Unit)? = null, showCardCircle: Boolean = true, showCardSubtitle: Boolean = true, showCardAgeRating: Boolean = true, showCardReleaseDate: Boolean = true, modifier: Modifier = Modifier )</ID>
+    <ID>CyclomaticComplexMethod:LyricsParser.kt$LyricsParser$fun matchBestSubtitle( sources: List&lt;SubtitleSource&gt;, trackTitle: String, trackIndex: Int = -1 ): SubtitleSource?</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
+    <ID>CyclomaticComplexMethod:PlayerControlsSection.kt$@Composable fun PlayerControlsSection( currentRjId: String?, isPlaying: Boolean, effectivePosition: Long, duration: Long, showRemainingTime: Boolean, onToggleRemainingTime: () -&gt; Unit, onSliderDrag: (Long) -&gt; Unit, onSliderDragFinished: () -&gt; Unit, chapters: List&lt;ChapterItem&gt;, isLoadingChapters: Boolean, activeChapterIndex: Int, activeChapter: ChapterItem?, translatedChapters: List&lt;ChapterItem&gt;, isTranslationActive: Boolean, isTranslating: Boolean, dacState: UsbDacInfo, audioSpecs: String, playerButtonOrder: String, repeatMode: Int, sleepTimerRemainingMs: Long?, isOnlineStreaming: Boolean, shuffleMode: Boolean, playbackSpeed: Float, onOpenChapterSheet: () -&gt; Unit, onOpenSleepTimerSheet: () -&gt; Unit, onOpenSpeedDialog: () -&gt; Unit, onOpenAudioGainDialog: () -&gt; Unit, onOpenPlaylistPickerSheet: () -&gt; Unit, onOpenLinkRjDialog: () -&gt; Unit, onOpenCoverPickerSheet: () -&gt; Unit, onToggleTranslation: () -&gt; Unit, onCycleRepeatMode: () -&gt; Unit, onToggleShuffleMode: () -&gt; Unit, onPlayPrevious: () -&gt; Unit, onReplay10: () -&gt; Unit, onTogglePlayPause: () -&gt; Unit, onForward10: () -&gt; Unit, onPlayNext: () -&gt; Unit )</ID>
+    <ID>CyclomaticComplexMethod:PlayerCoverLyricsPanel.kt$@Composable fun PlayerCoverLyricsPanel( currentCoverUrl: String?, lyrics: List&lt;LyricLine&gt;, activeLyricIndex: Int, availableSubtitles: List&lt;SubtitleSource&gt;, selectedSubtitleSource: SubtitleSource?, isLyricsTranslated: Boolean, isTranslatingLyrics: Boolean, showLyricsView: Boolean, onShowLyricsViewChange: (Boolean) -&gt; Unit, onOpenSubtitlePicker: () -&gt; Unit, onToggleLyricsTranslation: () -&gt; Unit, onSeekToLyricLine: (LyricLine) -&gt; Unit, privacyEnabled: Boolean, privacyBlurInApp: Boolean, temporaryUnblur: Boolean, onTemporaryUnblurChange: (Boolean) -&gt; Unit )</ID>
+    <ID>CyclomaticComplexMethod:PlayerLyricsDelegate.kt$PlayerLyricsDelegate$fun loadLyricsForCurrentTrack()</ID>
+    <ID>CyclomaticComplexMethod:PlayerScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PlayerScreen( viewModel: PlayerViewModel, onCollapse: () -&gt; Unit = {} )</ID>
+    <ID>CyclomaticComplexMethod:PlayerTranslationDelegate.kt$PlayerTranslationDelegate$fun loadOrFetchTranslations(targetRjid: String? = getCurrentRjId(), forceOnline: Boolean = false)</ID>
+    <ID>CyclomaticComplexMethod:PlayerViewModel.kt$PlayerViewModel$fun linkRjCode(currentRjid: String, targetRjInput: String, onResult: (Boolean, String?) -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:PlayerViewModel.kt$PlayerViewModel$fun loadChaptersForCurrentTrack(targetRjid: String? = _currentRjId.value, forceOnline: Boolean = false)</ID>
+    <ID>CyclomaticComplexMethod:PlayerViewModel.kt$PlayerViewModel$fun playLocalTrack(history: HistoryEntity, fullList: List&lt;HistoryEntity&gt; = _playlist.value, startPositionMs: Long = 0L)</ID>
+    <ID>CyclomaticComplexMethod:PlayerViewModel.kt$PlayerViewModel$private fun autoEnrichIncompleteMetadata(items: List&lt;HistoryEntity&gt;)</ID>
+    <ID>CyclomaticComplexMethod:PlayerViewModel.kt$PlayerViewModel$private fun prepareTrackSilently(history: HistoryEntity, fullList: List&lt;HistoryEntity&gt;, startPositionMs: Long)</ID>
+    <ID>CyclomaticComplexMethod:PlaylistScreen.kt$@Composable fun PlaylistScreen( viewModel: PlayerViewModel, onOpenPlayer: () -&gt; Unit, onOpenDrawer: () -&gt; Unit = {}, onViewWorkDetail: (String) -&gt; Unit = {}, modifier: Modifier = Modifier )</ID>
+    <ID>CyclomaticComplexMethod:QueueScreen.kt$@Composable fun QueueScreen( viewModel: QueueViewModel, onOpenDrawer: () -&gt; Unit = {} )</ID>
+    <ID>CyclomaticComplexMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( viewModel: SettingsViewModel, onOpenDrawer: () -&gt; Unit = {} )</ID>
+    <ID>CyclomaticComplexMethod:StorageSyncManager.kt$StorageSyncManager$fun syncStorageWithDatabase(context: Context, force: Boolean = false)</ID>
+    <ID>CyclomaticComplexMethod:StorageSyncManager.kt$StorageSyncManager$private suspend fun fetchAndCacheMetadata( context: Context, dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao, entity: HistoryEntity )</ID>
+    <ID>CyclomaticComplexMethod:StorageSyncManager.kt$StorageSyncManager$private suspend fun scanPhysicalDirectory( context: Context, dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao, rootDir: File, isImported: Boolean )</ID>
+    <ID>CyclomaticComplexMethod:StorageSyncManager.kt$StorageSyncManager$private suspend fun scanSafDirectory( context: Context, dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao, uriString: String )</ID>
+    <ID>CyclomaticComplexMethod:StorageSyncManager.kt$StorageSyncManager$private suspend fun syncMultiTrackFolder( context: Context, dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao, folder: File, audioTracks: List&lt;File&gt;, customRjid: String? = null, linkedRj: String? = null, fallbackCover: File? = null )</ID>
+    <ID>CyclomaticComplexMethod:StorageSyncManager.kt$StorageSyncManager$private suspend fun syncSingleAudioFile( context: Context, dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao, file: File, customRjid: String? = null, linkedRj: String? = null, fallbackCover: File? = null )</ID>
+    <ID>CyclomaticComplexMethod:StorageSyncManager.kt$StorageSyncManager$suspend fun previewImportDirectory(context: Context, uriOrPath: String): ImportPreviewData</ID>
+    <ID>CyclomaticComplexMethod:TrackDiscoveryService.kt$TrackDiscoveryService$fun filterSmartAsmrOneTracks(tree: JSONArray, preferredFormat: String = "auto"): List&lt;TrackInfo&gt;</ID>
+    <ID>CyclomaticComplexMethod:TranslationService.kt$TranslationService$suspend fun translateBatch( texts: List&lt;String&gt;, targetLang: String = "", provider: String = "", isSubtitleMode: Boolean = false ): Map&lt;String, String&gt;</ID>
+    <ID>CyclomaticComplexMethod:TranslationService.kt$TranslationService$suspend fun translateLyricsNaturally( lines: List&lt;String&gt;, targetLang: String, llmUrl: String, llmKey: String, llmModel: String, llmPrompt: String, concurrency: Int = 2, provider: String = "" ): Map&lt;String, String&gt;</ID>
+    <ID>CyclomaticComplexMethod:TranslationService.kt$TranslationService$suspend fun translateText( sourceText: String, targetLang: String = "", provider: String = "" ): String</ID>
+    <ID>CyclomaticComplexMethod:UsbDacManager.kt$UsbDacManager$private suspend fun performDeviceCheckInternal(context: Context)</ID>
+    <ID>EmptyCatchBlock:AudioDownloader.kt$AudioDownloader${}</ID>
+    <ID>EmptyCatchBlock:AudioMerger.kt$AudioMerger${}</ID>
+    <ID>EmptyCatchBlock:AudioStorageHelper.kt$AudioStorageHelper${ }</ID>
+    <ID>EmptyCatchBlock:AudioStorageHelper.kt$AudioStorageHelper${}</ID>
+    <ID>EmptyCatchBlock:AudioTagger.kt$AudioTagger${}</ID>
+    <ID>EmptyCatchBlock:ChapterDiscoveryService.kt$ChapterDiscoveryService${ }</ID>
+    <ID>EmptyCatchBlock:ChapterDiscoveryService.kt$ChapterDiscoveryService${}</ID>
+    <ID>EmptyCatchBlock:DownloadStorageSettingsScreen.kt${ }</ID>
+    <ID>EmptyCatchBlock:PlayerViewModel.kt$PlayerViewModel${ }</ID>
+    <ID>EmptyCatchBlock:PlayerViewModel.kt$PlayerViewModel${}</ID>
+    <ID>EmptyCatchBlock:QueueViewModel.kt$QueueViewModel${ }</ID>
+    <ID>EmptyCatchBlock:SettingsScreen.kt${ }</ID>
+    <ID>EmptyCatchBlock:StorageSyncManager.kt$StorageSyncManager${ }</ID>
+    <ID>EmptyCatchBlock:StorageSyncManager.kt$StorageSyncManager${}</ID>
+    <ID>ExplicitItLambdaParameter:SettingsComponents.kt${ _, it -&gt; it.name }</ID>
+    <ID>ImplicitDefaultLocale:AsmrOneApiService.kt$AsmrOneApiService$String.format("RJ%06d", id)</ID>
+    <ID>ImplicitDefaultLocale:AsmrOneApiService.kt$AsmrOneApiService$String.format("RJ%08d", id)</ID>
+    <ID>ImplicitDefaultLocale:AudioDownloader.kt$AudioDownloader$String.format("%.1f KB", kb)</ID>
+    <ID>ImplicitDefaultLocale:AudioDownloader.kt$AudioDownloader$String.format("%.1f MB", mb)</ID>
+    <ID>ImplicitDefaultLocale:AudioDownloader.kt$AudioDownloader$String.format("%.2f GB", gb)</ID>
+    <ID>ImplicitDefaultLocale:AudioDownloader.kt$AudioDownloader$String.format("%02d:%02d", m, s)</ID>
+    <ID>ImplicitDefaultLocale:PlayerControlsSection.kt$String.format("%02d:%02d", m, s)</ID>
+    <ID>LargeClass:AudioStorageHelper.kt$AudioStorageHelper</ID>
+    <ID>LargeClass:PlayerViewModel.kt$PlayerViewModel : AndroidViewModel</ID>
+    <ID>LargeClass:PreferencesManager.kt$PreferencesManager</ID>
+    <ID>LargeClass:StorageSyncManager.kt$StorageSyncManager</ID>
+    <ID>LargeClass:TagLocalizer.kt$TagLocalizer</ID>
+    <ID>LargeClass:TranslationService.kt$TranslationService</ID>
+    <ID>LongMethod:AppearanceThemeSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AppearanceThemeSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:AsmrOneBrowseScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AsmrOneBrowseScreen( viewModel: AsmrOneBrowseViewModel, playerViewModel: PlayerViewModel, onOpenDrawer: () -&gt; Unit, onOpenPlayer: () -&gt; Unit = {}, onSelectWorkForDownload: (String) -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:AsmrOneWorkCards.kt$@Composable fun AsmrOneWorkCard( work: AsmrOneWork, displayTitle: String, isDownloaded: Boolean, isSavedToPlaylist: Boolean, showCardCircle: Boolean, showCardSubtitle: Boolean, showCardAgeRating: Boolean, showCardReleaseDate: Boolean, showCardRating: Boolean = false, showCardPrice: Boolean = false, showCardSales: Boolean = false, onCopyRj: () -&gt; Unit, onDownloadClick: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit, onCardClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:AsmrOneWorkCards.kt$@Composable fun AsmrOneWorkListItem( work: AsmrOneWork, displayTitle: String, isDownloaded: Boolean, isSavedToPlaylist: Boolean, showCardCircle: Boolean, showCardReleaseDate: Boolean, showCardSubtitle: Boolean = true, showCardAgeRating: Boolean = true, showCardRating: Boolean = false, showCardPrice: Boolean = false, showCardSales: Boolean = false, onCopyRj: () -&gt; Unit, onDownloadClick: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit, onCardClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:AsmrOneWorkDetailScreen.kt$@OptIn(ExperimentalLayoutApi::class) @Composable fun AsmrOneWorkDetailScreen( work: AsmrOneWork, fileTree: List&lt;AsmrOneFileNode&gt;, audioTracks: List&lt;AsmrOneTrack&gt;, isLoadingFiles: Boolean, playerViewModel: PlayerViewModel, showRating: Boolean = false, showPrice: Boolean = false, showDuration: Boolean = true, showSales: Boolean = false, showReleaseDate: Boolean = true, showTranslateBtn: Boolean = true, showSubtitle: Boolean = true, showAgeRating: Boolean = true, onBack: () -&gt; Unit, onOpenPlayer: () -&gt; Unit = {}, onDownload: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:AudioDownloader.kt$AudioDownloader$private suspend fun downloadHlsStream( m3u8Url: String, destFile: File, tempDir: File, parallelConnections: Int, referer: String? = null, onProgress: (progress: Float, speedStr: String, etaStr: String, downloadedStr: String, totalStr: String) -&gt; Unit, onLog: (String) -&gt; Unit ): Boolean</ID>
+    <ID>LongMethod:AudioFormatSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AudioFormatSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:BlockedItemsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun BlockedItemsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:ChangelogSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ChangelogSettingsScreen( onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:ChapterDiscoveryService.kt$ChapterDiscoveryService$suspend fun fetchJapaneseAsmrChapters(rjIdOrUrl: String): List&lt;ChapterItem&gt;</ID>
+    <ID>LongMethod:ChapterDiscoveryService.kt$ChapterDiscoveryService$suspend fun generateChapters( trackFiles: List&lt;File&gt;, trackNames: List&lt;String&gt;? = null, rjId: String? = null ): List&lt;ChapterItem&gt;</ID>
+    <ID>LongMethod:DLsiteScraper.kt$DLsiteScraper$suspend fun fetchMetadata(rawRjId: String): AsmrWork</ID>
+    <ID>LongMethod:DownloadService.kt$DownloadService$private suspend fun processQueue()</ID>
+    <ID>LongMethod:DownloadStorageSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DownloadStorageSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:FileTreeComponents.kt$@Composable fun FileTreeNodeItem( node: AsmrOneFileNode, fallbackAudioTracks: List&lt;AsmrOneTrack&gt;, work: AsmrOneWork, playerViewModel: PlayerViewModel, autoExpandedFolders: Set&lt;String&gt;, translatedTitles: Map&lt;String, String&gt;, isTranslationActive: Boolean, onOpenPlayer: () -&gt; Unit = {}, depth: Int = 0, parentFolderTracks: List&lt;AsmrOneTrack&gt;? = null, onTranslateNodes: (List&lt;String&gt;) -&gt; Unit = {} )</ID>
+    <ID>LongMethod:FloatingLyricsBar.kt$@Composable fun FloatingLyricsBar( viewModel: PlayerViewModel, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:FloatingLyricsSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun FloatingLyricsSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:HistoryScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun HistoryScreen( viewModel: HistoryViewModel, onPlayTrack: (HistoryEntity) -&gt; Unit, onRedownload: (HistoryEntity) -&gt; Unit, onOpenDrawer: () -&gt; Unit = {} )</ID>
+    <ID>LongMethod:LLMSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun LLMSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:LanguageAndTranslationSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun LanguageAndTranslationSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:LocalWorkCards.kt$@Composable fun LocalWorkListViewItem( modifier: Modifier = Modifier, item: HistoryEntity, displayTitle: String = item.title, isCurrentTrack: Boolean, isPlaying: Boolean, isInPlaylist: Boolean = false, onClick: (HistoryEntity) -&gt; Unit, onMoveFolder: () -&gt; Unit, onCopyRj: () -&gt; Unit, onAudioInfo: () -&gt; Unit, onDelete: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit = {}, onViewDetail: (() -&gt; Unit)? = null, onLinkRj: (() -&gt; Unit)? = null, showCardCircle: Boolean = true, showCardSubtitle: Boolean = true, showCardAgeRating: Boolean = true, showCardReleaseDate: Boolean = true )</ID>
+    <ID>LongMethod:LocalWorkCards.kt$@Composable fun LocalWorkPinterestCard( item: HistoryEntity, displayTitle: String = item.title, isCurrentTrack: Boolean, isPlaying: Boolean, isInPlaylist: Boolean = false, onClick: () -&gt; Unit, onMoveFolder: () -&gt; Unit, onCopyRj: () -&gt; Unit, onAudioInfo: () -&gt; Unit, onDelete: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit = {}, onViewDetail: (() -&gt; Unit)? = null, onLinkRj: (() -&gt; Unit)? = null, showCardCircle: Boolean = true, showCardSubtitle: Boolean = true, showCardAgeRating: Boolean = true, showCardReleaseDate: Boolean = true, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:MainActivity.kt$MainActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
+    <ID>LongMethod:MiniPlayer.kt$@Composable fun MiniPlayer( viewModel: PlayerViewModel, onExpand: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:PaginationBar.kt$@Composable fun PaginationBar( currentPage: Int, totalPages: Int, totalCount: Int = 0, onPageSelected: (Int) -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:PlayerButtonsSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PlayerButtonsSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:PlayerControlsSection.kt$@Composable fun PlayerControlsSection( currentRjId: String?, isPlaying: Boolean, effectivePosition: Long, duration: Long, showRemainingTime: Boolean, onToggleRemainingTime: () -&gt; Unit, onSliderDrag: (Long) -&gt; Unit, onSliderDragFinished: () -&gt; Unit, chapters: List&lt;ChapterItem&gt;, isLoadingChapters: Boolean, activeChapterIndex: Int, activeChapter: ChapterItem?, translatedChapters: List&lt;ChapterItem&gt;, isTranslationActive: Boolean, isTranslating: Boolean, dacState: UsbDacInfo, audioSpecs: String, playerButtonOrder: String, repeatMode: Int, sleepTimerRemainingMs: Long?, isOnlineStreaming: Boolean, shuffleMode: Boolean, playbackSpeed: Float, onOpenChapterSheet: () -&gt; Unit, onOpenSleepTimerSheet: () -&gt; Unit, onOpenSpeedDialog: () -&gt; Unit, onOpenAudioGainDialog: () -&gt; Unit, onOpenPlaylistPickerSheet: () -&gt; Unit, onOpenLinkRjDialog: () -&gt; Unit, onOpenCoverPickerSheet: () -&gt; Unit, onToggleTranslation: () -&gt; Unit, onCycleRepeatMode: () -&gt; Unit, onToggleShuffleMode: () -&gt; Unit, onPlayPrevious: () -&gt; Unit, onReplay10: () -&gt; Unit, onTogglePlayPause: () -&gt; Unit, onForward10: () -&gt; Unit, onPlayNext: () -&gt; Unit )</ID>
+    <ID>LongMethod:PlayerCoverLyricsPanel.kt$@Composable fun PlayerCoverLyricsPanel( currentCoverUrl: String?, lyrics: List&lt;LyricLine&gt;, activeLyricIndex: Int, availableSubtitles: List&lt;SubtitleSource&gt;, selectedSubtitleSource: SubtitleSource?, isLyricsTranslated: Boolean, isTranslatingLyrics: Boolean, showLyricsView: Boolean, onShowLyricsViewChange: (Boolean) -&gt; Unit, onOpenSubtitlePicker: () -&gt; Unit, onToggleLyricsTranslation: () -&gt; Unit, onSeekToLyricLine: (LyricLine) -&gt; Unit, privacyEnabled: Boolean, privacyBlurInApp: Boolean, temporaryUnblur: Boolean, onTemporaryUnblurChange: (Boolean) -&gt; Unit )</ID>
+    <ID>LongMethod:PlayerLyricsDelegate.kt$PlayerLyricsDelegate$fun loadLyricsForCurrentTrack()</ID>
+    <ID>LongMethod:PlayerScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PlayerScreen( viewModel: PlayerViewModel, onCollapse: () -&gt; Unit = {} )</ID>
+    <ID>LongMethod:PlayerSheetsAndDialogs.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PlayerChapterSheet( chapters: List&lt;ChapterItem&gt;, translatedChapters: List&lt;ChapterItem&gt;, activeChapterIndex: Int, isLoadingChapters: Boolean, isTranslationActive: Boolean, isTranslating: Boolean, sheetNestedScroll: NestedScrollConnection, scope: CoroutineScope, viewModel: PlayerViewModel, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:PlayerSheetsAndDialogs.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PlayerCoverPickerSheet( rjid: String, currentCoverUrl: String?, playlist: List&lt;HistoryEntity&gt;, viewModel: PlayerViewModel, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:PlayerSheetsAndDialogs.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PlayerSleepTimerSheet( sleepTimerRemainingMs: Long?, draftTimerMinutes: Int, onDraftTimerMinutesChange: (Int) -&gt; Unit, viewModel: PlayerViewModel, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:PlayerViewModel.kt$PlayerViewModel$fun loadChaptersForCurrentTrack(targetRjid: String? = _currentRjId.value, forceOnline: Boolean = false)</ID>
+    <ID>LongMethod:PlayerViewModel.kt$PlayerViewModel$fun playLocalTrack(history: HistoryEntity, fullList: List&lt;HistoryEntity&gt; = _playlist.value, startPositionMs: Long = 0L)</ID>
+    <ID>LongMethod:PlaylistCards.kt$@Composable fun PlaylistItemCard( modifier: Modifier = Modifier, item: HistoryEntity, isCurrentTrack: Boolean, isPlaying: Boolean, isDragged: Boolean, dragOffsetY: Float, onDragStart: (String) -&gt; Unit, onDrag: (Float) -&gt; Unit, onDragEnd: () -&gt; Unit, onClick: (HistoryEntity) -&gt; Unit, onMoveFolder: () -&gt; Unit, onCopyRj: () -&gt; Unit, onAudioInfo: () -&gt; Unit, onDelete: () -&gt; Unit )</ID>
+    <ID>LongMethod:PlaylistCards.kt$@Composable fun PlaylistItemGridCard( item: PlaylistItemEntity, displayTitle: String = item.title, isCurrentTrack: Boolean = false, isOffline: Boolean = false, onClick: () -&gt; Unit, onRemove: () -&gt; Unit, onCopyRj: () -&gt; Unit, onViewDetail: () -&gt; Unit = {}, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:PlaylistExplorerSection.kt$@Composable private fun FolderThumbnailPreviewBox( coverUrls: List&lt;String&gt;, compact: Boolean = false, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:PlaylistScreen.kt$@Composable fun PlaylistScreen( viewModel: PlayerViewModel, onOpenPlayer: () -&gt; Unit, onOpenDrawer: () -&gt; Unit = {}, onViewWorkDetail: (String) -&gt; Unit = {}, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:PlaylistSelectionSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PlaylistSelectionSheet( workRjid: String, workTitle: String, coverUrl: String = "", circle: String = "-", cv: String = "-", playerViewModel: PlayerViewModel, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:PrivacyModeSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun PrivacyModeSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:QueueScreen.kt$@Composable fun QueueItemCard( item: DownloadQueueItem, onDismiss: () -&gt; Unit, onCancel: () -&gt; Unit = {} )</ID>
+    <ID>LongMethod:QueueScreen.kt$@Composable fun QueueScreen( viewModel: QueueViewModel, onOpenDrawer: () -&gt; Unit = {} )</ID>
+    <ID>LongMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( viewModel: SettingsViewModel, onOpenDrawer: () -&gt; Unit = {} )</ID>
+    <ID>LongMethod:TagFilterSheet.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun TagFilterSheet( availableTags: List&lt;String&gt;? = null, initialSelectedTags: Set&lt;String&gt; = emptySet(), onApplyTags: (Set&lt;String&gt;) -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:TranslationService.kt$TranslationService$suspend fun translateBatch( texts: List&lt;String&gt;, targetLang: String = "", provider: String = "", isSubtitleMode: Boolean = false ): Map&lt;String, String&gt;</ID>
+    <ID>LongMethod:UiSettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun UiSettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit, onNavigateToPlayerButtons: () -&gt; Unit, onNavigateToWorkCard: () -&gt; Unit, onNavigateToWorkDetail: () -&gt; Unit )</ID>
+    <ID>LongMethod:UsbDacManager.kt$UsbDacManager$private suspend fun performDeviceCheckInternal(context: Context)</ID>
+    <ID>LongMethod:WorkCardDisplaySettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun WorkCardDisplaySettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongMethod:WorkDetailDisplaySettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun WorkDetailDisplaySettingsScreen( viewModel: SettingsViewModel, onBack: () -&gt; Unit )</ID>
+    <ID>LongParameterList:AsmrOneWorkCards.kt$( work: AsmrOneWork, displayTitle: String, isDownloaded: Boolean, isSavedToPlaylist: Boolean, showCardCircle: Boolean, showCardReleaseDate: Boolean, showCardSubtitle: Boolean = true, showCardAgeRating: Boolean = true, showCardRating: Boolean = false, showCardPrice: Boolean = false, showCardSales: Boolean = false, onCopyRj: () -&gt; Unit, onDownloadClick: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit, onCardClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongParameterList:AsmrOneWorkCards.kt$( work: AsmrOneWork, displayTitle: String, isDownloaded: Boolean, isSavedToPlaylist: Boolean, showCardCircle: Boolean, showCardSubtitle: Boolean, showCardAgeRating: Boolean, showCardReleaseDate: Boolean, showCardRating: Boolean = false, showCardPrice: Boolean = false, showCardSales: Boolean = false, onCopyRj: () -&gt; Unit, onDownloadClick: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit, onCardClick: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongParameterList:AsmrOneWorkDetailScreen.kt$( work: AsmrOneWork, fileTree: List&lt;AsmrOneFileNode&gt;, audioTracks: List&lt;AsmrOneTrack&gt;, isLoadingFiles: Boolean, playerViewModel: PlayerViewModel, showRating: Boolean = false, showPrice: Boolean = false, showDuration: Boolean = true, showSales: Boolean = false, showReleaseDate: Boolean = true, showTranslateBtn: Boolean = true, showSubtitle: Boolean = true, showAgeRating: Boolean = true, onBack: () -&gt; Unit, onOpenPlayer: () -&gt; Unit = {}, onDownload: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongParameterList:FileTreeComponents.kt$( node: AsmrOneFileNode, fallbackAudioTracks: List&lt;AsmrOneTrack&gt;, work: AsmrOneWork, playerViewModel: PlayerViewModel, autoExpandedFolders: Set&lt;String&gt;, translatedTitles: Map&lt;String, String&gt;, isTranslationActive: Boolean, onOpenPlayer: () -&gt; Unit = {}, depth: Int = 0, parentFolderTracks: List&lt;AsmrOneTrack&gt;? = null, onTranslateNodes: (List&lt;String&gt;) -&gt; Unit = {} )</ID>
+    <ID>LongParameterList:LocalWorkCards.kt$( item: HistoryEntity, displayTitle: String = item.title, isCurrentTrack: Boolean, isPlaying: Boolean, isInPlaylist: Boolean = false, onClick: () -&gt; Unit, onMoveFolder: () -&gt; Unit, onCopyRj: () -&gt; Unit, onAudioInfo: () -&gt; Unit, onDelete: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit = {}, onViewDetail: (() -&gt; Unit)? = null, onLinkRj: (() -&gt; Unit)? = null, showCardCircle: Boolean = true, showCardSubtitle: Boolean = true, showCardAgeRating: Boolean = true, showCardReleaseDate: Boolean = true, modifier: Modifier = Modifier )</ID>
+    <ID>LongParameterList:LocalWorkCards.kt$( modifier: Modifier = Modifier, item: HistoryEntity, displayTitle: String = item.title, isCurrentTrack: Boolean, isPlaying: Boolean, isInPlaylist: Boolean = false, onClick: (HistoryEntity) -&gt; Unit, onMoveFolder: () -&gt; Unit, onCopyRj: () -&gt; Unit, onAudioInfo: () -&gt; Unit, onDelete: () -&gt; Unit, onAddToPlaylist: () -&gt; Unit = {}, onViewDetail: (() -&gt; Unit)? = null, onLinkRj: (() -&gt; Unit)? = null, showCardCircle: Boolean = true, showCardSubtitle: Boolean = true, showCardAgeRating: Boolean = true, showCardReleaseDate: Boolean = true )</ID>
+    <ID>LongParameterList:PlayerControlsSection.kt$( currentRjId: String?, isPlaying: Boolean, effectivePosition: Long, duration: Long, showRemainingTime: Boolean, onToggleRemainingTime: () -&gt; Unit, onSliderDrag: (Long) -&gt; Unit, onSliderDragFinished: () -&gt; Unit, chapters: List&lt;ChapterItem&gt;, isLoadingChapters: Boolean, activeChapterIndex: Int, activeChapter: ChapterItem?, translatedChapters: List&lt;ChapterItem&gt;, isTranslationActive: Boolean, isTranslating: Boolean, dacState: UsbDacInfo, audioSpecs: String, playerButtonOrder: String, repeatMode: Int, sleepTimerRemainingMs: Long?, isOnlineStreaming: Boolean, shuffleMode: Boolean, playbackSpeed: Float, onOpenChapterSheet: () -&gt; Unit, onOpenSleepTimerSheet: () -&gt; Unit, onOpenSpeedDialog: () -&gt; Unit, onOpenAudioGainDialog: () -&gt; Unit, onOpenPlaylistPickerSheet: () -&gt; Unit, onOpenLinkRjDialog: () -&gt; Unit, onOpenCoverPickerSheet: () -&gt; Unit, onToggleTranslation: () -&gt; Unit, onCycleRepeatMode: () -&gt; Unit, onToggleShuffleMode: () -&gt; Unit, onPlayPrevious: () -&gt; Unit, onReplay10: () -&gt; Unit, onTogglePlayPause: () -&gt; Unit, onForward10: () -&gt; Unit, onPlayNext: () -&gt; Unit )</ID>
+    <ID>LongParameterList:PlayerCoverLyricsPanel.kt$( currentCoverUrl: String?, lyrics: List&lt;LyricLine&gt;, activeLyricIndex: Int, availableSubtitles: List&lt;SubtitleSource&gt;, selectedSubtitleSource: SubtitleSource?, isLyricsTranslated: Boolean, isTranslatingLyrics: Boolean, showLyricsView: Boolean, onShowLyricsViewChange: (Boolean) -&gt; Unit, onOpenSubtitlePicker: () -&gt; Unit, onToggleLyricsTranslation: () -&gt; Unit, onSeekToLyricLine: (LyricLine) -&gt; Unit, privacyEnabled: Boolean, privacyBlurInApp: Boolean, temporaryUnblur: Boolean, onTemporaryUnblurChange: (Boolean) -&gt; Unit )</ID>
+    <ID>LongParameterList:PlayerLyricsDelegate.kt$PlayerLyricsDelegate$( private val appContext: Context, private val scope: CoroutineScope, private val prefs: PreferencesManager, private val historyDao: HistoryDao, private val getPlayer: () -&gt; Player?, private val getCurrentRjId: () -&gt; String?, private val getCurrentTitle: () -&gt; String, private val getCurrentChapters: () -&gt; List&lt;ChapterItem&gt;, private val getIsOnlineStreaming: () -&gt; Boolean, private val getIsVirtualAlbum: () -&gt; Boolean, private val getCurrentStreamTrackTitle: () -&gt; String?, private val setCurrentStreamTrackTitle: (String) -&gt; Unit, private val getCurrentAlbumHistory: () -&gt; HistoryEntity? )</ID>
+    <ID>LongParameterList:PlayerSheetsAndDialogs.kt$( chapters: List&lt;ChapterItem&gt;, translatedChapters: List&lt;ChapterItem&gt;, activeChapterIndex: Int, isLoadingChapters: Boolean, isTranslationActive: Boolean, isTranslating: Boolean, sheetNestedScroll: NestedScrollConnection, scope: CoroutineScope, viewModel: PlayerViewModel, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongParameterList:PlayerTranslationDelegate.kt$PlayerTranslationDelegate$( private val appContext: Context, private val scope: CoroutineScope, private val prefs: PreferencesManager, private val sp: SharedPreferences, private val historyDao: HistoryDao, private val getCurrentRjId: () -&gt; String?, private val getCurrentTitle: () -&gt; String, private val getCurrentChapters: () -&gt; List&lt;ChapterItem&gt;, private val getIsOnlineStreaming: () -&gt; Boolean, private val onClearPlaylistEntityTranslations: () -&gt; Unit )</ID>
+    <ID>LongParameterList:PlaylistCards.kt$( modifier: Modifier = Modifier, item: HistoryEntity, isCurrentTrack: Boolean, isPlaying: Boolean, isDragged: Boolean, dragOffsetY: Float, onDragStart: (String) -&gt; Unit, onDrag: (Float) -&gt; Unit, onDragEnd: () -&gt; Unit, onClick: (HistoryEntity) -&gt; Unit, onMoveFolder: () -&gt; Unit, onCopyRj: () -&gt; Unit, onAudioInfo: () -&gt; Unit, onDelete: () -&gt; Unit )</ID>
+    <ID>LoopWithTooManyJumpStatements:AudioDownloader.kt$AudioDownloader$while</ID>
+    <ID>LoopWithTooManyJumpStatements:DLsiteScraper.kt$DLsiteScraper$for</ID>
+    <ID>LoopWithTooManyJumpStatements:DownloadService.kt$DownloadService$for</ID>
+    <ID>LoopWithTooManyJumpStatements:DownloadService.kt$DownloadService$while</ID>
+    <ID>LoopWithTooManyJumpStatements:LyricsParser.kt$LyricsParser$for</ID>
+    <ID>LoopWithTooManyJumpStatements:PlayerViewModel.kt$PlayerViewModel$for</ID>
+    <ID>LoopWithTooManyJumpStatements:QueueViewModel.kt$QueueViewModel$for</ID>
+    <ID>LoopWithTooManyJumpStatements:StorageSyncManager.kt$StorageSyncManager$for</ID>
+    <ID>LoopWithTooManyJumpStatements:StorageSyncManager.kt$StorageSyncManager$while</ID>
+    <ID>LoopWithTooManyJumpStatements:TrackDiscoveryService.kt$TrackDiscoveryService$while</ID>
+    <ID>MatchingDeclarationName:BottomNavBar.kt$NavTab</ID>
+    <ID>MatchingDeclarationName:PlaylistExplorerSection.kt$ExplorerFolderEntry</ID>
+    <ID>MatchingDeclarationName:SettingsScreen.kt$SettingsSubScreen</ID>
+    <ID>MatchingDeclarationName:SortOptionsSheet.kt$SortOptionItem&lt;T&gt;</ID>
+    <ID>MaxLineLength:AsmrOneApiService.kt$AsmrOneApiService$(lowerPath.contains("seあり") || lowerPath.contains("se有り") || lowerPath.contains("se_ari") || lowerPath.contains("se ari") || lowerPath.contains("効果音あり"))</ID>
+    <ID>MaxLineLength:AsmrOneApiService.kt$AsmrOneApiService$if (lowerPath.contains("seなし") || lowerPath.contains("se無し") || lowerPath.contains("se_nashi") || lowerPath.contains("se nashi") || lowerPath.contains("効果音なし") || lowerPath.contains("効果音無") || lowerPath.contains("nose")) score -= 60</ID>
+    <ID>MaxLineLength:AsmrOneApiService.kt$AsmrOneApiService$if (lowerPath.contains("おまけ") || lowerPath.contains("特典") || lowerPath.contains("bonus") || lowerPath.contains("free talk") || lowerPath.contains("フリートーク")) score -= 40</ID>
+    <ID>MaxLineLength:AsmrOneApiService.kt$AsmrOneApiService$private</ID>
+    <ID>MaxLineLength:AsmrOneApiService.kt$AsmrOneApiService$suspend</ID>
+    <ID>MaxLineLength:AsmrOneApiService.kt$AsmrOneApiService$val localized = if (!directEn.isNullOrEmpty()) directEn else com.saymaven.downloader.japaneseasmr.service.TagLocalizer.localize(tagId, rawName)</ID>
+    <ID>MaxLineLength:AsmrOneBrowseViewModel.kt$AsmrOneBrowseViewModel$val audioFormatPriority = prefs.audioFormatPriorityFlow.stateIn(viewModelScope, SharingStarted.Lazily, "mp3_se,mp3,flac,wav,opus,m4a,aac")</ID>
+    <ID>MaxLineLength:AsmrOneWorkDetailScreen.kt$color = if (isFileTreeTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MaxLineLength:AsmrOneWorkDetailScreen.kt$color = if (isFileTreeTranslated) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant</ID>
+    <ID>MaxLineLength:AsmrOneWorkDetailScreen.kt$tint = if (isFileTreeTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MaxLineLength:AsmrOneWorkDetailScreen.kt$tint = if (isTitleTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MaxLineLength:AsmrOneWorkDetailScreen.kt$val map = TranslationService.translateBatch(titlesToTranslate.toList(), targetLangNow, provider)</ID>
+    <ID>MaxLineLength:AudioDownloader.kt$AudioDownloader$if</ID>
+    <ID>MaxLineLength:AudioDownloader.kt$AudioDownloader$onLog(DownloadLogHelper.downloadSegmentProgress(done, totalSegments, (pct * 100).toInt(), downloadedStr, speedStr))</ID>
+    <ID>MaxLineLength:AudioDownloader.kt$AudioDownloader$val etaSec = if (currentRead &gt; 0) ((totalBytes - currentRead) * timeElapsed) / currentRead else 0L</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$Text(stringResource(R.string.settings_speed_max), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$Text(stringResource(R.string.settings_speed_min), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$Text(stringResource(R.string.settings_speed_normal), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$color = if (index == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$leadingContent = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$leadingContent = { Icon(Icons.Default.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$leadingContent = { Icon(Icons.Default.Hearing, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$leadingContent = { Icon(Icons.Default.Restore, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$leadingContent = { Icon(Icons.Default.StayCurrentPortrait, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_audio_focus_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_auto_resume_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_dac_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_keep_screen_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_pause_unplug_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:AudioFormatSettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_skip_silence_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:AudioMerger.kt$AudioMerger$(bytes[i] == 'I'.code.toByte() &amp;&amp; bytes[i + 1] == 'n'.code.toByte() &amp;&amp; bytes[i + 2] == 'f'.code.toByte() &amp;&amp; bytes[i + 3] == 'o'.code.toByte())</ID>
+    <ID>MaxLineLength:AudioMerger.kt$AudioMerger$if</ID>
+    <ID>MaxLineLength:AudioStorageHelper.kt$AudioStorageHelper$if</ID>
+    <ID>MaxLineLength:AudioStorageHelper.kt$AudioStorageHelper$val</ID>
+    <ID>MaxLineLength:AudioStorageHelperTest.kt$AudioStorageHelperTest$org.junit.Assert.assertFalse("Collection folder with multiple audios is not dedicated", AudioStorageHelper.isDedicatedSingleWorkFolder(multiFolder))</ID>
+    <ID>MaxLineLength:AudioStorageHelperTest.kt$AudioStorageHelperTest$org.junit.Assert.assertFalse(AudioStorageHelper.isMismatchedFolderCover(audio1, "https://img.dlsite.jp/modpub/images2/work/doujin/RJ01080000/RJ01081584_img_main.jpg", "RJ01081584"))</ID>
+    <ID>MaxLineLength:ChapterDiscoveryService.kt$ChapterDiscoveryService$val pDuration = Pattern.compile("(?:\r?\n|^)\\s*(\\d{1,2}\\s+[^\\s\\d][^\\n\\r\\t]{1,60}?)\\s+(\\d{1,2}:\\d{2})(?=\\s|$)")</ID>
+    <ID>MaxLineLength:DownloadService.kt$DownloadService$"in" -&gt; "[!] Format ${sourceExtension.uppercase()} tidak mendukung penggabungan instan tanpa kompresi ulang. Mengunduh secara aman sebagai struktur folder asli."</ID>
+    <ID>MaxLineLength:DownloadService.kt$DownloadService$else -&gt; "[!] Format ${sourceExtension.uppercase()} does not support instant remuxing without re-encoding. Downloading safely as original folder structure."</ID>
+    <ID>MaxLineLength:DownloadService.kt$DownloadService$statusText = DownloadLogHelper.statusDownloadingTrack(track.name, tIdx + 1, tracks.size, (pct * 100).toInt())</ID>
+    <ID>MaxLineLength:DownloadService.kt$DownloadService$val resolvedAgeRating = if (scraped.ageRating.isNotBlank() &amp;&amp; scraped.ageRating != "-") scraped.ageRating else (qItem?.ageRating?.takeIf { it.isNotBlank() &amp;&amp; it != "-" } ?: scraped.ageRating)</ID>
+    <ID>MaxLineLength:DownloadService.kt$DownloadService$val resolvedCircle = if (scraped.circle.isNotBlank() &amp;&amp; scraped.circle != "-") scraped.circle else (qItem?.circle?.takeIf { it.isNotBlank() &amp;&amp; it != "-" } ?: scraped.circle)</ID>
+    <ID>MaxLineLength:DownloadService.kt$DownloadService$val resolvedCv = if (scraped.cv.isNotBlank() &amp;&amp; scraped.cv != "-") scraped.cv else (qItem?.cv?.takeIf { it.isNotBlank() &amp;&amp; it != "-" } ?: scraped.cv)</ID>
+    <ID>MaxLineLength:DownloadService.kt$DownloadService$val resolvedGenre = if (scraped.genre.isNotBlank() &amp;&amp; scraped.genre != "-") scraped.genre else (qItem?.genre?.takeIf { it.isNotBlank() &amp;&amp; it != "-" } ?: scraped.genre)</ID>
+    <ID>MaxLineLength:DownloadService.kt$DownloadService$val resolvedTitle = if (scraped.title.isNotBlank() &amp;&amp; scraped.title != itemRjid) scraped.title else (qItem?.title?.takeIf { it.isNotBlank() } ?: scraped.title)</ID>
+    <ID>MaxLineLength:FileTreeComponents.kt$if</ID>
+    <ID>MaxLineLength:FileTreeComponents.kt$if (full.contains("seなし") || full.contains("se無し") || full.contains("se_nashi") || full.contains("se nashi") || full.contains("効果音なし") || full.contains("効果音無") || full.contains("nose")) s -= 60</ID>
+    <ID>MaxLineLength:FileTreeComponents.kt$if (full.contains("おまけ") || full.contains("特典") || full.contains("bonus") || full.contains("free talk") || full.contains("フリートーク")) s -= 40</ID>
+    <ID>MaxLineLength:FloatingLyricsSettingsScreen.kt$headlineContent = { Text(stringResource(R.string.settings_floating_lyrics_enable), fontWeight = FontWeight.SemiBold) }</ID>
+    <ID>MaxLineLength:FloatingLyricsSettingsScreen.kt$headlineContent = { Text(stringResource(R.string.settings_floating_lyrics_lock), fontWeight = FontWeight.SemiBold) }</ID>
+    <ID>MaxLineLength:FloatingLyricsSettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_floating_lyrics_enable_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:FloatingLyricsSettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_floating_lyrics_lock_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:FloatingLyricsSettingsScreen.kt$text = stringResource(R.string.settings_floating_lyrics_opacity, String.format(Locale.US, "%d%%", (draftOpacity * 100).toInt()))</ID>
+    <ID>MaxLineLength:HistoryDao.kt$HistoryDao$@Query("SELECT * FROM history_table WHERE rjid LIKE '%' || :query || '%' OR title LIKE '%' || :query || '%' OR cv LIKE '%' || :query || '%' OR circle LIKE '%' || :query || '%' ORDER BY downloadDate DESC")</ID>
+    <ID>MaxLineLength:HistoryDao.kt$HistoryDao$@Query("UPDATE history_table SET translatedTitle = :translatedTitle, translatedChaptersJson = :translatedChaptersJson WHERE rjid = :rjid")</ID>
+    <ID>MaxLineLength:HistoryScreen.kt$Toast.makeText(context, context.getString(R.string.history_toast_missing_cleaned), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:HistoryScreen.kt$color = if (item.isPresent) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)</ID>
+    <ID>MaxLineLength:HistoryScreen.kt$containerColor = if (item.isPresent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)</ID>
+    <ID>MaxLineLength:HistoryScreen.kt$imageVector = if (sortOrder == HistorySortOrder.TITLE_DESC) Icons.Default.ArrowUpward else Icons.Default.SortByAlpha</ID>
+    <ID>MaxLineLength:HistoryScreen.kt$leadingIcon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error) }</ID>
+    <ID>MaxLineLength:HistoryScreen.kt$text = if (item.isPresent) "${item.downloadDate} \u2022 ${item.fileSize}" else stringResource(R.string.history_status_missing)</ID>
+    <ID>MaxLineLength:HistoryScreen.kt$text = if (searchQuery.isBlank()) stringResource(R.string.history_empty_title) else stringResource(R.string.history_no_matching_works)</ID>
+    <ID>MaxLineLength:HistoryScreen.kt$text = if (sortOrder == HistorySortOrder.DATE_ASC) stringResource(R.string.history_sort_date_asc) else stringResource(R.string.history_sort_date_desc)</ID>
+    <ID>MaxLineLength:HistoryScreen.kt$text = if (sortOrder == HistorySortOrder.TITLE_DESC) stringResource(R.string.history_sort_title_desc) else stringResource(R.string.history_sort_title_asc)</ID>
+    <ID>MaxLineLength:HistoryViewModel.kt$HistoryViewModel$val localCover = customCover ?: AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, item.localFilePath)?.absolutePath</ID>
+    <ID>MaxLineLength:LLMSettingsScreen.kt$text = "Setel slider ke 1-2 jika menggunakan API Key gratis (Free Tier) agar tidak terkena batas request per menit (HTTP 429). Gunakan 3-5 jika menggunakan akun API berbayar dengan batas request tinggi."</ID>
+    <ID>MaxLineLength:LLMSettingsScreen.kt$text = "Untuk audio drama erotis (R-18), model seperti DeepSeek sangat direkomendasikan karena tidak menolak dialog intim. Jika provider LLM menolak teks karena filter keamanan, aplikasi otomatis mengalihkan terjemahan ke Google Translate tanpa error."</ID>
+    <ID>MaxLineLength:LocalWorkCards.kt$(!item.chaptersJson.isNullOrBlank() &amp;&amp; (item.chaptersJson.contains(".vtt") || item.chaptersJson.contains(".lrc") || item.chaptersJson.contains(".srt")))</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$Toast.makeText(this@MainActivity, getString(R.string.player_toast_download_enqueued, historyEntity.rjid), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$Toast.makeText(this@MainActivity, getString(R.string.player_toast_download_starting, historyEntity.rjid), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$text = androidx.compose.ui.res.stringResource(com.saymaven.downloader.japaneseasmr.R.string.network_offline_banner)</ID>
+    <ID>MaxLineLength:MiniPlayer.kt$if (currentArtist.isNotBlank() &amp;&amp; currentArtist != "-") "$currentStreamTrackTitle • CV: $currentArtist" else currentStreamTrackTitle!!</ID>
+    <ID>MaxLineLength:MiniPlayer.kt$if (currentArtist.isNotBlank() &amp;&amp; currentArtist != "-") "CV: $currentArtist" else stringResource(R.string.player_audio_player)</ID>
+    <ID>MaxLineLength:PaginationBar.kt$color = if (canNext) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)</ID>
+    <ID>MaxLineLength:PaginationBar.kt$color = if (canNext) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)</ID>
+    <ID>MaxLineLength:PaginationBar.kt$color = if (canPrev) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)</ID>
+    <ID>MaxLineLength:PaginationBar.kt$color = if (canPrev) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)</ID>
+    <ID>MaxLineLength:PaginationBar.kt$tint = if (canNext) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)</ID>
+    <ID>MaxLineLength:PaginationBar.kt$tint = if (canPrev) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)</ID>
+    <ID>MaxLineLength:PlayerButtonsSettingsScreen.kt$color = if (isMainBar) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MaxLineLength:PlayerButtonsSettingsScreen.kt$text = if (isMainBar) stringResource(R.string.settings_player_buttons_row1) else stringResource(R.string.settings_player_buttons_backup)</ID>
+    <ID>MaxLineLength:PlayerControlsSection.kt$border = if (isTranslationActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)) else null</ID>
+    <ID>MaxLineLength:PlayerControlsSection.kt$contentDescription = if (isPlaying) stringResource(R.string.player_action_pause) else stringResource(R.string.player_action_play)</ID>
+    <ID>MaxLineLength:PlayerControlsSection.kt$text = if (showRemainingTime) "-${formatDuration((duration - effectivePosition).coerceAtLeast(0L))}" else formatDuration(duration)</ID>
+    <ID>MaxLineLength:PlayerControlsSection.kt$tint = if (chapters.isNotEmpty()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)</ID>
+    <ID>MaxLineLength:PlayerControlsSection.kt$tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)</ID>
+    <ID>MaxLineLength:PlayerControlsSection.kt$tint = if (playbackSpeed != 1.0f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)</ID>
+    <ID>MaxLineLength:PlayerControlsSection.kt$tint = if (sleepTimerRemainingMs != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)</ID>
+    <ID>MaxLineLength:PlayerCoverLyricsPanel.kt$color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)</ID>
+    <ID>MaxLineLength:PlayerCoverLyricsPanel.kt$color = if (isActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)</ID>
+    <ID>MaxLineLength:PlayerCoverLyricsPanel.kt$tint = if (isLyricsTranslated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MaxLineLength:PlayerLyricsDelegate.kt$PlayerLyricsDelegate$!resolvedHistory?.localFilePath.isNullOrBlank() &amp;&amp; File(resolvedHistory!!.localFilePath).exists() -&gt; File(resolvedHistory.localFilePath)</ID>
+    <ID>MaxLineLength:PlayerScreen.kt$if</ID>
+    <ID>MaxLineLength:PlayerScreen.kt$val cleanTranslatedTitle = if (shouldMask) null else translatedTitle?.replace(Regex("^\\[(?:RJ|VJ|BJ)?\\d+\\]\\s*"), "")?.trim()</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$Text(stringResource(R.string.player_timer_turn_off), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$Toast.makeText(context, context.getString(R.string.player_cover_success_toast), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$Toast.makeText(context, context.getString(R.string.player_link_rj_success_toast, rjOrMsg), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$Toast.makeText(context, context.getString(R.string.player_timer_toast_set, label), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$Toast.makeText(context, rjOrMsg ?: context.getString(R.string.player_link_rj_error_toast, rjInput), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$color = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$if</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$text = if (chapters.isNotEmpty()) stringResource(R.string.player_chapter_detected, chapters.size) else stringResource(R.string.player_chapter_sync)</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$text = stringResource(R.string.player_chapter_duration_format, String.format(Locale.US, "%02d:%02d", m, s))</ID>
+    <ID>MaxLineLength:PlayerSheetsAndDialogs.kt$tint = if (isTranslationActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)</ID>
+    <ID>MaxLineLength:PlayerTranslationDelegate.kt$PlayerTranslationDelegate$!parsedChaps.indices.all { TranslationService.isPoisonedTranslation(currentChaps[it].title, parsedChaps[it].title, targetLang) }</ID>
+    <ID>MaxLineLength:PlayerTranslationDelegate.kt$PlayerTranslationDelegate$i &lt; currentChaps.size &amp;&amp; !TranslationService.isPoisonedTranslation(currentChaps[i].title, translatedChapsList[i].title, targetLang)</ID>
+    <ID>MaxLineLength:PlayerTranslationDelegate.kt$PlayerTranslationDelegate$val hasValidTitle = history != null &amp;&amp; !TranslationService.isPoisonedTranslation(rawTitle, history.translatedTitle, targetLang)</ID>
+    <ID>MaxLineLength:PlayerTranslationDelegate.kt$PlayerTranslationDelegate$val history = if (getIsOnlineStreaming() || forceOnline) null else withContext(Dispatchers.IO) { historyDao.getHistoryById(targetRjid) }</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$_currentStreamTrackTitle.value = initialChapters.getOrNull(initialTrackIdx)?.title ?: tracks.getOrNull(initialTrackIdx)?.nameWithoutExtension</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$ageRating = if (meta.ageRating.isNotBlank() &amp;&amp; meta.ageRating != "-") meta.ageRating else asmrWork.ageRating</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$ageRating = if (meta.ageRating.isNotBlank() &amp;&amp; meta.ageRating != "-") meta.ageRating else history.ageRating</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$chaptersJson = if (obj.has("chaptersJson") &amp;&amp; !obj.isNull("chaptersJson")) obj.optString("chaptersJson") else null</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$circle = if (meta.circle.isNotBlank() &amp;&amp; meta.circle != "-") meta.circle else asmrWork.circle</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$genre = if (meta.genre.isNotBlank() &amp;&amp; meta.genre != "-") meta.genre else asmrWork.tags.joinToString(", ")</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$if</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$private val _audioSpecs = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_specs", "- | - | -") ?: "- | - | -" else "- | - | -")</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$private val _currentTitle = MutableStateFlow(if (isAutoResumeActive) sp.getString("cached_title", "Belum ada lagu yang diputar") ?: "Belum ada lagu yang diputar" else "Belum ada lagu yang diputar")</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$private val _repeatMode = MutableStateFlow(if (isAutoResumeActive) sp.getInt("cached_repeat", Player.REPEAT_MODE_OFF) else Player.REPEAT_MODE_OFF)</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$title = if (meta.title.isNotBlank() &amp;&amp; meta.title != history.linkedRjId) meta.title else asmrWork.title</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$translatedChaptersJson = if (obj.has("translatedChaptersJson") &amp;&amp; !obj.isNull("translatedChaptersJson")) obj.optString("translatedChaptersJson") else null</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$translatedTitle = if (obj.has("translatedTitle") &amp;&amp; !obj.isNull("translatedTitle")) obj.optString("translatedTitle") else null</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$val</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$val downloadDir = if (!customDirStr.isNullOrBlank()) File(customDirStr) else DownloadService.getDefaultDownloadDirectory()</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel$val localCover = customCover ?: AudioStorageHelper.getLocalCoverFile(getApplication(), item.rjid, validFile.absolutePath)?.absolutePath</ID>
+    <ID>MaxLineLength:PlayerViewModel.kt$PlayerViewModel.&lt;no name provided&gt;$val album = currentAlbumHistory ?: _currentRjId.value?.let { rj -&gt; _playlist.value.firstOrNull { it.rjid == rj } }</ID>
+    <ID>MaxLineLength:PlaylistCards.kt$color = if (isOffline) Color(0xFF2E7D32).copy(alpha = 0.9f) else MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f)</ID>
+    <ID>MaxLineLength:PlaylistCards.kt$text = if (isOffline) stringResource(R.string.playlist_badge_offline) else stringResource(R.string.playlist_badge_online)</ID>
+    <ID>MaxLineLength:PlaylistDialogs.kt$Text(text = "CV: ${info.cv}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:PlaylistDialogs.kt$Text(text = "Circle: ${info.circle}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:PlaylistDialogs.kt$Text(text = stringResource(R.string.player_audio_info_channels, "Stereo 2.0 (Binaural)"), style = MaterialTheme.typography.bodyMedium)</ID>
+    <ID>MaxLineLength:PlaylistDialogs.kt$Text(text = stringResource(R.string.player_audio_info_path, info.localFilePath), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)</ID>
+    <ID>MaxLineLength:PlaylistScreen.kt$Toast.makeText(context, context.getString(R.string.browse_toast_rj_copied, item.rjid), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:PlaylistScreen.kt$contentDescription = if (isGridMode) stringResource(R.string.hiby_mode_list) else stringResource(R.string.hiby_mode_grid)</ID>
+    <ID>MaxLineLength:PlaylistScreen.kt$tint = if (selectedTagFilters.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MaxLineLength:PlaylistScreen.kt$val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: item.title else item.title</ID>
+    <ID>MaxLineLength:PlaylistScreen.kt$val displayTitle = if (isTranslationActive) playlistTranslatedTitles[item.rjid] ?: validHistoryTrans ?: item.title else item.title</ID>
+    <ID>MaxLineLength:PlaylistScreen.kt$val folderDisplay = if (selectedFolder == "Utama") stringResource(R.string.player_folder_main) else selectedFolder</ID>
+    <ID>MaxLineLength:PlaylistScreen.kt$val validHistoryTrans = if (!item.translatedTitle.isNullOrBlank() &amp;&amp; item.translatedTitle != item.title) item.translatedTitle else null</ID>
+    <ID>MaxLineLength:PreferencesManager.kt$PreferencesManager$suspend</ID>
+    <ID>MaxLineLength:PreferencesManager.kt$PreferencesManager$suspend fun setFloatingLyricsCornerRadius(radius: Float)</ID>
+    <ID>MaxLineLength:PreferencesManager.kt$PreferencesManager$suspend fun setFloatingLyricsFontSize(size: Float)</ID>
+    <ID>MaxLineLength:PreferencesManager.kt$PreferencesManager$suspend fun setFloatingLyricsOpacity(opacity: Float)</ID>
+    <ID>MaxLineLength:PreferencesManager.kt$PreferencesManager$val privacyCustomMaskFlow: Flow&lt;String&gt; = context.dataStore.data.map { it[KEY_PRIVACY_CUSTOM_MASK] ?: "Audio Relaksasi" }.distinctUntilChanged()</ID>
+    <ID>MaxLineLength:PreferencesManager.kt$PreferencesManager.Companion$const val DEFAULT_LLM_PROMPT = "You are a professional translator. Translate the following text into id. Output ONLY the translated text without any explanations, notes, or markdown code blocks."</ID>
+    <ID>MaxLineLength:QueueScreen.kt$Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.queue_paste_clipboard), tint = MaterialTheme.colorScheme.primary)</ID>
+    <ID>MaxLineLength:QueueScreen.kt$Toast.makeText(context, context.getString(R.string.queue_toast_invalid_rj), Toast.LENGTH_SHORT).show()</ID>
+    <ID>MaxLineLength:QueueScreen.kt$contentDescription = if (showConsole) stringResource(R.string.queue_hide_console) else stringResource(R.string.queue_show_console)</ID>
+    <ID>MaxLineLength:QueueScreen.kt$logLine.contains("[ERROR]") || logLine.contains("[!]") -&gt; MaterialTheme.colorScheme.error</ID>
+    <ID>MaxLineLength:QueueScreen.kt$tint = if (showConsole) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)</ID>
+    <ID>MaxLineLength:SettingsComponents.kt$border = if (isSelected) BorderStroke(2.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, Color.Transparent)</ID>
+    <ID>MaxLineLength:SettingsComponents.kt$containerColor = if (isSelected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)</ID>
+    <ID>MaxLineLength:SettingsComponents.kt$if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$Text(stringResource(R.string.settings_import_preview_multi, preview.multiAlbumCount), style = MaterialTheme.typography.bodyMedium)</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$Text(stringResource(R.string.settings_import_preview_singles, preview.singleCount), style = MaterialTheme.typography.bodyMedium)</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$Text(stringResource(R.string.settings_import_preview_total, preview.totalAudioTracks), fontWeight = FontWeight.SemiBold)</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$color = if (info.isDebugAsset) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$color = if (info.isDebugAsset) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$headlineContent = { Text(stringResource(R.string.settings_update_dev_channel_toggle), fontWeight = FontWeight.SemiBold) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$if (info.isDebugAsset) stringResource(R.string.settings_update_channel_debug) else stringResource(R.string.settings_update_channel_release)</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$leadingContent = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$leadingContent = { Icon(Icons.Default.DashboardCustomize, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$leadingContent = { Icon(Icons.Default.HistoryEdu, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$leadingContent = { Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$leadingContent = { Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_appearance_theme_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_audio_format_and_playback_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_blocked_items_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_changelog_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_download_storage_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_floating_lyrics_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_import_folders_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_lang_and_trans_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_privacy_enable_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_user_guide_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$val isSdCard = physical.contains("SD Card", ignoreCase = true) || (physical.startsWith("/storage/") &amp;&amp; !physical.contains("emulated"))</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$val resolved = AudioStorageHelper.resolvePhysicalPathFromUri(context, preview.folderPathOrUri) ?: preview.folderPathOrUri</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$fun setFloatingLyricsShowTranslation(show: Boolean)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val audioGainDb = preferencesManager.audioGainDbFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialAudioGainDb())</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val detailShowExternalLinks = preferencesManager.detailShowExternalLinksFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val detailShowRecommendations = preferencesManager.detailShowRecommendationsFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val detailShowReleaseDate = preferencesManager.detailShowReleaseDateFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val detailShowSubtitle = preferencesManager.detailShowSubtitleTagFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val detailShowTranslateBtn = preferencesManager.detailShowTranslateButtonFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val floatingLyricsCornerRadius = preferencesManager.floatingLyricsCornerRadiusFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 16f)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val floatingLyricsDisplayMode = preferencesManager.floatingLyricsDisplayModeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "BOTH")</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val floatingLyricsFontSize = preferencesManager.floatingLyricsFontSizeFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 14f)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val floatingLyricsLocked = preferencesManager.floatingLyricsLockedFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val floatingLyricsOpacity = preferencesManager.floatingLyricsOpacityFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.90f)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val floatingLyricsShowTranslation = preferencesManager.floatingLyricsShowTranslationFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val llmPrompt = preferencesManager.llmPromptFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PreferencesManager.DEFAULT_LLM_PROMPT)</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val privacyBlurInApp = preferencesManager.privacyBlurInAppFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialPrivacyBlurInApp())</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val privacyBlurNotif = preferencesManager.privacyBlurNotifFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialPrivacyBlurNotif())</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val privacyCustomMask = preferencesManager.privacyCustomMaskFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialPrivacyCustomMask())</ID>
+    <ID>MaxLineLength:SettingsViewModel.kt$SettingsViewModel$val privacyMaskTitle = preferencesManager.privacyMaskTitleFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), preferencesManager.getInitialPrivacyMaskTitle())</ID>
+    <ID>MaxLineLength:StorageSyncManager.kt$StorageSyncManager$sourceType = if (audioDocs.size &gt;= 2) SourceType.LOCAL_FOLDER.name else (if (isOfficialRj) SourceType.DL_SITE.name else SourceType.LOCAL_SINGLE.name)</ID>
+    <ID>MaxLineLength:StorageSyncManager.kt$StorageSyncManager$syncMultiTrackFolder(context, dao, leaf, audioFiles, customRjid = effectiveCustomRjid, linkedRj = rj, fallbackCover = fallbackCover)</ID>
+    <ID>MaxLineLength:StorageSyncManager.kt$StorageSyncManager$syncMultiTrackFolder(context, dao, workDir, allRecursiveTracks, customRjid = effectiveCustomRjid, linkedRj = rj, fallbackCover = fallbackCover)</ID>
+    <ID>MaxLineLength:StorageSyncManager.kt$StorageSyncManager$val</ID>
+    <ID>MaxLineLength:StorageSyncManager.kt$StorageSyncManager$val audioDocs = children.filter { it.isFile &amp;&amp; AudioStorageHelper.AUDIO_EXTENSIONS.contains(it.name?.substringAfterLast('.', "")?.lowercase()) }</ID>
+    <ID>MaxLineLength:StorageSyncManager.kt$StorageSyncManager$val trackPattern = Regex("^(?:\\d{1,3}|track|ch|chapter|part|scene|op|ed|se|disc|\\(\\d+\\)|\\[\\d+\\])[-_ .]", RegexOption.IGNORE_CASE)</ID>
+    <ID>MaxLineLength:StorageSyncManager.kt$StorageSyncManager$val variantDirRegex = Regex("(?:mp3|wav|flac|m4a|aac|opus|wma|seあり|se有り|seなし|se無し|se_ari|se_nashi|効果音|nose|音声原本)", RegexOption.IGNORE_CASE)</ID>
+    <ID>MaxLineLength:TagFilterSheet.kt$color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface</ID>
+    <ID>MaxLineLength:TagFilterSheet.kt$color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)</ID>
+    <ID>MaxLineLength:TagFilterSheet.kt$color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer</ID>
+    <ID>MaxLineLength:TrackDiscoveryService.kt$TrackDiscoveryService$if</ID>
+    <ID>MaxLineLength:TrackDiscoveryService.kt$TrackDiscoveryService$lower.contains("効果音あり")</ID>
+    <ID>MaxLineLength:TrackDiscoveryService.kt$TrackDiscoveryService$pref == "flac" || pref == "wav" -&gt; existing.url.contains(".flac", ignoreCase = true) || existing.url.contains(".wav", ignoreCase = true)</ID>
+    <ID>MaxLineLength:TrackDiscoveryService.kt$TrackDiscoveryService$pref == "flac" || pref == "wav" -&gt; tr.url.contains(".flac", ignoreCase = true) || tr.url.contains(".wav", ignoreCase = true)</ID>
+    <ID>MaxLineLength:TrackDiscoveryService.kt$TrackDiscoveryService$pref == "m4a" || pref == "aac" -&gt; existing.url.contains(".m4a", ignoreCase = true) || existing.url.contains(".aac", ignoreCase = true)</ID>
+    <ID>MaxLineLength:TrackDiscoveryService.kt$TrackDiscoveryService$pref == "m4a" || pref == "aac" -&gt; tr.url.contains(".m4a", ignoreCase = true) || tr.url.contains(".aac", ignoreCase = true)</ID>
+    <ID>MaxLineLength:TrackDiscoveryService.kt$TrackDiscoveryService$val allLossless = numberedRoot.all { it.name.endsWith(".wav", ignoreCase = true) || it.name.endsWith(".flac", ignoreCase = true) }</ID>
+    <ID>MaxLineLength:TrackDiscoveryService.kt$TrackDiscoveryService$val mp3Tracks = extractAudiosFromNode(item, item.optString("title", "").trim()).filter { it.url.contains(".mp3", ignoreCase = true) || it.url.contains(".m4a", ignoreCase = true) }</ID>
+    <ID>MaxLineLength:TranslationGlossaryTest.kt$TranslationGlossaryTest$assertFalse("Pure kanji Japanese title must not be marked definitively Chinese", ChineseAsmrGlossary.isDefinitivelyChinese(jaTitlePureKanji))</ID>
+    <ID>MaxLineLength:TranslationGlossaryTest.kt$TranslationGlossaryTest$assertFalse("Subtitle preprocessor should not inject parenthetical tags", JapaneseAsmrGlossary.preProcessForSubtitle("あぁっ、いっちゃう！").contains("絶頂"))</ID>
+    <ID>MaxLineLength:TranslationGlossaryTest.kt$TranslationGlossaryTest$assertTrue("Translation should be Halo", result.contains("Halo", ignoreCase = true) || result.contains("Selamat", ignoreCase = true))</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$"^([#◆【\\[]?\\s*(?:(?:TR|Track|TRACK|トラック|T)?\\.?\\s*\\d+(?:-\\d+)?[\\.\\:、_～~】\\]]?\\s*|\\d+(?:-\\d+)?[\\.\\:、_～~】\\]]?\\s*))(.*)$"</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$"llm" -&gt; translateViaLlmSingle(preProcessed, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: WebTranslationProviders.translateViaMyMemory(preProcessed, normalizedTl, detectedSl)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$"microsoft" -&gt; WebTranslationProviders.translateViaMicrosoftEdge(plainPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$"microsoft" -&gt; WebTranslationProviders.translateViaMicrosoftEdge(preProcessed, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: WebTranslationProviders.translateViaMyMemory(preProcessed, normalizedTl, detectedSl)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$"microsoft" -&gt; WebTranslationProviders.translateViaMicrosoftEdge(taggedPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$"youdao" -&gt; WebTranslationProviders.translateViaYoudaoWeb(plainPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(plainPayload, normalizedTl, sourceLang)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$"youdao" -&gt; WebTranslationProviders.translateViaYoudaoWeb(preProcessed, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: WebTranslationProviders.translateViaMyMemory(preProcessed, normalizedTl, detectedSl)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$"youdao" -&gt; WebTranslationProviders.translateViaYoudaoWeb(taggedPayload, normalizedTl) ?: WebTranslationProviders.translateViaGoogleWeb(taggedPayload, normalizedTl, sourceLang)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$LlmTranslationClient.callClaudeAnthropic(config.key, config.model.ifBlank { "claude-haiku-5-5" }, systemInstruction, text, ::emitError)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$LlmTranslationClient.callClaudeAnthropic(config.key, config.model.ifBlank { "claude-haiku-5-5" }, systemInstruction, userPrompt, ::emitError)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$LlmTranslationClient.callClaudeAnthropic(llmKey, llmModel.ifBlank { "claude-haiku-5-5" }, systemInstruction, userPrompt, ::emitError)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$LlmTranslationClient.callOpenAiCompatibleLlm(config.url, config.key, config.model.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, text, ::emitError)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$LlmTranslationClient.callOpenAiCompatibleLlm(config.url, config.key, config.model.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, userPrompt, ::emitError)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$LlmTranslationClient.callOpenAiCompatibleLlm(llmUrl, llmKey, llmModel.ifBlank { "gemini-3.5-flash-lite" }, systemInstruction, userPrompt, ::emitError)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$else -&gt; WebTranslationProviders.translateViaGoogleWeb(preProcessed, normalizedTl, detectedSl) ?: WebTranslationProviders.translateViaMyMemory(preProcessed, normalizedTl, detectedSl)</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$emitError("Gagal menerjemahkan${if (!lastNetworkError.isNullOrBlank()) ": $lastNetworkError" else ". Periksa koneksi internet."}")</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$if</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$val</ID>
+    <ID>MaxLineLength:TranslationService.kt$TranslationService$val tagRegex = Regex("""(?:\[\[|［［|\[\s*\[)(\d+)(?:\]\]|］］|\]\s*\])\s*([\s\S]*?)(?=(?:\[\[|［［|\[\s*\[)\d+(?:\]\]|］］|\]\s*\])|$)""")</ID>
+    <ID>MaxLineLength:UsbAudioEngine.kt$UsbAudioEngine$Log.i(TAG, "NativeAudioPlayer.setUsbStreamerDevice (fd=$fd, ac=$acId, as=$asId, ep=0x%02X, cs=$clockSourceId) result: $streamOk".format(epOut))</ID>
+    <ID>MaxLineLength:WorkCardDisplaySettingsScreen.kt$headlineContent = { Text(stringResource(R.string.settings_display_release_date), fontWeight = FontWeight.SemiBold) }</ID>
+    <ID>MaxLineLength:WorkCardDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_age_rating_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkCardDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_circle_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkCardDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_duration_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkCardDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_price_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkCardDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_rating_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkCardDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_release_date_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkCardDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_sales_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkCardDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_subtitle_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$headlineContent = { Text(stringResource(R.string.settings_display_recommendations), fontWeight = FontWeight.SemiBold) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$headlineContent = { Text(stringResource(R.string.settings_display_release_date), fontWeight = FontWeight.SemiBold) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$headlineContent = { Text(stringResource(R.string.settings_display_translate_btn), fontWeight = FontWeight.SemiBold) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_age_rating_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_duration_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_price_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_rating_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_recommendations_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_release_date_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_sales_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_subtitle_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:WorkDetailDisplaySettingsScreen.kt$supportingContent = { Text(stringResource(R.string.settings_display_translate_btn_desc), style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>NestedBlockDepth:AudioDownloader.kt$AudioDownloader$private fun muxAdtsFileToM4a(adtsFile: File, outputFile: File, onLog: (String) -&gt; Unit): Boolean</ID>
+    <ID>NestedBlockDepth:AudioMerger.kt$AudioMerger$fun mergeMp3Files( trackFiles: List&lt;File&gt;, destFile: File, onLog: ((String) -&gt; Unit)? = null ): Boolean</ID>
+    <ID>NestedBlockDepth:AudioMerger.kt$AudioMerger$fun mergeWavFiles( trackFiles: List&lt;File&gt;, destFile: File, onLog: ((String) -&gt; Unit)? = null ): Boolean</ID>
+    <ID>NestedBlockDepth:AudioMerger.kt$AudioMerger$private fun inspectTrackFast(file: File): TrackSlice</ID>
+    <ID>NestedBlockDepth:AudioStorageHelper.kt$AudioStorageHelper$fun getLocalCoverFile(context: Context, rjid: String, audioFilePath: String?): File?</ID>
+    <ID>NestedBlockDepth:AudioStorageHelper.kt$AudioStorageHelper$fun moveAudioFile(sourceFile: File, targetSubfolderName: String, downloadDir: File?): File?</ID>
+    <ID>NestedBlockDepth:AudioStorageHelper.kt$AudioStorageHelper$fun resolvePhysicalPathFromUri(context: Context, uriString: String?): String?</ID>
+    <ID>NestedBlockDepth:DLsiteScraper.kt$DLsiteScraper$private fun enrichMetadataFromAsmrOne( cleanId: String, title: String, cv: String, circle: String, genre: String, ageRating: String ): Array&lt;String&gt;</ID>
+    <ID>NestedBlockDepth:DownloadService.kt$DownloadService$private suspend fun processQueue()</ID>
+    <ID>NestedBlockDepth:StorageSyncManager.kt$StorageSyncManager$private suspend fun fetchAndCacheMetadata( context: Context, dao: com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao, entity: HistoryEntity )</ID>
+    <ID>NestedBlockDepth:TrackDiscoveryService.kt$TrackDiscoveryService$fun filterSmartAsmrOneTracks(tree: JSONArray, preferredFormat: String = "auto"): List&lt;TrackInfo&gt;</ID>
+    <ID>PrintStackTrace:AudioDownloader.kt$AudioDownloader$e</ID>
+    <ID>PrintStackTrace:AudioStorageHelper.kt$AudioStorageHelper$e</ID>
+    <ID>PrintStackTrace:NativeAudioPlayer.kt$NativeAudioPlayer$e</ID>
+    <ID>PrintStackTrace:PlayerViewModel.kt$PlayerViewModel$e</ID>
+    <ID>PrintStackTrace:QueueViewModel.kt$QueueViewModel$e</ID>
+    <ID>PrintStackTrace:StorageSyncManager.kt$StorageSyncManager$e</ID>
+    <ID>PrintStackTrace:TranslationService.kt$TranslationService$e</ID>
+    <ID>TooGenericExceptionThrown:AsmrOneApiService.kt$AsmrOneApiService$throw Exception("Work not found for $idOrRj")</ID>
+    <ID>TooManyFunctions:AudioStorageHelper.kt$AudioStorageHelper</ID>
+    <ID>TooManyFunctions:DownloadLogHelper.kt$DownloadLogHelper</ID>
+    <ID>TooManyFunctions:HistoryDao.kt$HistoryDao</ID>
+    <ID>TooManyFunctions:PlayerViewModel.kt$PlayerViewModel : AndroidViewModel</ID>
+    <ID>TooManyFunctions:PlaylistDao.kt$PlaylistDao</ID>
+    <ID>TooManyFunctions:PreferencesManager.kt$PreferencesManager</ID>
+    <ID>TooManyFunctions:SettingsViewModel.kt$SettingsViewModel : AndroidViewModel</ID>
+    <ID>UnusedParameter:AsmrOneBrowseScreen.kt$onOpenPlayer: () -&gt; Unit = {}</ID>
+    <ID>UnusedParameter:AsmrOneBrowseScreen.kt$onSelectWorkForDownload: (String) -&gt; Unit</ID>
+    <ID>UnusedParameter:AsmrOneBrowseViewModel.kt$AsmrOneBrowseViewModel$context: Context</ID>
+    <ID>UnusedParameter:AsmrOneBrowseViewModel.kt$AsmrOneBrowseViewModel$forceRefresh: Boolean = false</ID>
+    <ID>UnusedParameter:DLsiteScraper.kt$DLsiteScraper$timeoutSec: Long = 4</ID>
+    <ID>UnusedParameter:PlayerViewModel.kt$PlayerViewModel$context: Context? = null</ID>
+    <ID>UnusedParameter:PlayerViewModel.kt$PlayerViewModel$fullList: List&lt;HistoryEntity&gt; = _playlist.value</ID>
+    <ID>UnusedParameter:PlayerViewModel.kt$PlayerViewModel$targetLang: String = TranslationService.getActiveTargetLanguage(getApplication())</ID>
+    <ID>UnusedPrivateMember:AudioMerger.kt$AudioMerger$private fun updateMasterXingHeader(frame: ByteArray, totalFrames: Long, totalBytes: Long)</ID>
+    <ID>UnusedPrivateProperty:AudioStorageHelperTest.kt$AudioStorageHelperTest$val nashiFile = File(root, "01_jacket_なし.jpg").apply { writeText("fake image bytes") }</ID>
+    <ID>UnusedPrivateProperty:AudioStorageHelperTest.kt$AudioStorageHelperTest$val sourceCover = File(root, "RJ123456.jpg").apply { writeText("cover bytes") }</ID>
+    <ID>UnusedPrivateProperty:AudioStorageHelperTest.kt$AudioStorageHelperTest$val sourceCue = File(root, "RJ123456.cue").apply { writeText("cue content") }</ID>
+    <ID>UnusedPrivateProperty:PlaylistScreen.kt$var isLinkingRj by remember { mutableStateOf(false) }</ID>
+    <ID>UnusedPrivateProperty:UsbAudioEngine.kt$UsbAudioEngine$private const val FU_MUTE_CONTROL = 0x01</ID>
+    <ID>UnusedPrivateProperty:UsbAudioEngine.kt$UsbAudioEngine$private const val UAC1_REQ_GET_MAX = 0x83</ID>
+    <ID>UnusedPrivateProperty:UsbAudioEngine.kt$UsbAudioEngine$private const val UAC1_REQ_GET_MIN = 0x82</ID>
+    <ID>UnusedPrivateProperty:UsbAudioEngine.kt$UsbAudioEngine$private const val UAC1_REQ_GET_RES = 0x84</ID>
+    <ID>UnusedPrivateProperty:UsbAudioEngine.kt$UsbAudioEngine$private const val UAC2_REQ_RANGE = 0x02</ID>
+    <ID>UnusedPrivateProperty:UsbAudioEngine.kt$UsbAudioEngine$private var volumeMaxDb: Short = 0.toShort() // default 0 dB</ID>
+    <ID>UnusedPrivateProperty:UsbAudioEngine.kt$UsbAudioEngine$private var volumeMinDb: Short = (-96 * 256).toShort() // default -96 dB in 1/256 dB units</ID>
+    <ID>UnusedPrivateProperty:UsbAudioEngine.kt$UsbAudioEngine$private var volumeResDb: Short = 128.toShort() // 0.5 dB</ID>
+    <ID>VariableNaming:PlayerViewModel.kt$PlayerViewModel$private val CURRENT_TRANSLATION_ENGINE_VERSION = 2</ID>
+  </CurrentIssues>
+</SmellBaseline>

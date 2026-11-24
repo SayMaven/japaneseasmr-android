@@ -33,20 +33,20 @@ abstract class AsmrDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AsmrDatabase? = null
 
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE history_table ADD COLUMN chaptersJson TEXT DEFAULT NULL")
             }
         }
 
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE history_table ADD COLUMN translatedTitle TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE history_table ADD COLUMN translatedChaptersJson TEXT DEFAULT NULL")
             }
         }
 
-        private val MIGRATION_3_4 = object : Migration(3, 4) {
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `translation_cache` (" +
@@ -60,14 +60,14 @@ abstract class AsmrDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_4_5 = object : Migration(4, 5) {
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE history_table ADD COLUMN sourceType TEXT NOT NULL DEFAULT 'DL_SITE'")
                 db.execSQL("ALTER TABLE history_table ADD COLUMN linkedRjId TEXT DEFAULT NULL")
             }
         }
 
-        private val MIGRATION_5_6 = object : Migration(5, 6) {
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `user_playlists` (" +

@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.detekt)
 }
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -106,6 +107,10 @@ android {
         }
     }
 
+    sourceSets {
+        getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+    }
+
     // Penamaan otomatis file output APK sesuai versi di build.gradle.kts
     applicationVariants.all {
         val variant = this
@@ -177,8 +182,18 @@ dependencies {
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("$rootDir/detekt.yml"))
+    baseline = file("$rootDir/detekt-baseline.xml")
 }

@@ -26,6 +26,12 @@ internal object WebTranslationProviders {
     var lastNetworkError: String? = null
         private set
 
+    @androidx.annotation.VisibleForTesting
+    internal var googleApiBaseUrl: String = "https://translate.googleapis.com"
+
+    @androidx.annotation.VisibleForTesting
+    internal var clients5BaseUrl: String = "https://clients5.google.com"
+
     private val webClient = OkHttpClient.Builder()
         .dispatcher(Dispatcher().apply {
             maxRequests = 32
@@ -54,29 +60,29 @@ internal object WebTranslationProviders {
         }
 
         if (encoded.length <= 1200) {
-            val gtxUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t&q=$encoded"
+            val gtxUrl = "$googleApiBaseUrl/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t&q=$encoded"
             tryGet(gtxUrl)?.let { return it }
             if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
 
             if (sl != "auto") {
-                val gtxAutoUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t&q=$encoded"
+                val gtxAutoUrl = "$googleApiBaseUrl/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t&q=$encoded"
                 tryGet(gtxAutoUrl)?.let { return it }
                 if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
             }
 
             if (trimmed.length <= 500) {
-                val clients5Url = "https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=$sl&tl=$tl&q=$encoded"
+                val clients5Url = "$clients5BaseUrl/translate_a/t?client=dict-chrome-ex&sl=$sl&tl=$tl&q=$encoded"
                 tryGet(clients5Url)?.let { return it }
                 if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
             }
         }
 
-        val postUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t"
+        val postUrl = "$googleApiBaseUrl/translate_a/single?client=gtx&sl=$sl&tl=$tl&dt=t"
         tryPost(postUrl, trimmed)?.let { return it }
         if (System.currentTimeMillis() < googleRateLimitUntilMs) return null
 
         if (sl != "auto") {
-            val postAutoUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t"
+            val postAutoUrl = "$googleApiBaseUrl/translate_a/single?client=gtx&sl=auto&tl=$tl&dt=t"
             tryPost(postAutoUrl, trimmed)?.let { return it }
         }
 
