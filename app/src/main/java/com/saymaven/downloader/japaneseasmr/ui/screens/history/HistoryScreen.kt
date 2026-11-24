@@ -289,9 +289,7 @@ fun HistoryItemCard(
                 }
             },
         shape = HistoryCardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = if (item.isPresent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Row(
             modifier = Modifier

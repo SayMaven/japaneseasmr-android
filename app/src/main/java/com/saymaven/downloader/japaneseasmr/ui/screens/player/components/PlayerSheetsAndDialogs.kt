@@ -460,7 +460,11 @@ fun PlayerChapterSheet(
                             Surface(
                                 onClick = { viewModel.seekToChapter(chapter) },
                                 shape = RoundedCornerShape(12.dp),
-                                color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                color = if (isActive) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerLow
+                                },
                                 border = if (isActive) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
                                 modifier = Modifier.fillMaxWidth()
                             ) {

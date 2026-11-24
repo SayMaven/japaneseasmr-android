@@ -82,7 +82,7 @@ fun MiniPlayer(
                         .fillMaxWidth()
                         .height(2.5.dp),
                     color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                 )
 
                 Row(

@@ -87,7 +87,7 @@ fun PlaylistMoveToFolderDialog(
                             onDismiss()
                         },
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)

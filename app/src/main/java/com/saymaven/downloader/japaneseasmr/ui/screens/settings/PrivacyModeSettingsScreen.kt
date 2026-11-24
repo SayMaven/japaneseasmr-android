@@ -69,7 +69,7 @@ fun PrivacyModeSettingsScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    else MaterialTheme.colorScheme.surfaceContainerLow
                 )
             ) {
                 ListItem(
@@ -104,7 +104,7 @@ fun PrivacyModeSettingsScreen(
             if (enabled) {
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                 ) {
                     Column {
                         ListItem(
@@ -179,7 +179,7 @@ fun PrivacyModeSettingsScreen(
                 if (maskTitle) {
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(

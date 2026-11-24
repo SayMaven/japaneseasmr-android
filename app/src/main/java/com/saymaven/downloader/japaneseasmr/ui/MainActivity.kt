@@ -217,7 +217,7 @@ class MainActivity : ComponentActivity() {
                     drawerContent = {
                         ModalDrawerSheet(
                             modifier = Modifier.width(300.dp),
-                            drawerContainerColor = MaterialTheme.colorScheme.surface,
+                            drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                             drawerContentColor = MaterialTheme.colorScheme.onSurface
                         ) {
                             Column(
@@ -239,7 +239,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            HorizontalDivider()
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Spacer(modifier = Modifier.height(8.dp))
 
                             NavigationDrawerItem(
@@ -683,7 +683,7 @@ private fun WorkDetailLoadingOverlay(
         ) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
                 shadowElevation = 8.dp
             ) {
                 Row(

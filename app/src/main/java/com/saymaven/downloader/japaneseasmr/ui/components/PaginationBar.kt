@@ -70,7 +70,7 @@ fun PaginationBar(
             val canPrev = currentPage > 1
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (canPrev) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                color = if (canPrev) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
                     .clickable(enabled = canPrev) { onPageSelected(currentPage - 1) }
@@ -131,7 +131,7 @@ fun PaginationBar(
             val canNext = currentPage < totalPages
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (canNext) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                color = if (canNext) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
                     .clickable(enabled = canNext) { onPageSelected(currentPage + 1) }

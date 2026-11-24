@@ -273,7 +273,7 @@ fun AsmrOneWorkCard(
                         if (showCardSales && work.dlCount != null && work.dlCount > 0) {
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.surfaceContainerLow
                             ) {
                                 Text(
                                     text = "${work.dlCount} DL",
@@ -583,7 +583,7 @@ fun AsmrOneWorkListItem(
                         if (showCardSales && work.dlCount != null && work.dlCount > 0) {
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.surfaceContainerLow
                             ) {
                                 Text(
                                     text = "${work.dlCount} DL",

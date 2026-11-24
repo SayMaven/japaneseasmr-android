@@ -243,7 +243,7 @@ private fun FolderThumbnailPreviewBox(
                                 } else {
                                     Surface(
                                         shape = RoundedCornerShape(tileRadius),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
                                         modifier = Modifier
                                             .weight(1f)
                                             .fillMaxHeight()
@@ -334,7 +334,7 @@ fun ExplorerFolderCard(
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
@@ -388,7 +388,7 @@ fun ExplorerFolderListRow(
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(

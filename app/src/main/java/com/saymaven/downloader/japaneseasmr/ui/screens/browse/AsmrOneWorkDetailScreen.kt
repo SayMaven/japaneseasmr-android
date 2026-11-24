@@ -462,13 +462,13 @@ fun AsmrOneWorkDetailScreen(
                             work.tags.forEach { tag ->
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f)
+                                    color = MaterialTheme.colorScheme.surfaceContainerHighest
                                 ) {
                                     Text(
                                         text = tag,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }

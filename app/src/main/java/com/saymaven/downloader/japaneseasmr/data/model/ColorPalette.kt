@@ -10,8 +10,8 @@ enum class ColorPalette(
     val tertiary: Color,
     val darkBackground: Color,
     val darkSurface: Color,
-    val lightBackground: Color = Color(0xFFFCF5F4),
-    val lightSurface: Color = Color(0xFFFFFFFF)
+    val lightBackground: Color? = null,
+    val lightSurface: Color? = null
 ) {
     DEFAULT(
         title = "Default Rose",

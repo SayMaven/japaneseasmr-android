@@ -118,8 +118,8 @@ fun PlayerButtonsSettingsScreen(
                     Card(
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isMainBar) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                            containerColor = if (isMainBar) MaterialTheme.colorScheme.surfaceContainerLow
+                            else MaterialTheme.colorScheme.surfaceContainerLow
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {

@@ -67,7 +67,7 @@ fun PlayerCoverLyricsPanel(
         Card(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             ),
             modifier = Modifier
                 .fillMaxWidth(0.94f)

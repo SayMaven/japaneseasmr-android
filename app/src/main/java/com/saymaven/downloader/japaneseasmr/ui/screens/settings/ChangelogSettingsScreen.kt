@@ -181,7 +181,7 @@ private fun ChangelogVersionCard(
             containerColor = if (isLatest)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
             else
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                MaterialTheme.colorScheme.surfaceContainerLow
         ),
         modifier = Modifier.fillMaxWidth()
     ) {
