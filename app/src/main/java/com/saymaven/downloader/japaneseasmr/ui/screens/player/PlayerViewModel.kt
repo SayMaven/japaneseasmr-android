@@ -416,6 +416,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val playlistDelegate by lazy {
         PlayerPlaylistDelegate(
+            appContext = getApplication(),
             scope = viewModelScope,
             prefs = prefs,
             historyDao = historyDao,

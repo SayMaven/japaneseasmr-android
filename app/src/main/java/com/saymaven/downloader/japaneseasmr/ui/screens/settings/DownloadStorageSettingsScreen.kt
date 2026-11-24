@@ -73,6 +73,36 @@ fun DownloadStorageSettingsScreen(
         }
     }
 
+    val exportBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.exportBackup(uri) { res ->
+                val msg = res.fold(
+                    onSuccess = { "Backup playlist & riwayat berhasil diekspor" },
+                    onFailure = { "Gagal ekspor backup: ${it.message}" }
+                )
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val importBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.importBackup(uri) { res ->
+                val msg = res.fold(
+                    onSuccess = {
+                        "Restore selesai: ${it.playlistsRestored} playlist, ${it.itemsRestored} item, ${it.historyRestored} riwayat"
+                    },
+                    onFailure = { "Gagal restore backup: ${it.message}" }
+                )
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     val threadOptions = listOf(
         4 to stringResource(R.string.settings_threads_opt_4),
         8 to stringResource(R.string.settings_threads_opt_8),
@@ -289,6 +319,58 @@ fun DownloadStorageSettingsScreen(
                                 checked = mergeDownloadedAudio,
                                 onCheckedChange = { viewModel.setMergeDownloadedAudio(it) }
                             )
+                        }
+                    )
+                }
+            }
+
+            // 3. Backup & Restore Playlist & History
+            SettingsCategoryHeader(
+                title = "Backup & Restore Data",
+                icon = Icons.Default.Backup
+            )
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            ) {
+                Column {
+                    ListItem(
+                        modifier = Modifier.clickable {
+                            exportBackupLauncher.launch("JapaneseASMR-Backup.json")
+                        },
+                        headlineContent = {
+                            Text("Ekspor Backup (Playlist & Riwayat)", fontWeight = FontWeight.SemiBold)
+                        },
+                        supportingContent = {
+                            Text(
+                                "Simpan daftar playlist, item, dan riwayat ke file JSON " +
+                                    "(juga otomatis dicadangkan di Download/JapaneseASMR/japaneseasmr_backup_auto.json)",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = {
+                            Icon(Icons.Default.FileUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    ListItem(
+                        modifier = Modifier.clickable {
+                            importBackupLauncher.launch(arrayOf("application/json", "*/*"))
+                        },
+                        headlineContent = {
+                            Text("Pulihkan Backup (Import JSON)", fontWeight = FontWeight.SemiBold)
+                        },
+                        supportingContent = {
+                            Text(
+                                "Gabungkan playlist & riwayat dari file backup JSON tanpa menimpa data yang sudah ada",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = {
+                            Icon(Icons.Default.FileDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         }
                     )
                 }

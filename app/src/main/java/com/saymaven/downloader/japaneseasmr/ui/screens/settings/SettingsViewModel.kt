@@ -9,6 +9,8 @@ import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.model.ColorPalette
 import com.saymaven.downloader.japaneseasmr.data.model.ThemeMode
 import com.saymaven.downloader.japaneseasmr.data.model.UpdateInfo
+import com.saymaven.downloader.japaneseasmr.service.BackupManager
+import com.saymaven.downloader.japaneseasmr.service.BackupRestoreResult
 import com.saymaven.downloader.japaneseasmr.service.ImportPreviewData
 import com.saymaven.downloader.japaneseasmr.service.StorageSyncManager
 import com.saymaven.downloader.japaneseasmr.service.TranslationService
@@ -561,6 +563,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setFloatingLyricsShowTranslation(show: Boolean) = viewModelScope.launch { preferencesManager.setFloatingLyricsShowTranslation(show) }
     fun setFloatingLyricsDisplayMode(mode: String) = viewModelScope.launch { preferencesManager.setFloatingLyricsDisplayMode(mode) }
     fun setFloatingLyricsLocked(locked: Boolean) = viewModelScope.launch { preferencesManager.setFloatingLyricsLocked(locked) }
+
+    // Backup & Restore
+    fun exportBackup(uri: android.net.Uri, onResult: (Result<Unit>) -> Unit) = viewModelScope.launch {
+        val result = BackupManager.exportToUri(getApplication(), uri)
+        onResult(result)
+    }
+
+    fun importBackup(uri: android.net.Uri, onResult: (Result<BackupRestoreResult>) -> Unit) = viewModelScope.launch {
+        val result = BackupManager.importFromUri(getApplication(), uri)
+        onResult(result)
+    }
 }
 
 sealed interface UpdateUiState {

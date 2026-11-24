@@ -1,5 +1,6 @@
 package com.saymaven.downloader.japaneseasmr.ui.screens.player.delegates
 
+import android.content.Context
 import com.saymaven.downloader.japaneseasmr.data.local.PreferencesManager
 import com.saymaven.downloader.japaneseasmr.data.local.dao.HistoryDao
 import com.saymaven.downloader.japaneseasmr.data.local.dao.PlaylistDao
@@ -8,6 +9,7 @@ import com.saymaven.downloader.japaneseasmr.data.local.entity.PlaylistItemEntity
 import com.saymaven.downloader.japaneseasmr.data.local.entity.UserPlaylistEntity
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneApiService
 import com.saymaven.downloader.japaneseasmr.data.remote.AsmrOneTrack
+import com.saymaven.downloader.japaneseasmr.service.BackupManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +23,7 @@ import kotlinx.coroutines.withContext
  * remains focused on Media3 playback coordination.
  */
 class PlayerPlaylistDelegate(
+    private val appContext: Context,
     private val scope: CoroutineScope,
     private val prefs: PreferencesManager,
     private val historyDao: HistoryDao,
@@ -39,6 +42,7 @@ class PlayerPlaylistDelegate(
         scope.launch(Dispatchers.IO) {
             val entity = UserPlaylistEntity(name = name.trim())
             val id = playlistDao.insertPlaylist(entity)
+            BackupManager.autoBackupToExternalIfPossible(appContext)
             withContext(Dispatchers.Main) { onCreated(id) }
         }
     }
@@ -46,12 +50,14 @@ class PlayerPlaylistDelegate(
     fun renamePlaylist(id: Long, newName: String) {
         scope.launch(Dispatchers.IO) {
             playlistDao.updatePlaylistName(id, newName.trim())
+            BackupManager.autoBackupToExternalIfPossible(appContext)
         }
     }
 
     fun deletePlaylist(playlist: UserPlaylistEntity) {
         scope.launch(Dispatchers.IO) {
             playlistDao.deletePlaylist(playlist)
+            BackupManager.autoBackupToExternalIfPossible(appContext)
         }
     }
 
@@ -73,12 +79,14 @@ class PlayerPlaylistDelegate(
                 cv = cv ?: "-"
             )
             playlistDao.insertItem(item)
+            BackupManager.autoBackupToExternalIfPossible(appContext)
         }
     }
 
     fun removeWorkFromPlaylist(playlistId: Long, rjid: String) {
         scope.launch(Dispatchers.IO) {
             playlistDao.removeItem(playlistId, rjid)
+            BackupManager.autoBackupToExternalIfPossible(appContext)
         }
     }
 
