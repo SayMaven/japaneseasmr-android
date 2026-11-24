@@ -192,9 +192,8 @@ fun AsmrOneBrowseScreen(
 
             Spacer(modifier = Modifier.width(6.dp))
 
-            if (!isSearchExpanded) {
-                // Category Dropdown Button (Semua / Populer / Rekomendasi)
-                var showTabDropdown by remember { mutableStateOf(false) }
+            // Category Dropdown Button (Semua / Populer / Rekomendasi)
+            var showTabDropdown by remember { mutableStateOf(false) }
                 val currentTabLabel = when (currentTab) {
                     BrowseTabType.ALL -> stringResource(R.string.browse_tab_all)
                     BrowseTabType.POPULAR -> stringResource(R.string.browse_btn_popular)
@@ -325,48 +324,72 @@ fun AsmrOneBrowseScreen(
 
                 // Search Icon Button
                 IconButton(
-                    onClick = { isSearchExpanded = true },
+                    onClick = {
+                        if (isSearchExpanded) {
+                            isSearchExpanded = false
+                            viewModel.onSearchQueryChange("")
+                        } else {
+                            isSearchExpanded = true
+                        }
+                    },
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (isSearchExpanded || searchQuery.isNotBlank()) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                 }
-            } else {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.onSearchQueryChange(it) },
-                    placeholder = {
-                        Text(
-                            stringResource(R.string.browse_search_hint),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    trailingIcon = {
-                        IconButton(
-                            onClick = {
+        }
+
+        AnimatedVisibility(visible = isSearchExpanded) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { viewModel.onSearchQueryChange(it) },
+                placeholder = {
+                    Text(
+                        stringResource(R.string.browse_search_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                trailingIcon = {
+                    IconButton(
+                        onClick = {
+                            if (searchQuery.isNotEmpty()) {
                                 viewModel.onSearchQueryChange("")
+                            } else {
                                 isSearchExpanded = false
                             }
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Close Search")
                         }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(54.dp)
-                )
-            }
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close Search")
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            )
         }
 
         // Active Search / Sort / Filter Chip Bar

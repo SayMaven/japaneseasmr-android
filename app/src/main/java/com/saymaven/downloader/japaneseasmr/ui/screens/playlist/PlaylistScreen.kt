@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -112,9 +113,16 @@ fun PlaylistScreen(
         }
     }
 
-    // Tag Filter State (Multi-Tag Support)
+    // Search & Tag Filter State (Multi-Tag Support)
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedTagFilters by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showTagFilterSheet by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = isSearchExpanded) {
+        isSearchExpanded = false
+        searchQuery = ""
+    }
 
     val allLocalTags = remember(playlist) {
         playlist.map { it.genre }
@@ -125,9 +133,15 @@ fun PlaylistScreen(
             .distinct()
     }
 
-    val displayedPlaylist = remember(filteredPlaylist, selectedTagFilters) {
-        if (selectedTagFilters.isEmpty()) filteredPlaylist
-        else {
+    val displayedPlaylist = remember(
+        filteredPlaylist,
+        selectedTagFilters,
+        searchQuery,
+        playlistTranslatedTitles
+    ) {
+        val tagFiltered = if (selectedTagFilters.isEmpty()) {
+            filteredPlaylist
+        } else {
             filteredPlaylist.filter { item ->
                 val itemGenres = item.genre.split(",").map { it.trim() }
                 selectedTagFilters.all { filterTag ->
@@ -135,11 +149,26 @@ fun PlaylistScreen(
                     val filterJp = TagLocalizer.getJapaneseName(filterTag)
                     itemGenres.any { g ->
                         g.equals(filterTag, ignoreCase = true) ||
-                        (filterJp != null && (g.equals(filterJp, ignoreCase = true) || g.contains(filterJp, ignoreCase = true))) ||
-                        TagLocalizer.localize(null, g).equals(filterEn, ignoreCase = true) ||
-                        (filterEn.isNotBlank() && TagLocalizer.localize(null, g).contains(filterEn, ignoreCase = true))
+                            (filterJp != null && (g.equals(filterJp, ignoreCase = true) || g.contains(filterJp, ignoreCase = true))) ||
+                            TagLocalizer.localize(null, g).equals(filterEn, ignoreCase = true) ||
+                            (filterEn.isNotBlank() && TagLocalizer.localize(null, g).contains(filterEn, ignoreCase = true))
                     }
                 }
+            }
+        }
+        val q = searchQuery.trim()
+        if (q.isBlank()) {
+            tagFiltered
+        } else {
+            tagFiltered.filter { item ->
+                val translatedTitle = playlistTranslatedTitles[item.rjid].orEmpty()
+                item.title.contains(q, ignoreCase = true) ||
+                    translatedTitle.contains(q, ignoreCase = true) ||
+                    item.rjid.contains(q, ignoreCase = true) ||
+                    (item.linkedRjId?.contains(q, ignoreCase = true) == true) ||
+                    item.cv.contains(q, ignoreCase = true) ||
+                    item.circle.contains(q, ignoreCase = true) ||
+                    item.genre.contains(q, ignoreCase = true)
             }
         }
     }
@@ -350,6 +379,77 @@ fun PlaylistScreen(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            // Search Toggle Button (far right, matching Jelajah ASMR)
+            IconButton(
+                onClick = {
+                    if (isSearchExpanded) {
+                        isSearchExpanded = false
+                        searchQuery = ""
+                    } else {
+                        isSearchExpanded = true
+                    }
+                },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search",
+                    tint = if (isSearchExpanded || searchQuery.isNotBlank()) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+        }
+
+        AnimatedVisibility(visible = isSearchExpanded) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.browse_search_hint),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                trailingIcon = {
+                    IconButton(
+                        onClick = {
+                            if (searchQuery.isNotEmpty()) {
+                                searchQuery = ""
+                            } else {
+                                isSearchExpanded = false
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.action_close)
+                        )
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            )
         }
 
         // Active Tag Filter Badges (Horizontal scrolling row)
