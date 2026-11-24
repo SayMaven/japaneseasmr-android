@@ -169,7 +169,7 @@ fun HistoryScreen(
                     state = listState,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     items(
                         items = pagedHistory,
@@ -475,7 +475,6 @@ fun HistoryItemCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var showMenu by remember { mutableStateOf(false) }
 
     Card(
         onClick = {
@@ -501,16 +500,16 @@ fun HistoryItemCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.Top
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             HistoryThumb(coverUrl = item.coverUrl, rjid = item.rjid, item = item.entity)
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(
                     text = item.title,
@@ -525,7 +524,11 @@ fun HistoryItemCard(
                     }
                 )
                 Text(
-                    text = "${item.circle} • ${item.downloadDate}",
+                    text = if (item.isPresent) {
+                        "${item.circle} • ${item.downloadDate} • ${item.fileSize}"
+                    } else {
+                        "${item.circle} • ${item.downloadDate}"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -538,38 +541,38 @@ fun HistoryItemCard(
                     if (item.cv.isNotBlank() && item.cv != "-") {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f),
+                            modifier = Modifier.weight(1f, fill = false)
                         ) {
                             Text(
                                 text = item.cv,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (item.isPresent) {
-                            MaterialTheme.colorScheme.surfaceContainerHighest
-                        } else {
-                            MaterialTheme.colorScheme.errorContainer
+                    if (!item.isPresent) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Text(
+                                text = stringResource(R.string.history_status_missing),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
                         }
-                    ) {
-                        Text(
-                            text = if (item.isPresent) item.fileSize else stringResource(R.string.history_status_missing),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (item.isPresent) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.onErrorContainer
-                            },
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.width(4.dp))
 
             HistoryItemActions(
                 isPresent = item.isPresent,
@@ -632,7 +635,7 @@ private fun HistoryThumb(coverUrl: String?, rjid: String, item: HistoryEntity) {
     val context = LocalContext.current
     Box(
         modifier = Modifier
-            .size(84.dp)
+            .size(72.dp)
             .clip(HistoryThumbShape)
     ) {
         if (!coverUrl.isNullOrBlank()) {
